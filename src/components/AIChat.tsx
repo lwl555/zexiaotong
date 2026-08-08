@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { agnesChat, ChatMsg } from '../lib/agnes'
+import { agnesChat, ChatMsg, SearchMeta } from '../lib/agnes'
 import { renderReport, ThemeKey } from './Report'
 import { exportDocx } from '../lib/docx'
 
@@ -26,23 +26,26 @@ export default function AIChat({ title, systemPrompt, placeholder, webSearch, th
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [searchMeta, setSearchMeta] = useState<SearchMeta | null>(null)
   const lastReply = useRef('')
 
   async function send() {
     const text = input.trim()
     if (!text || loading) return
     setError('')
+    setSearchMeta(null)
     const next = [...messages, { role: 'user' as const, content: text }]
     setMessages(next)
     setInput('')
     setLoading(true)
     try {
-      const reply = await agnesChat(
+      const { content, search } = await agnesChat(
         [{ role: 'system', content: systemPrompt }, ...next.map((m): ChatMsg => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }))],
         { webSearch }
       )
-      lastReply.current = reply
-      setMessages([...next, { role: 'ai' as const, content: reply }])
+      setSearchMeta(search ?? null)
+      lastReply.current = content
+      setMessages([...next, { role: 'ai' as const, content }])
     } catch (e: any) {
       setError(String(e?.message || e))
     } finally {
@@ -61,16 +64,22 @@ export default function AIChat({ title, systemPrompt, placeholder, webSearch, th
     <div className={`panel theme-${theme}`}>
       <div className="panel-head">
         <span className="who">{title}</span>
-        {webSearch && <span className="meta">· 深度分析（数据可能非实时）</span>}
+        {webSearch && searchMeta?.ok && (
+          <span className="meta ok">🌐 已联网检索 {searchMeta.count} 条（{searchMeta.sources.join(' · ')}）</span>
+        )}
+        {webSearch && searchMeta && !searchMeta.ok && (
+          <span className="meta warn">⚠️ 联网检索暂不可用，已按模型知识作答</span>
+        )}
+        {webSearch && !searchMeta && !loading && <span className="meta">· 待检索</span>}
         {loading && <span className="meta">· 生成中…</span>}
       </div>
 
       <div className="panel-body">
         {messages.length === 0 && !loading && (
           <div className="note">
-            在下方输入，AI 会基于分析直接给出带颜色标记的结论（优点 / 缺点 / 亮点 / 重点 一目了然）。
+            在下方输入，AI 会<b>先联网检索真实资料</b>，再结合多维度分析给出带颜色标记的结论（优点 / 缺点 / 亮点 / 重点 一目了然），关键事实会标注来源。
             <br />
-            <span className="note-sub">提示：当前为模型知识作答，数据可能非最新，重大决策请以官方最新信息为准。</span>
+            <span className="note-sub">提示：检索来自公开网络，可能不保证 100% 最新；重大决策请以官方最新信息为准。若检索服务暂不可用，会自动降级为模型自身知识作答。</span>
           </div>
         )}
         {messages.map((m, i) => (
@@ -85,7 +94,7 @@ export default function AIChat({ title, systemPrompt, placeholder, webSearch, th
           <div className="msg ai">
             <div className="bubble">
               <div className="loading">
-                <span className="spinner" /> 正在{messages.some((m) => m.role === 'user') ? '拆解分析' : '准备'}…
+                <span className="spinner" /> {webSearch ? '正在联网检索并分析…' : `正在${messages.some((m) => m.role === 'user') ? '拆解分析' : '准备'}…`}
               </div>
             </div>
           </div>

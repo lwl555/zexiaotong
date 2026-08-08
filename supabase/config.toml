@@ -1,0 +1,7 @@
+project_id = "wcnssyiqitugqfmcbdhe"
+
+[functions.agnes-search]
+verify_jwt = false
+
+[functions.agnes-proxy]
+verify_jwt = false

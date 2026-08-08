@@ -17,12 +17,12 @@ export default function DocWorkshop() {
     setLoading(true)
     setResult('')
     try {
-      const reply = await agnesChat(
+      const { content: reply } = await agnesChat(
         [
           { role: 'system', content: PROMPT_DOC_WORKSHOP },
           { role: 'user', content: req }
         ],
-        { maxTokens: 4096 }
+        { maxTokens: 4096, webSearch: true }
       )
       setResult(reply)
       // 尝试从首行 # 标题取文档名

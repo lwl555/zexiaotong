@@ -27,7 +27,7 @@ jobs:
       - run: npm run build
         env:
           # 这些值本就要进入前端 bundle（公开，非机密），故直接内联，避免依赖仓库 Variables/Secrets 配置。
-          VITE_AGNES_BASE: https://wcnssyiqitugqfmcbdhe.functions.supabase.co/agnes-proxy
+          VITE_AGNES_BASE: https://wcnssyiqitugqfmcbdhe.functions.supabase.co/agnes-search
           VITE_SUPABASE_URL: https://wcnssyiqitugqfmcbdhe.supabase.co
           VITE_SUPABASE_ANON: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndjbnNzeWlxaXR1Z3FmbWNiZGhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0MDEyNzUsImV4cCI6MjA5ODk3NzI3NX0.9EfbEr7BQhZtbOwHJ3IrkOy16kcaxlmzuJuV0A2Z8Eg
       - uses: actions/upload-pages-artifact@v3

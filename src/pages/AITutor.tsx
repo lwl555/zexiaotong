@@ -33,12 +33,12 @@ export default function AITutor() {
     setResult('')
     const user = `省份：${form.province}\n科类：${form.kl}\n高考分数：${form.score}\n全省位次：${form.rank || '未知'}\n意向城市：${form.cities || '不限'}\n意向专业方向：${form.majors || '不限'}\n优先考虑因素：${form.factor}\n补充说明：${form.extra || '无'}`
     try {
-      const reply = await agnesChat(
+      const { content: reply } = await agnesChat(
         [
           { role: 'system', content: PROMPT_AI_TUTOR },
           { role: 'user', content: user }
         ],
-        { maxTokens: 4096 }
+        { maxTokens: 4096, webSearch: true }
       )
       setResult(reply)
     } catch (e: any) {

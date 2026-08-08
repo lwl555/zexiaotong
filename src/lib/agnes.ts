@@ -67,15 +67,28 @@ export interface ChatMsg {
 export interface ChatOptions {
   model?: string
   maxTokens?: number
-  /** 开启服务端联网搜索（仅 agnes-proxy 支持；为 true 时函数会先检索再作答） */
+  /** 开启服务端联网搜索（agnes-search 函数支持；为 true 时函数会先检索再作答） */
   webSearch?: boolean
 }
 
-/** OpenAI 兼容 chat/completions，返回纯文本。 */
+/** 函数返回的联网检索元数据（agnes-search 在响应体里附带） */
+export interface SearchMeta {
+  ok: boolean
+  count: number
+  sources: string[]
+}
+
+/** chat 返回：正文 + 可选的检索元数据 */
+export interface ChatResult {
+  content: string
+  search?: SearchMeta
+}
+
+/** OpenAI 兼容 chat/completions，返回正文与检索元数据。 */
 export async function agnesChat(
   messages: ChatMsg[],
   opts: ChatOptions = {}
-): Promise<string> {
+): Promise<ChatResult> {
   const data = await call('/v1/chat/completions', {
     body: {
       model: opts.model || DEFAULT_MODEL,
@@ -85,5 +98,7 @@ export async function agnesChat(
       web_search: opts.webSearch ?? false
     }
   })
-  return (data as any)?.choices?.[0]?.message?.content ?? ''
+  const content = (data as any)?.choices?.[0]?.message?.content ?? ''
+  const search = (data as any)?.search as SearchMeta | undefined
+  return { content, search }
 }
