@@ -10,7 +10,7 @@ const SRC_LABEL: Record<string, string> = {
   'wiki-zh': '维基(中)',
   'wiki-en': '维基(英)',
   ddg: 'DuckDuckGo',
-  tavily: 'Tavily',
+  tavily: '实时检索',
   brave: 'Brave',
   serper: 'Serper'
 }
