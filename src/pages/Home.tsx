@@ -71,7 +71,6 @@ export default function Home() {
             loading="lazy"
             referrerPolicy="no-referrer"
           />
-          <figcaption>真实课堂一隅 · 图源 Wikimedia Commons</figcaption>
         </figure>
         <figure>
           <img
@@ -80,7 +79,6 @@ export default function Home() {
             loading="lazy"
             referrerPolicy="no-referrer"
           />
-          <figcaption>毕业时刻 · 图源 Unsplash</figcaption>
         </figure>
       </section>
 
