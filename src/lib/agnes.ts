@@ -76,6 +76,8 @@ export interface SearchMeta {
   ok: boolean
   count: number
   sources: string[]
+  /** 针对查询实体的真实题图（维基百科），用于报告配图；可能为空 */
+  image?: { url: string; title: string } | null
 }
 
 /** chat 返回：正文 + 可选的检索元数据 */

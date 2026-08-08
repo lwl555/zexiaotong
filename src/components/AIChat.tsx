@@ -34,6 +34,8 @@ interface Props {
 interface Msg {
   role: 'user' | 'ai'
   content: string
+  /** 该条 AI 回复对应的真实题图（学校/实体照片），来自维基百科 */
+  image?: { url: string; title: string } | null
 }
 
 export default function AIChat({ title, systemPrompt, placeholder, webSearch, theme = 'school', exportable, exportName, exportTitle }: Props) {
@@ -60,7 +62,7 @@ export default function AIChat({ title, systemPrompt, placeholder, webSearch, th
       )
       setSearchMeta(search ?? null)
       lastReply.current = content
-      setMessages([...next, { role: 'ai' as const, content }])
+      setMessages([...next, { role: 'ai' as const, content, image: search?.image ?? null }])
     } catch (e: any) {
       setError(String(e?.message || e))
     } finally {
@@ -101,7 +103,19 @@ export default function AIChat({ title, systemPrompt, placeholder, webSearch, th
           <div key={i} className={`msg ${m.role}`}>
             <div className="bubble">
               <div className="role">{m.role === 'user' ? '你' : 'AI'}</div>
-              {m.role === 'user' ? m.content : <div className="report">{renderReport(m.content, theme)}</div>}
+              {m.role === 'user' ? (
+                m.content
+              ) : (
+                <>
+                  {m.image?.url && (
+                    <figure className="lead-photo">
+                      <img src={m.image.url} alt={m.image.title || '配图'} loading="lazy" referrerPolicy="no-referrer" />
+                      <figcaption>配图 · {m.image.title || '真实资料图'}</figcaption>
+                    </figure>
+                  )}
+                  <div className="report">{renderReport(m.content, theme)}</div>
+                </>
+              )}
             </div>
           </div>
         ))}

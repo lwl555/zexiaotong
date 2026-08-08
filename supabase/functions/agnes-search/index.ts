@@ -4,9 +4,10 @@
 //
 // 设计要点：
 //  - 不改动现在能跑的 v9 / Agnes 配置，只是套一层搜索。
-//  - 搜索源：优先用可选密钥（Tavily / Brave / Serper）；否则走零成本兜底
-//    （中文维基 + 英文维基 + DuckDuckGo HTML）。Edge 节点（悉尼）出网不受国内 GFW 限制，
-//    所以即使浏览器在国内，这里也能稳定抓到数据。
+//  - 搜索源：**无需任何外部密钥即可联网**。动态/新闻类（Google News 中文 RSS、
+//    Hacker News、Bing 网页摘要、Reddit 社区）+ 百科类（中文/英文维基 + DuckDuckGo 兜底）。
+//    可选密钥（Tavily / Brave / Serper）仅在配置后启用，作为进一步的质量升级。
+//    Edge 节点（悉尼）出网不受国内 GFW 限制，浏览器在国内也能稳定抓到数据。
 //  - 返回体沿用 OpenAI chat/completions 形状，并额外附带 `search` 字段供前端诚实标注。
 //
 // 部署：
@@ -206,16 +207,128 @@ async function searchDuckDuckGo(q: string): Promise<{ items: string[]; ok: boole
   }
 }
 
+// 维基百科题图（REST summary）：给 AI 报告配「真实学校/实体照片」。
+// 仅作点缀，失败不影响主回答。Edge 节点（悉尼）可稳定访问维基。
+async function fetchLeadImage(q: string): Promise<{ url: string; title: string } | null> {
+  for (const lang of ['zh', 'en'] as const) {
+    try {
+      const url = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(q)}`
+      const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'zexiaotong/1.0 (image)' } }, 6000)
+      if (!r.ok) continue
+      const j = await r.json()
+      const thumb = j?.thumbnail?.source
+      if (thumb) return { url: thumb, title: j?.title || q }
+    } catch {
+      /* ignore */
+    }
+  }
+  return null
+}
+
 interface SearchResult {
   results: string[]
   sources: string[]
   ok: boolean
 }
 
+// —— 动态 / 新闻类（免 key）——
+// Google News 中文 RSS：拿到最新新闻标题与来源，最适合「最新」「近期」「新闻」类查询。
+async function searchGoogleNews(q: string): Promise<{ items: string[]; ok: boolean }> {
+  try {
+    const url =
+      'https://news.google.com/rss/search?q=' +
+      encodeURIComponent(q) +
+      '&hl=zh-CN&gl=CN&ceid=CN:zh-Hans'
+    const r = await fetchWithTimeout(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; zexiaotong/1.0)' }
+    })
+    const xml = await r.text()
+    const items: string[] = []
+    const re = /<item>([\s\S]*?)<\/item>/g
+    let m: RegExpExecArray | null
+    let i = 0
+    while ((m = re.exec(xml)) !== null && i < 6) {
+      const block = m[1]
+      const title = (block.match(/<title>([\s\S]*?)<\/title>/) || [])[1] || ''
+      const src = (block.match(/<source[^>]*>([\s\S]*?)<\/source>/) || [])[1] || ''
+      const t = stripHtml(title).replace(/\s+-\s+[^-]+$/, '') // 去掉末尾 " - 来源"
+      if (t) items.push('- 【新闻】' + t + (src ? `（${stripHtml(src)}）` : ''))
+      i++
+    }
+    return { items, ok: items.length > 0 }
+  } catch {
+    return { items: [], ok: false }
+  }
+}
+
+// Hacker News（Algolia API）：科技 / 创业 / 产品类讨论，JSON 免 key，稳定。
+async function searchHackerNews(q: string): Promise<{ items: string[]; ok: boolean }> {
+  try {
+    const url = 'https://hn.algolia.com/api/v1/search?query=' + encodeURIComponent(q) + '&hitsPerPage=5'
+    const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'zexiaotong/1.0' } })
+    const j = await r.json()
+    const items = (j.hits || [])
+      .slice(0, 5)
+      .map((h: any) => {
+        const pts = h.points != null ? `（👍${h.points}）` : ''
+        const d = h.created_at ? ` ${String(h.created_at).slice(0, 10)}` : ''
+        return `- 【讨论】${stripHtml(h.title || '')}${pts}${d}`
+      })
+    return { items, ok: items.length > 0 }
+  } catch {
+    return { items: [], ok: false }
+  }
+}
+
+// Bing 网页搜索：通用网页摘要，覆盖面广，但偶有反爬挑战页（检测到就跳过）。
+async function searchBing(q: string): Promise<{ items: string[]; ok: boolean }> {
+  try {
+    const url = 'https://www.bing.com/search?q=' + encodeURIComponent(q) + '&setlang=zh-CN&cc=CN'
+    const r = await fetchWithTimeout(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+    })
+    const html = await r.text()
+    if (/verify you are human|CAPTCHA|异常访问|启用 JavaScript|are you a robot/i.test(html)) {
+      return { items: [], ok: false }
+    }
+    const snippets: string[] = []
+    const re = /<li class="b_algo"[\s\S]*?<p[^>]*>([\s\S]*?)<\/p>/g
+    let m: RegExpExecArray | null
+    let i = 0
+    while ((m = re.exec(html)) !== null && i < 6) {
+      const txt = stripHtml(m[1])
+      if (txt && txt.length > 15) snippets.push('- ' + txt.slice(0, 200))
+      i++
+    }
+    return { items: snippets, ok: snippets.length > 0 }
+  } catch {
+    return { items: [], ok: false }
+  }
+}
+
+// Reddit 社区讨论：真实用户观点，对「体验」「口碑」「避雷」类问题有价值。
+async function searchReddit(q: string): Promise<{ items: string[]; ok: boolean }> {
+  try {
+    const url = 'https://www.reddit.com/search.json?q=' + encodeURIComponent(q) + '&limit=5&sort=relevance'
+    const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'zexiaotong/1.0 by researcher' } })
+    const j = await r.json()
+    const items = (j.data?.children || [])
+      .slice(0, 5)
+      .map((c: any) => {
+        const d = c.data || {}
+        const txt = String(d.selftext || d.title || '').slice(0, 180)
+        return `- 【社区】r/${d.subreddit || '?'}：${stripHtml(txt)}`
+      })
+    return { items, ok: items.length > 0 }
+  } catch {
+    return { items: [], ok: false }
+  }
+}
+
 // 多源并发检索，收集任意成功源的结果
 async function searchMulti(query: string): Promise<SearchResult> {
   const tokens = query.split(' ').filter(Boolean)
-  const wikiQueries = Array.from(new Set([query, ...tokens])).slice(0, 4) // 整句 + 分词，多候选回退
+  const wikiQueries = Array.from(new Set([query, ...tokens])).slice(0, 3) // 整句 + 分词，多候选回退
 
   const tasks: Promise<{ items: string[]; ok: boolean; src: string }>[] = []
 
@@ -226,23 +339,33 @@ async function searchMulti(query: string): Promise<SearchResult> {
     tasks.push(s2(p(query), keySrc))
   }
 
-  // 零成本兜底源：维基（中/英）多候选并发，DuckDuckGo 兜底
+  // 动态 / 新闻源（最新信息，优先注入模型上下文）
+  tasks.push(s2(searchGoogleNews(query), 'gnews'))
+  tasks.push(s2(searchHackerNews(query), 'hn'))
+  tasks.push(s2(searchBing(query), 'bing'))
+  tasks.push(s2(searchReddit(query), 'reddit'))
+
+  // 百科兜底源：维基（中/英，多候选并发）+ DuckDuckGo
   for (const c of wikiQueries) tasks.push(s2(searchWikipedia(c, 'zh'), 'wiki-zh'))
   for (const c of wikiQueries) tasks.push(s2(searchWikipedia(c, 'en'), 'wiki-en'))
   tasks.push(s2(searchDuckDuckGo(query), 'ddg'))
 
   const settled = await Promise.all(tasks)
   const sources: string[] = []
-  const results: string[] = []
+  const dyn: string[] = []
+  const wiki: string[] = []
   const seen = new Set<string>()
   for (const s of settled) {
     if (s.ok && s.items.length) {
-      const base = s.src.split(':')[0] // wiki-zh / wiki-en / tavily / brave / serper / ddg
+      const base = s.src.split(':')[0] // gnews / hn / bing / reddit / wiki-zh / wiki-en / ddg / tavily / brave / serper
       if (!sources.includes(base)) sources.push(base)
-      for (const it of s.items) if (!seen.has(it)) { seen.add(it); results.push(it) }
+      const bucket = base === 'wiki-zh' || base === 'wiki-en' || base === 'ddg' ? wiki : dyn
+      for (const it of s.items) if (!seen.has(it)) { seen.add(it); bucket.push(it) }
     }
   }
-  return { results: results.slice(0, 12), sources, ok: results.length > 0 }
+  // 动态源优先（最多 10 条），维基兜底（最多 6 条），合计 16 条上限
+  const merged = [...dyn.slice(0, 10), ...wiki.slice(0, 6)]
+  return { results: merged, sources, ok: merged.length > 0 }
 }
 
 function s2(p: Promise<{ items: string[]; ok: boolean }>, src: string) {
@@ -256,7 +379,11 @@ async function probe(): Promise<Record<string, boolean>> {
   const runs: [string, Promise<{ ok: boolean }>][] = [
     ['wiki-zh', searchWikipedia(q, 'zh')],
     ['wiki-en', searchWikipedia(q, 'en')],
-    ['ddg', searchDuckDuckGo(q)]
+    ['ddg', searchDuckDuckGo(q)],
+    ['gnews', searchGoogleNews(q)],
+    ['hn', searchHackerNews(q)],
+    ['bing', searchBing(q)],
+    ['reddit', searchReddit(q)]
   ]
   if (SEARCH_KEY) runs.push([SEARCH_PROVIDER || 'tavily-key', searchTavily(q)])
   const res = await Promise.all(runs.map(([, p]) => p))
@@ -288,29 +415,36 @@ Deno.serve(async (req: Request) => {
   const sysMessages = messages.filter((m) => m.role === 'system')
   const otherMessages = messages.filter((m) => m.role !== 'system')
 
-  let searchMeta = { ok: false, count: 0, sources: [] as string[] }
+  const rawUser = lastUserText(otherMessages)
+  const query = webSearch ? extractQuery(rawUser) : ''
 
-  if (webSearch) {
-    const rawQuery = lastUserText(otherMessages)
-    const query = extractQuery(rawQuery)
-    if (query) {
-      const ctx = await searchMulti(query)
-      searchMeta = { ok: ctx.ok, count: ctx.results.length, sources: ctx.sources }
-      if (ctx.ok) {
-        sysMessages.push({
-          role: 'system',
-          content:
-            '你具备联网检索能力。以下是针对用户问题实时检索到的资料（来自网络，可能不保证 100% 最新，请批判性采用，优先采信可交叉验证的事实）：\n' +
-            '<search>\n' +
-            ctx.results.join('\n') +
-            '\n</search>\n' +
-            '要求：① 优先依据上述检索资料作答，并在关键事实后用「（来源：xxx）」标注；' +
-            '② 若资料不足以回答，明确说明「未检索到确切信息」，不要编造；' +
-            '③ 涉及排名/分数/政策等易变数据，提醒用户以官方最新公布为准。'
-        })
-      }
+  let searchMeta: { ok: boolean; count: number; sources: string[]; image: { url: string; title: string } | null } = {
+    ok: false,
+    count: 0,
+    sources: [] as string[],
+    image: null
+  }
+
+  if (webSearch && query) {
+    const ctx = await searchMulti(query)
+    searchMeta = { ok: ctx.ok, count: ctx.results.length, sources: ctx.sources, image: null }
+    if (ctx.ok) {
+      sysMessages.push({
+        role: 'system',
+        content:
+          '你具备联网检索能力。以下是针对用户问题实时检索到的资料（来自网络，可能不保证 100% 最新，请批判性采用，优先采信可交叉验证的事实）：\n' +
+          '<search>\n' +
+          ctx.results.join('\n') +
+          '\n</search>\n' +
+          '要求：① 优先依据上述检索资料作答，并在关键事实后用「（来源：xxx）」标注；' +
+          '② 若资料不足以回答，明确说明「未检索到确切信息」，不要编造；' +
+          '③ 涉及排名/分数/政策等易变数据，提醒用户以官方最新公布为准。'
+      })
     }
   }
+
+  // 真实题图（与上游并行获取，失败不影响主回答）
+  const imagePromise = webSearch && query ? fetchLeadImage(query) : Promise.resolve(null)
 
   // 转发给现有 v9（Agnes）
   const upstream = await fetch(`${V9_BASE}/v1/chat/completions`, {
@@ -329,7 +463,8 @@ Deno.serve(async (req: Request) => {
   })
 
   const data = await upstream.json().catch(() => ({}))
-  // 把搜索元数据附到返回体，供前端诚实标注
-  const enriched = { ...data, search: searchMeta }
+  const image = await imagePromise.catch(() => null)
+  // 把搜索元数据（含真实题图）附到返回体，供前端诚实标注与配图
+  const enriched = { ...data, search: { ...searchMeta, image } }
   return json(enriched, upstream.status)
 })

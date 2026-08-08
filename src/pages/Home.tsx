@@ -63,6 +63,27 @@ export default function Home() {
         ))}
       </div>
 
+      <section className="ambient">
+        <figure>
+          <img
+            src="https://upload.wikimedia.org/wikipedia/commons/1/16/5th_Floor_Lecture_Hall.jpg"
+            alt="真实课堂一隅"
+            loading="lazy"
+            referrerPolicy="no-referrer"
+          />
+          <figcaption>真实课堂一隅 · 图源 Wikimedia Commons</figcaption>
+        </figure>
+        <figure>
+          <img
+            src="https://images.unsplash.com/photo-1623461487986-9400110de28e?fm=jpg&q=70&w=1200&auto=format&fit=crop"
+            alt="毕业时刻"
+            loading="lazy"
+            referrerPolicy="no-referrer"
+          />
+          <figcaption>毕业时刻 · 图源 Unsplash</figcaption>
+        </figure>
+      </section>
+
       <div className="disclaimer">
         <b>关于数据：</b>AI 基于公开信息与模型知识作答，未必是最新实时数据。涉及择校、求职、搞钱等重大决策，请以官方招生网、企业官方信息与实地核实为准。
       </div>
