@@ -1,5 +1,20 @@
 import { useState, useRef } from 'react'
 import { agnesChat, ChatMsg, SearchMeta } from '../lib/agnes'
+
+// 检索来源英文 key → 中文友好标签（用于诚实标注展示）
+const SRC_LABEL: Record<string, string> = {
+  gnews: '新闻',
+  hn: '技术讨论',
+  bing: '网页',
+  reddit: '社区',
+  'wiki-zh': '维基(中)',
+  'wiki-en': '维基(英)',
+  ddg: 'DuckDuckGo',
+  tavily: 'Tavily',
+  brave: 'Brave',
+  serper: 'Serper'
+}
+const srcLabel = (s: string) => SRC_LABEL[s] || s
 import { renderReport, ThemeKey } from './Report'
 import { exportDocx } from '../lib/docx'
 
@@ -65,7 +80,7 @@ export default function AIChat({ title, systemPrompt, placeholder, webSearch, th
       <div className="panel-head">
         <span className="who">{title}</span>
         {webSearch && searchMeta?.ok && (
-          <span className="meta ok">🌐 已联网检索 {searchMeta.count} 条（{searchMeta.sources.join(' · ')}）</span>
+          <span className="meta ok">🌐 已联网检索 {searchMeta.count} 条（{searchMeta.sources.map(srcLabel).join(' · ')}）</span>
         )}
         {webSearch && searchMeta && !searchMeta.ok && (
           <span className="meta warn">⚠️ 联网检索暂不可用，已按模型知识作答</span>
