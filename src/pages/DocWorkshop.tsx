@@ -18,7 +18,7 @@ export default function DocWorkshop() {
     setLoading(true)
     setResult('')
     try {
-      const { content: reply } = await agnesChat(
+      const { content: reply, search } = await agnesChat(
         [
           { role: 'system', content: PROMPT_DOC_WORKSHOP + '\n\n' + PROMPT_EMPHASIS },
           { role: 'user', content: req }
@@ -33,7 +33,7 @@ export default function DocWorkshop() {
         pageLabel: '文档工坊',
         question: req,
         answer: reply,
-        search: null,
+        search: search ?? null,
         image: null,
         createdAt: Date.now()
       })

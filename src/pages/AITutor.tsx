@@ -34,7 +34,7 @@ export default function AITutor() {
     setResult('')
     const user = `省份：${form.province}\n科类：${form.kl}\n高考分数：${form.score}\n全省位次：${form.rank || '未知'}\n意向城市：${form.cities || '不限'}\n意向专业方向：${form.majors || '不限'}\n优先考虑因素：${form.factor}\n补充说明：${form.extra || '无'}`
     try {
-      const { content: reply } = await agnesChat(
+      const { content: reply, search } = await agnesChat(
         [
           { role: 'system', content: PROMPT_AI_TUTOR + '\n\n' + PROMPT_EMPHASIS },
           { role: 'user', content: user }
@@ -49,7 +49,7 @@ export default function AITutor() {
         pageLabel: '择校导师',
         question: `高考评估：${form.province} ${form.kl} ${form.score}分（位次${form.rank || '未知'}）意向${form.cities || '不限'}/${form.majors || '不限'}`,
         answer: reply,
-        search: null,
+        search: search ?? null,
         image: null,
         createdAt: Date.now()
       })
