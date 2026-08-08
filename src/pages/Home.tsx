@@ -55,9 +55,69 @@ export default function Home() {
         </div>
         <figure className="hero-figure">
           <img
-            src="https://images.unsplash.com/photo-1523050854058-8df90110c9f1?fm=jpg&q=70&w=1200&auto=format&fit=crop"
+            src="https://images.pexels.com/photos/267885/pexels-photo-267885.jpeg?auto=compress&cs=tinysrgb&w=1200"
             alt="毕业生抛起学士帽"
             loading="lazy"
+            decoding="async"
+            onError={(e) => {
+              // Pexels 万一被 hotlink 限流，自动切到内联 SVG 占位（绝对不破图）
+              const img = e.currentTarget as HTMLImageElement
+              const fig = img.parentElement
+              if (!fig || fig.dataset.fallback === '1') return
+              fig.dataset.fallback = '1'
+              img.style.display = 'none'
+              fig.insertAdjacentHTML(
+                'afterbegin',
+                '<svg class="hero-fallback" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">' +
+                  '<defs>' +
+                    '<linearGradient id="g" x1="0" y1="0" x2="0" y2="1">' +
+                      '<stop offset="0" stop-color="#7a2e0a"/>' +
+                      '<stop offset="1" stop-color="#3a1606"/>' +
+                    '</linearGradient>' +
+                  '</defs>' +
+                  '<rect width="800" height="600" fill="url(#g)"/>' +
+                  // 远景楼群
+                  '<g fill="#1a0a04" opacity="0.55">' +
+                    '<rect x="40" y="280" width="120" height="220"/>' +
+                    '<rect x="170" y="240" width="90" height="260"/>' +
+                    '<rect x="270" y="260" width="100" height="240"/>' +
+                    '<rect x="380" y="220" width="110" height="280"/>' +
+                    '<rect x="500" y="250" width="90" height="250"/>' +
+                    '<rect x="600" y="270" width="120" height="230"/>' +
+                    '<rect x="730" y="240" width="70" height="260"/>' +
+                  '</g>' +
+                  // 楼群窗户（暖黄点光）
+                  '<g fill="#f5c481" opacity="0.6">' +
+                    '<rect x="55" y="310" width="6" height="6"/><rect x="70" y="310" width="6" height="6"/><rect x="85" y="310" width="6" height="6"/><rect x="100" y="310" width="6" height="6"/><rect x="115" y="310" width="6" height="6"/><rect x="130" y="310" width="6" height="6"/>' +
+                    '<rect x="55" y="340" width="6" height="6"/><rect x="70" y="340" width="6" height="6"/><rect x="85" y="340" width="6" height="6"/><rect x="115" y="340" width="6" height="6"/><rect x="130" y="340" width="6" height="6"/>' +
+                    '<rect x="190" y="280" width="6" height="6"/><rect x="205" y="280" width="6" height="6"/><rect x="220" y="280" width="6" height="6"/><rect x="235" y="280" width="6" height="6"/>' +
+                    '<rect x="190" y="320" width="6" height="6"/><rect x="220" y="320" width="6" height="6"/><rect x="235" y="320" width="6" height="6"/>' +
+                    '<rect x="395" y="260" width="6" height="6"/><rect x="410" y="260" width="6" height="6"/><rect x="440" y="260" width="6" height="6"/><rect x="455" y="260" width="6" height="6"/>' +
+                    '<rect x="410" y="300" width="6" height="6"/><rect x="440" y="300" width="6" height="6"/><rect x="470" y="300" width="6" height="6"/>' +
+                    '<rect x="410" y="340" width="6" height="6"/><rect x="440" y="340" width="6" height="6"/>' +
+                    '<rect x="525" y="290" width="6" height="6"/><rect x="540" y="290" width="6" height="6"/><rect x="570" y="290" width="6" height="6"/>' +
+                    '<rect x="540" y="330" width="6" height="6"/><rect x="570" y="330" width="6" height="6"/>' +
+                    '<rect x="620" y="310" width="6" height="6"/><rect x="635" y="310" width="6" height="6"/><rect x="650" y="310" width="6" height="6"/><rect x="680" y="310" width="6" height="6"/><rect x="695" y="310" width="6" height="6"/><rect x="710" y="310" width="6" height="6"/>' +
+                    '<rect x="620" y="345" width="6" height="6"/><rect x="650" y="345" width="6" height="6"/><rect x="680" y="345" width="6" height="6"/><rect x="710" y="345" width="6" height="6"/>' +
+                  '</g>' +
+                  // 抛起的小方块（学士帽抽象）
+                  '<g fill="#f5e9d6">' +
+                    '<rect x="280" y="140" width="22" height="6" rx="1" transform="rotate(15 291 143)"/>' +
+                    '<rect x="420" y="100" width="22" height="6" rx="1" transform="rotate(-22 431 103)"/>' +
+                    '<rect x="540" y="155" width="22" height="6" rx="1" transform="rotate(8 551 158)"/>' +
+                    '<rect x="350" y="195" width="22" height="6" rx="1" transform="rotate(-12 361 198)"/>' +
+                    '<rect x="500" y="210" width="22" height="6" rx="1" transform="rotate(28 511 213)"/>' +
+                    '<rect x="620" y="190" width="22" height="6" rx="1" transform="rotate(-8 631 193)"/>' +
+                  '</g>' +
+                  // 流苏
+                  '<g stroke="#e8d4a8" stroke-width="1.2" opacity="0.85">' +
+                    '<line x1="295" y1="146" x2="297" y2="166"/><line x1="435" y1="106" x2="437" y2="126"/><line x1="555" y1="161" x2="557" y2="181"/><line x1="365" y1="201" x2="367" y2="221"/><line x1="515" y1="216" x2="517" y2="236"/><line x1="635" y1="196" x2="637" y2="216"/>' +
+                  '</g>' +
+                  // 太阳/光源
+                  '<circle cx="680" cy="80" r="42" fill="#f3a25a" opacity="0.55"/>' +
+                '</svg>'
+              )
+            }}
           />
           <figcaption>毕业季 · 每一个选择都值得被认真对待</figcaption>
         </figure>

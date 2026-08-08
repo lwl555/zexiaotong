@@ -246,6 +246,7 @@ a { color: inherit; text-decoration: none; }
   aspect-ratio: 4 / 3; box-shadow: var(--shadow);
 }
 .hero-figure img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.hero-figure .hero-fallback { width: 100%; height: 100%; display: block; }
 .hero-figure figcaption {
   position: absolute; left: 0; right: 0; bottom: 0;
   padding: 28px 16px 14px;
