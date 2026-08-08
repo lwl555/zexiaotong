@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { agnesChat } from '../lib/agnes'
-import { PROMPT_AI_TUTOR } from '../lib/prompts'
+import { PROMPT_AI_TUTOR, PROMPT_EMPHASIS } from '../lib/prompts'
 import { renderReport } from '../components/Report'
+import { addQuery, newId } from '../lib/history'
 
 const provinces = ['北京', '上海', '广东', '江苏', '浙江', '山东', '河南', '河北', '四川', '湖北', '湖南', '福建', '其他']
 const kl = ['理科', '文科', '物理类', '历史类', '综合改革']
@@ -35,12 +36,23 @@ export default function AITutor() {
     try {
       const { content: reply } = await agnesChat(
         [
-          { role: 'system', content: PROMPT_AI_TUTOR },
+          { role: 'system', content: PROMPT_AI_TUTOR + '\n\n' + PROMPT_EMPHASIS },
           { role: 'user', content: user }
         ],
         { maxTokens: 4096, webSearch: true }
       )
       setResult(reply)
+      addQuery({
+        id: newId(),
+        pageKey: 'ai-tutor',
+        channel: 'tutor',
+        pageLabel: '择校导师',
+        question: `高考评估：${form.province} ${form.kl} ${form.score}分（位次${form.rank || '未知'}）意向${form.cities || '不限'}/${form.majors || '不限'}`,
+        answer: reply,
+        search: null,
+        image: null,
+        createdAt: Date.now()
+      })
     } catch (e: any) {
       setError(String(e?.message || e))
     } finally {

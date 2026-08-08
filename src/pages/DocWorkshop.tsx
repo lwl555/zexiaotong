@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { agnesChat } from '../lib/agnes'
-import { PROMPT_DOC_WORKSHOP } from '../lib/prompts'
+import { PROMPT_DOC_WORKSHOP, PROMPT_EMPHASIS } from '../lib/prompts'
 import { renderReport } from '../components/Report'
 import { exportDocx } from '../lib/docx'
+import { addQuery, newId } from '../lib/history'
 
 export default function DocWorkshop() {
   const [req, setReq] = useState('')
@@ -19,12 +20,23 @@ export default function DocWorkshop() {
     try {
       const { content: reply } = await agnesChat(
         [
-          { role: 'system', content: PROMPT_DOC_WORKSHOP },
+          { role: 'system', content: PROMPT_DOC_WORKSHOP + '\n\n' + PROMPT_EMPHASIS },
           { role: 'user', content: req }
         ],
         { maxTokens: 4096, webSearch: true }
       )
       setResult(reply)
+      addQuery({
+        id: newId(),
+        pageKey: 'document-workshop',
+        channel: 'doc',
+        pageLabel: '文档工坊',
+        question: req,
+        answer: reply,
+        search: null,
+        image: null,
+        createdAt: Date.now()
+      })
       // 尝试从首行 # 标题取文档名
       const firstHeading = reply.match(/^#\s+(.+)$/m)
       setTitle(firstHeading ? firstHeading[1] : '文档工坊导出')

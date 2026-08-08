@@ -34,6 +34,19 @@ function stripTag(line: string): string {
   return line.replace(/^(【)?(优点|优势|长处|利好|加分|值得|缺点|劣势|不足|坑|雷|避雷|亮点|好点|推荐|重点|关键|提醒|注意|警告|务必)(】)?[：:]\s*/, '')
 }
 
+function renderInline(text: string): ReactNode[] {
+  if (!text) return []
+  // 解析 **关键短语** → 红色加粗（重要信息自动标红）。其余按原样渲染。
+  const parts = text.split(/(\*\*[^*]+\*\*)/g)
+  const out: ReactNode[] = []
+  parts.forEach((p, i) => {
+    const m = p.match(/^\*\*([^*]+)\*\*$/)
+    if (m) out.push(<strong key={i} className="hot">{m[1]}</strong>)
+    else if (p) out.push(<span key={i}>{p}</span>)
+  })
+  return out
+}
+
 function renderBody(body: string[], si: number): ReactNode {
   const out: ReactNode[] = []
   let para: string[] = []
@@ -41,7 +54,7 @@ function renderBody(body: string[], si: number): ReactNode {
     if (para.length) {
       out.push(
         <p key={`p${si}-${k}`} className="rep-p">
-          {para.join('\n')}
+          {renderInline(para.join('\n'))}
         </p>
       )
       para = []
@@ -58,7 +71,7 @@ function renderBody(body: string[], si: number): ReactNode {
       flush(i)
       out.push(
         <div key={`h${si}-${i}`} className="rep-sub">
-          {h[2]}
+          {renderInline(h[2])}
         </div>
       )
       return
@@ -72,7 +85,7 @@ function renderBody(body: string[], si: number): ReactNode {
       out.push(
         <div key={`i${si}-${i}`} className={`rep-item${showCat ? ' cat-' + showCat : ''}`}>
           {showCat && <span className={`rep-chip cat-${showCat}`}>{CAT_LABEL[showCat]}</span>}
-          <span className="rep-item-text">{stripTag(item)}</span>
+          <span className="rep-item-text">{renderInline(stripTag(item))}</span>
         </div>
       )
       return
@@ -115,7 +128,7 @@ export function renderReport(text: string, theme: ThemeKey = 'school'): ReactNod
   if (leadText) {
     blocks.push(
       <p key="lead" className="rep-lead">
-        {leadText}
+        {renderInline(leadText)}
       </p>
     )
   }
@@ -123,7 +136,7 @@ export function renderReport(text: string, theme: ThemeKey = 'school'): ReactNod
   sections.forEach((s, si) => {
     blocks.push(
       <section key={`s${si}`} className={`rep-section cat-${s.cat}`}>
-        <div className="rep-section-title">{s.title}</div>
+        <div className="rep-section-title">{renderInline(s.title)}</div>
         <div className="rep-section-body">{renderBody(s.body, si)}</div>
       </section>
     )

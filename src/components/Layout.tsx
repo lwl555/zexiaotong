@@ -1,5 +1,6 @@
-import { ReactNode } from 'react'
+import { ReactNode, useState } from 'react'
 import { NavLink } from 'react-router-dom'
+import HistoryDrawer from './HistoryDrawer'
 
 interface Props {
   navItems: { to: string; label: string; end?: boolean }[]
@@ -7,6 +8,7 @@ interface Props {
 }
 
 export default function Layout({ navItems, children }: Props) {
+  const [drawerOpen, setDrawerOpen] = useState(false)
   return (
     <div className="shell">
       <header className="topbar">
@@ -26,6 +28,9 @@ export default function Layout({ navItems, children }: Props) {
                 {n.label}
               </NavLink>
             ))}
+            <button className="nav-history" onClick={() => setDrawerOpen(true)} title="历史对话与查询记录">
+              🕘 历史
+            </button>
           </nav>
         </div>
       </header>
@@ -35,6 +40,8 @@ export default function Layout({ navItems, children }: Props) {
       <footer className="footer">
         <b>择校通</b> · 真实 · 直接 · 不客气 — AI 只说大实话，不粉饰、不回避、不绕弯子。
       </footer>
+
+      <HistoryDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </div>
   )
 }
