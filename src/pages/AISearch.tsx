@@ -15,8 +15,14 @@ export default function AISearch() {
   const [mode, setMode] = useState<ModeKey>('school')
   const cur = MODES.find((m) => m.key === mode)!
 
-  // 从历史「对话记录」点开某会话时，自动切到对应子频道
+  // 从 URL ?tab= 或「聊天大厅 / 历史」pending channel 自动切到对应子频道
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const tab = params.get('tab')
+    if (tab && MODES.some((m) => m.key === tab)) {
+      setMode(tab as ModeKey)
+      return
+    }
     const pc = consumePendingChannel()
     if (pc && MODES.some((m) => m.key === pc)) setMode(pc as ModeKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
