@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>择校通</title>
+  <script>
+    // GitHub Pages SPA fallback：
+    // 任意未匹配路径会触发 404.html，本脚本把原路径存到 sessionStorage，
+    // 再重定向到 /zexiaotong/，让 index.html 的 SPA 接管（main.tsx 会读 sessionStorage 恢复路由）
+    (function () {
+      try {
+        var path = window.location.pathname + window.location.search + window.location.hash;
+        var base = '/zexiaotong';
+        var rel = path.indexOf(base) === 0 ? path.substring(base.length) : path;
+        if (!rel || rel === '/' || rel === '') rel = '/';
+        if (rel !== '/') {
+          sessionStorage.setItem('zxt.spa.redirect', rel);
+        }
+        window.location.replace(base + '/');
+      } catch (e) {
+        window.location.replace('/zexiaotong/');
+      }
+    })();
+  </script>
+</head>
+<body>
+  <noscript>请启用 JavaScript 以使用择校通。</noscript>
+</body>
+</html>
