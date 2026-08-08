@@ -11,21 +11,6 @@ const toolCards = [
   { to: '/about', cls: 'about', ic: 'ℹ️', title: '关于我们', desc: '原则、数据来源、决策边界，一次说清。' }
 ]
 
-const tags = [
-  'AI百事通', '联网实时检索', '直白说优缺点',
-  '查实习', '应届生求职', '社招跳槽',
-  '按城市找工作', '真实案例', '避雷清单'
-]
-
-const scenes = [
-  { ic: '🎓', t: '高考家庭', d: '分数、位次、兴趣、城市——填进来，AI 按冲稳保给出可比较的院校清单，每条都说为什么。' },
-  { ic: '🏢', t: '即将入职 / 跳槽', d: '查公司值不值得去：薪资结构、五险一金、加班、部门差异，一次说清而不是套话。' },
-  { ic: '🌆', t: '换城市找工作', d: '看一个城市的产业、薪资、生活成本、机会点，并和 2-3 个对标城市横向比。' },
-  { ic: '📚', t: '在校生选课 / 转专业', d: '了解学校的真实口碑、食宿、保研与就业去向——哪些数字是注水、哪些是含金量。' },
-  { ic: '📝', t: '做报告 / 写文档', d: '把零散的 AI 输出和联网事实直接生成一份可下载 Word 的报告或简历。' },
-  { ic: '⚠️', t: '记录避雷', d: '把自己的踩坑 / 同学的吐槽一条条加到避雷清单，公共看板累积价值。' }
-]
-
 const features = [
   { f: '联网实时检索', yt: '是', sd: '网页 / 新闻 / 维基 / Tavily', ab: '是' },
   { f: 'AI 综合整理与对比', yt: '是', sd: '横向对比 + 同档定位', ab: '是' },
@@ -37,43 +22,40 @@ const features = [
   { f: '免费', yt: '是', sd: 'Supabase 免费档', ab: '是' }
 ]
 
+const scenes = [
+  { ic: '🎓', t: '高考家庭', d: '分数、位次、兴趣、城市——填进来，AI 按冲稳保给出可比较的院校清单，每条都说为什么。' },
+  { ic: '🏢', t: '即将入职 / 跳槽', d: '查公司值不值得去：薪资结构、五险一金、加班、部门差异，一次说清而不是套话。' },
+  { ic: '🌆', t: '换城市找工作', d: '看一个城市的产业、薪资、生活成本、机会点，并和 2-3 个对标城市横向比。' },
+  { ic: '📚', t: '在校生选课 / 转专业', d: '了解学校的真实口碑、食宿、保研与就业去向——哪些数字是注水、哪些是含金量。' },
+  { ic: '📝', t: '做报告 / 写文档', d: '把零散的 AI 输出和联网事实直接生成一份可下载 Word 的报告或简历。' },
+  { ic: '⚠️', t: '记录避雷', d: '把自己的踩坑 / 同学的吐槽一条条加到避雷清单，公共看板累积价值。' }
+]
+
 export default function Home() {
   return (
     <>
-      {/* 深紫 Hero */}
+      {/* 极简 Hero：只一个装饰方框 */}
       <section className="hero">
         <span className="deco d1" />
-        <span className="deco d2" />
-        <span className="deco d3" />
-        <span className="deco d4" />
-        <span className="deco d5" />
 
         <span className="badge">
           <span className="bolt">⚡</span>
           全面改版 · 新版本
         </span>
         <h1>高校选择工具集</h1>
-        <div className="subt">
-          <span className="item">AI百事通</span>
-          <span className="item">AI择校导师</span>
-          <span className="item">文档工坊</span>
-          <span className="item">搞钱项目</span>
-        </div>
         <p>
-          所有高校选择与摘钱相关工具一目了然。选学校、问导师、做文档、找项目，点一下立刻使用。
+          所有高校选择与搞钱相关工具一目了然。<br />
+          选学校、问导师、做文档、找项目，点一下立刻使用。
         </p>
+        <div className="hero-cta">
+          <Link to="/ai-search?tab=school" className="cta primary">🧭 开始一次查询</Link>
+          <Link to="/ai-tutor" className="cta">🎓 试试择校导师</Link>
+        </div>
       </section>
 
-      {/* 紫色功能标签条 */}
-      <div className="feature-bar">
-        {tags.map((t) => (
-          <span className="ic" key={t}>{t}</span>
-        ))}
-      </div>
-
-      {/* 实时数据条 */}
-      <div className="stats" style={{ marginTop: 28 }}>
-        <div className="stat"><div className="n">8+</div><div className="lbl">在线 AI 工具</div></div>
+      {/* 实时数据条（克制：4 个数字一行） */}
+      <div className="stats">
+        <div className="stat"><div className="n">8+</div><div className="lbl">在线工具</div></div>
         <div className="stat"><div className="n">50%</div><div className="lbl">联网事实 / 50% AI 整理</div></div>
         <div className="stat"><div className="n">5</div><div className="lbl">检索数据源</div></div>
         <div className="stat"><div className="n">7×24</div><div className="lbl">免登录可用</div></div>

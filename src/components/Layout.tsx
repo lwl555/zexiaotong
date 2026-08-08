@@ -1,5 +1,5 @@
-import { ReactNode, useState } from 'react'
-import { NavLink } from 'react-router-dom'
+import { ReactNode, useState, useEffect, useRef } from 'react'
+import { NavLink, useNavigate } from 'react-router-dom'
 import HistoryDrawer from './HistoryDrawer'
 
 interface NavDef {
@@ -11,13 +11,14 @@ interface NavDef {
 }
 
 interface Props {
-  navItems: NavDef[]
+  primaryNav: NavDef[]
+  moreNav: NavDef[]
   children: ReactNode
 }
 
-export default function Layout({ navItems, children }: Props) {
+export default function Layout({ primaryNav, moreNav, children }: Props) {
   const [drawerOpen, setDrawerOpen] = useState(false)
-  // 用户身份 ID（演示用：根据浏览器生成一个稳定值）
+  const [moreOpen, setMoreOpen] = useState(false)
   const [uid] = useState(() => {
     if (typeof window === 'undefined') return '18882632073'
     try {
@@ -32,55 +33,85 @@ export default function Layout({ navItems, children }: Props) {
       return '18882632073'
     }
   })
+  const moreRef = useRef<HTMLDivElement>(null)
+  const nav = useNavigate()
+
+  // 点外面关掉「更多」下拉
+  useEffect(() => {
+    if (!moreOpen) return
+    const onDoc = (e: MouseEvent) => {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) setMoreOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [moreOpen])
 
   return (
     <div className="shell">
       <header className="topbar">
         <div className="topbar-inner">
-          {/* 紫色 logo + 紫色"工具导航"chip */}
-          <div className="topbar-left">
-            <NavLink to="/" className="brand" end>
-              <span className="brand-logo">
-                <span className="brand-logo-dot" />
-                <span className="brand-logo-text">择校通</span>
-              </span>
-            </NavLink>
-            <span className="brand-chip" title="全部工具入口">
-              <span className="brand-chip-ico">❖</span>
-              <span>工具导航</span>
-            </span>
-          </div>
+          {/* 左：极简紫色 logo */}
+          <NavLink to="/" className="brand" end>
+            <span className="brand-mark">择</span>
+            <span className="brand-text">择校通</span>
+          </NavLink>
 
-          {/* 中央：多列深色功能链接（每条 icon + 双行） */}
+          {/* 中：4 个主链接 + 「更多」下拉 */}
           <nav className="nav">
-            {navItems.map((n) => (
+            {primaryNav.map((n) => (
               <NavLink
                 key={n.to}
                 to={n.to}
                 end={n.end}
-                title={n.label}
                 className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}
               >
                 <span className="nav-link-ico">{n.icon}</span>
                 <span className="nav-link-lbl">{n.label}</span>
-                {n.live && <span className="live-dot" title="AI 实时联网检索已接入" />}
+                {n.live && <span className="live-dot" title="AI 实时联网" />}
               </NavLink>
             ))}
+
+            <div className="nav-more" ref={moreRef}>
+              <button
+                className={'nav-link nav-more-btn' + (moreOpen ? ' open' : '')}
+                onClick={() => setMoreOpen((v) => !v)}
+                aria-haspopup="true"
+                aria-expanded={moreOpen}
+              >
+                <span className="nav-link-ico">⋯</span>
+                <span className="nav-link-lbl">更多</span>
+              </button>
+              {moreOpen && (
+                <div className="nav-more-pop">
+                  {moreNav.map((n) => (
+                    <NavLink
+                      key={n.to}
+                      to={n.to}
+                      onClick={() => setMoreOpen(false)}
+                      className={({ isActive }) => 'nav-more-item' + (isActive ? ' active' : '')}
+                    >
+                      <span className="ic">{n.icon}</span>
+                      <span>{n.label}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+            </div>
           </nav>
 
-          {/* 右侧：状态徽标 + 历史 + 紫色 + 红色角标 + uid */}
+          {/* 右：克制 — 历史按钮 + 头像下拉（含 uid） */}
           <div className="topbar-right">
-            <span className="status-pill" title="AI 服务在线，可实时联网检索">
-              <span className="dot-live" />
-              AI 在线
-            </span>
-            <button className="nav-history" onClick={() => setDrawerOpen(true)} title="历史对话与查询记录">
-              🕘 历史
+            <button
+              className="ghost-btn"
+              onClick={() => setDrawerOpen(true)}
+              title="历史对话与查询记录"
+            >
+              <span className="ico">🕘</span>历史
             </button>
-            <span className="badge-purple" title="本站工具集数量（演示）">
-              <span className="num">18</span>
-            </span>
-            <span className="uid">{uid}</span>
+            <div className="avatar" onClick={() => nav('/about')} title="关于本站">
+              兄
+            </div>
+            <span className="uid-hint">{uid}</span>
           </div>
         </div>
       </header>
