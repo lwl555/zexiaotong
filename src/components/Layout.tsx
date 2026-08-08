@@ -19,20 +19,6 @@ interface Props {
 export default function Layout({ primaryNav, moreNav, children }: Props) {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
-  const [uid] = useState(() => {
-    if (typeof window === 'undefined') return '18882632073'
-    try {
-      const k = 'zxt.uid'
-      let v = window.localStorage.getItem(k)
-      if (!v) {
-        v = String(Math.floor(8000000000 + Math.random() * 900000000))
-        window.localStorage.setItem(k, v)
-      }
-      return v
-    } catch {
-      return '18882632073'
-    }
-  })
   const moreRef = useRef<HTMLDivElement>(null)
   const nav = useNavigate()
 
@@ -111,7 +97,6 @@ export default function Layout({ primaryNav, moreNav, children }: Props) {
             <div className="avatar" onClick={() => nav('/about')} title="关于本站">
               兄
             </div>
-            <span className="uid-hint">{uid}</span>
           </div>
         </div>
       </header>

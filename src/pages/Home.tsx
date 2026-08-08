@@ -1,14 +1,19 @@
 import { Link } from 'react-router-dom'
 
 const toolCards = [
-  { to: '/ai-search?tab=school', cls: 'school', ic: '🔍', title: '查院校', desc: '多维度拆解：数据、食堂、住宿、就业、优缺点 全摊开。' },
-  { to: '/ai-search?tab=by-company', cls: 'by-company', ic: '🏢', title: '查公司', desc: '薪资结构、加班、福利、坑点 直接说不编。' },
-  { to: '/ai-search?tab=by-city', cls: 'by-city', ic: '🌆', title: '按城市找工作', desc: '产业 / 薪资 / 房价 / 机会 一站说清。' },
-  { to: '/ai-tutor', cls: 'tutor', ic: '🎯', title: 'AI择校导师', desc: '填分数和位次，AI 按冲稳保三档给具体推荐。' },
-  { to: '/document-workshop', cls: 'workshop', ic: '📝', title: '文档工坊', desc: 'AI 一键生成报告 / 简历 / 避雷清单，导出 Word。' },
-  { to: '/warnings', cls: 'warnings', ic: '⚠️', title: '避雷清单', desc: '记下学校 / 公司的真实缺点，公共看板，人人可加。' },
-  { to: '/money', cls: 'money', ic: '💰', title: '搞钱项目', desc: '兼职 / 副业 / 创业 项目聚合，发现身边真实机会。' },
-  { to: '/about', cls: 'about', ic: 'ℹ️', title: '关于我们', desc: '原则、数据来源、决策边界，一次说清。' }
+  { to: '/ai-search?tab=school', ic: '🔍', title: '查院校', desc: '多维度拆解：数据、食堂、住宿、就业、优缺点 全摊开。' },
+  { to: '/ai-search?tab=by-company', ic: '🏢', title: '查公司', desc: '薪资结构、加班、福利、坑点 直接说不编。' },
+  { to: '/ai-search?tab=by-city', ic: '🌆', title: '按城市找工作', desc: '产业 / 薪资 / 房价 / 机会 一站说清。' },
+  { to: '/ai-tutor', ic: '🎯', title: 'AI择校导师', desc: '填分数和位次，AI 按冲稳保三档给具体推荐。' },
+  { to: '/document-workshop', ic: '📝', title: '文档工坊', desc: 'AI 一键生成报告 / 简历 / 避雷清单，导出 Word。' },
+  { to: '/warnings', ic: '⚠️', title: '避雷清单', desc: '记下学校 / 公司的真实缺点，公共看板，人人可加。' },
+  { to: '/money', ic: '💰', title: '搞钱项目', desc: '兼职 / 副业 / 创业 项目聚合，发现身边真实机会。' },
+  { to: '/about', ic: 'ℹ️', title: '关于我们', desc: '原则、数据来源、决策边界，一次说清。' }
+]
+
+const marqueeItems = [
+  '联网实时检索', 'AI 综合整理与对比', '事实 / AI 整理 双标注', '多轮上下文 + 历史',
+  '导出 Word', '优 / 缺 / 亮 / 重 分类着色', '匿名可用', '完全免费'
 ]
 
 const features = [
@@ -34,51 +39,72 @@ const scenes = [
 export default function Home() {
   return (
     <>
-      {/* 极简 Hero：只一个装饰方框 */}
+      {/* 编辑式 Hero：左文右图，非对称 */}
       <section className="hero">
-        <span className="deco d1" />
-
-        <span className="badge">
-          <span className="bolt">⚡</span>
-          全面改版 · 新版本
-        </span>
-        <h1>高校选择工具集</h1>
-        <p>
-          所有高校选择与搞钱相关工具一目了然。<br />
-          选学校、问导师、做文档、找项目，点一下立刻使用。
-        </p>
-        <div className="hero-cta">
-          <Link to="/ai-search?tab=school" className="cta primary">🧭 开始一次查询</Link>
-          <Link to="/ai-tutor" className="cta">🎓 试试择校导师</Link>
+        <div className="hero-text">
+          <div className="hero-eyebrow">择校通 · 高校与职业决策工具</div>
+          <h1>选学校、挑公司，<br />我们把<span className="em">实话</span>摊在桌面上。</h1>
+          <p className="hero-lead">
+            不粉饰、不绕弯、不回避。关于分数、食堂、薪资、加班这些硬事实，
+            一半来自联网检索的真实资料，一半来自 AI 的整理与对比——每条都标明白，哪句是事实、哪句是判断。
+          </p>
+          <div className="hero-cta">
+            <Link to="/ai-search?tab=school" className="cta primary">🧭 开始一次查询</Link>
+            <Link to="/ai-tutor" className="cta ghost">🎓 试试择校导师</Link>
+          </div>
         </div>
+        <figure className="hero-figure">
+          <img
+            src="https://images.unsplash.com/photo-1523050854058-8df90110c9f1?fm=jpg&q=70&w=1200&auto=format&fit=crop"
+            alt="毕业生抛起学士帽"
+            loading="lazy"
+          />
+          <figcaption>毕业季 · 每一个选择都值得被认真对待</figcaption>
+        </figure>
       </section>
 
-      {/* 实时数据条（克制：4 个数字一行） */}
+      {/* 跑马灯能力条（克制滚动，替代紫渐变条） */}
+      <div className="marquee" aria-hidden="true">
+        <div className="marquee-track">
+          {marqueeItems.map((m, i) => (
+            <span key={`a${i}`}>{m}</span>
+          ))}
+          {marqueeItems.map((m, i) => (
+            <span key={`b${i}`}>{m}</span>
+          ))}
+        </div>
+      </div>
+
+      {/* 实时数据条 */}
       <div className="stats">
-        <div className="stat"><div className="n">8+</div><div className="lbl">在线工具</div></div>
-        <div className="stat"><div className="n">50%</div><div className="lbl">联网事实 / 50% AI 整理</div></div>
+        <div className="stat"><div className="n">8<span className="u">+</span></div><div className="lbl">在线工具</div></div>
+        <div className="stat"><div className="n">50<span className="u">%</span></div><div className="lbl">联网事实 / 50% AI 整理</div></div>
         <div className="stat"><div className="n">5</div><div className="lbl">检索数据源</div></div>
         <div className="stat"><div className="n">7×24</div><div className="lbl">免登录可用</div></div>
       </div>
 
-      {/* 工具卡片网格 */}
+      {/* 工具索引（杂志式编号列表） */}
       <h2 className="section-title">
-        工具一栏 <span className="sub">点开即用 · 所有工具免费</span>
+        <span className="eyebrow">Index</span>工具索引
+        <span className="sub">点开即用 · 全部免费</span>
       </h2>
-      <div className="tool-grid">
-        {toolCards.map((c) => (
-          <Link key={c.title} to={c.to} className={`tool-card ${c.cls}`}>
-            <div className="ic">{c.ic}</div>
-            <h3>{c.title}</h3>
-            <p>{c.desc}</p>
-            <span className="arrow">进入 →</span>
+      <div className="tools-index">
+        {toolCards.map((c, i) => (
+          <Link key={c.title} to={c.to} className="tool-row">
+            <span className="num">{String(i + 1).padStart(2, '0')}</span>
+            <div>
+              <h3>{c.title}</h3>
+              <p className="desc">{c.desc}</p>
+            </div>
+            <span className="go">进入 →</span>
           </Link>
         ))}
       </div>
 
       {/* 横向对比表 */}
       <h2 className="section-title">
-        工具能力 <span className="sub">本站 vs 普通 AI vs 普通搜索</span>
+        <span className="eyebrow">Compare</span>能力对比
+        <span className="sub">本站 vs 普通 AI vs 普通搜索</span>
       </h2>
       <div className="compare">
         <table>
@@ -116,7 +142,8 @@ export default function Home() {
 
       {/* 场景说明 */}
       <h2 className="section-title">
-        谁在用 <span className="sub">覆盖不同人群的真实场景</span>
+        <span className="eyebrow">Who</span>谁在用
+        <span className="sub">覆盖不同人群的真实场景</span>
       </h2>
       <div className="scene-grid">
         {scenes.map((s) => (
