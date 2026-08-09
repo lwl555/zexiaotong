@@ -27,13 +27,15 @@ const SRC_LABEL: Record<string, string> = {
 const srcLabel = (s: string) => SRC_LABEL[s] || s
 import { renderReport, ThemeKey } from './Report'
 import { exportDocx } from '../lib/docx'
-import { PROMPT_EMPHASIS } from '../lib/prompts'
+import { PROMPT_EMPHASIS, SYSTEM_IDENTITY } from '../lib/prompts'
 
 interface Props {
   title: string
   systemPrompt: string
   placeholder: string
   webSearch?: boolean
+  /** 由服务端模型自动判断是否检索（优先级高于 webSearch） */
+  autoSearch?: boolean
   /** 业务主题色：school / by-city / by-company，决定板块与头部配色 */
   theme?: ThemeKey
   /** 功能页标识，用于历史归属：ai-search / ai-tutor / document-workshop */
@@ -62,6 +64,7 @@ export default function AIChat({
   systemPrompt,
   placeholder,
   webSearch,
+  autoSearch,
   theme = 'school',
   pageKey = 'ai-search',
   channel = 'school',
@@ -134,8 +137,8 @@ export default function AIChat({
     abortRef.current = controller
     try {
       const { content, search } = await agnesChat(
-        [{ role: 'system', content: systemPrompt + '\n\n' + PROMPT_EMPHASIS }, ...next.map((m): ChatMsg => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }))],
-        { webSearch, signal: controller.signal }
+        [{ role: 'system', content: `${SYSTEM_IDENTITY}\n\n${systemPrompt}\n\n${PROMPT_EMPHASIS}` }, ...next.map((m): ChatMsg => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }))],
+        { webSearch: (webSearch || autoSearch) ?? false, autoSearch, signal: controller.signal }
       )
       setSearchMeta(search ?? null)
       lastReply.current = content
@@ -205,10 +208,10 @@ export default function AIChat({
           新建对话
         </button>
         {webSearch && searchMeta?.ok && (
-          <span className="meta ok">🌐 已联网检索 {searchMeta.count} 条（{searchMeta.sources.map(srcLabel).join(' · ')}）</span>
+          <span className="meta ok">🌐 已参考 {searchMeta.count} 条公开资料（{searchMeta.sources.map(srcLabel).join(' · ')}）</span>
         )}
         {webSearch && searchMeta && !searchMeta.ok && (
-          <span className="meta warn">⚠️ 联网检索暂不可用，已按模型知识作答</span>
+          <span className="meta warn">⚠️ 公开资料暂时无法获取，已按已有知识作答</span>
         )}
         {webSearch && !searchMeta && !loading && <span className="meta">· 待检索</span>}
         {loading && <span className="meta">· 生成中…</span>}

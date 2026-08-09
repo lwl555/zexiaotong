@@ -1,12 +1,15 @@
 import { useState } from 'react'
 import { agnesChat } from '../lib/agnes'
-import { PROMPT_AI_TUTOR, PROMPT_EMPHASIS } from '../lib/prompts'
+import { PROMPT_AI_TUTOR, PROMPT_EMPHASIS, SYSTEM_IDENTITY } from '../lib/prompts'
 import { renderReport } from '../components/Report'
+import { exportDocx } from '../lib/docx'
 import { addQuery, newId } from '../lib/history'
 
 const provinces = ['北京', '上海', '广东', '江苏', '浙江', '山东', '河南', '河北', '四川', '湖北', '湖南', '福建', '其他']
 const kl = ['理科', '文科', '物理类', '历史类', '综合改革']
 const factors = ['学校层次/名气', '专业就业前景', '城市位置', '录取概率(稳)', '深造/考研', '性价比']
+const batches = ['本科一批', '本科二批', '特控线（强基/综评）', '专科批', '不分批次（新高考）']
+const adjusts = ['服从调剂', '不服从调剂', '视情况而定']
 
 export default function AITutor() {
   const [form, setForm] = useState({
@@ -14,6 +17,8 @@ export default function AITutor() {
     kl: '物理类',
     score: '',
     rank: '',
+    batch: '本科一批',
+    adjust: '服从调剂',
     cities: '',
     majors: '',
     factor: '专业就业前景',
@@ -32,14 +37,14 @@ export default function AITutor() {
     setError('')
     setLoading(true)
     setResult('')
-    const user = `省份：${form.province}\n科类：${form.kl}\n高考分数：${form.score}\n全省位次：${form.rank || '未知'}\n意向城市：${form.cities || '不限'}\n意向专业方向：${form.majors || '不限'}\n优先考虑因素：${form.factor}\n补充说明：${form.extra || '无'}`
+    const user = `省份：${form.province}\n科类：${form.kl}\n高考分数：${form.score}\n全省位次：${form.rank || '未知'}\n填报批次：${form.batch}\n是否服从调剂：${form.adjust}\n意向城市：${form.cities || '不限'}\n意向专业方向：${form.majors || '不限'}\n优先考虑因素：${form.factor}\n补充说明：${form.extra || '无'}`
     try {
       const { content: reply, search } = await agnesChat(
         [
-          { role: 'system', content: PROMPT_AI_TUTOR + '\n\n' + PROMPT_EMPHASIS },
+          { role: 'system', content: `${SYSTEM_IDENTITY}\n\n${PROMPT_AI_TUTOR}\n\n${PROMPT_EMPHASIS}` },
           { role: 'user', content: user }
         ],
-        { maxTokens: 4096, webSearch: true }
+        { maxTokens: 8000, autoSearch: true }
       )
       setResult(reply)
       addQuery({
@@ -103,6 +108,24 @@ export default function AITutor() {
             <label>意向专业方向（逗号分隔）</label>
             <input value={form.majors} placeholder="如 计算机,电子信息" onChange={(e) => set('majors', e.target.value)} />
           </div>
+          <div className="row">
+            <div className="field">
+              <label>填报批次</label>
+              <select value={form.batch} onChange={(e) => set('batch', e.target.value)}>
+                {batches.map((p) => (
+                  <option key={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label>是否服从调剂</label>
+              <select value={form.adjust} onChange={(e) => set('adjust', e.target.value)}>
+                {adjusts.map((p) => (
+                  <option key={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+          </div>
           <div className="field">
             <label>优先考虑因素</label>
             <select value={form.factor} onChange={(e) => set('factor', e.target.value)}>
@@ -135,7 +158,22 @@ export default function AITutor() {
               </div>
             )}
             {error && <div className="err">出错了：{error}</div>}
-            {result && <div className="report theme-school">{renderReport(result, 'school')}</div>}
+            {result && (
+              <>
+                <div className="report theme-school">{renderReport(result, 'school')}</div>
+                <div className="toolbar">
+                  <button className="btn btn-ghost btn-sm" onClick={() => navigator.clipboard.writeText(result).catch(() => {})}>
+                    复制
+                  </button>
+                  <button className="btn btn-primary btn-sm" onClick={() => exportDocx('择校方案', '择校导师推荐', result)}>
+                    导出 Word
+                  </button>
+                  <button className="btn btn-ghost btn-sm" onClick={submit} disabled={loading || !form.score.trim()}>
+                    换一批推荐
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

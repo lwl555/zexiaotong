@@ -72,8 +72,12 @@ export interface ChatMsg {
 export interface ChatOptions {
   model?: string
   maxTokens?: number
-  /** 开启服务端联网搜索（agnes-search 函数支持；为 true 时函数会先检索再作答） */
+  /** 强制开启服务端检索（agnes-search 函数支持；为 true 时函数必定先检索再作答） */
   webSearch?: boolean
+  /** 由服务端模型自动判断是否检索（agnes-search 函数支持；与 webSearch 二选一，优先级高于 webSearch） */
+  autoSearch?: boolean
+  /** 仅返回检索结果、不调用生成模型（agnes-search 函数支持；用于实时资讯台） */
+  searchOnly?: boolean
   /** 外部中断信号（如用户点击「停止生成」） */
   signal?: AbortSignal
 }
@@ -87,10 +91,11 @@ export interface SearchMeta {
   image?: { url: string; title: string } | null
 }
 
-/** chat 返回：正文 + 可选的检索元数据 */
+/** chat 返回：正文 + 可选的检索元数据 + 可选的纯检索结果（search_only 模式） */
 export interface ChatResult {
   content: string
   search?: SearchMeta
+  results?: string[]
 }
 
 /** OpenAI 兼容 chat/completions，返回正文与检索元数据。 */
@@ -104,11 +109,14 @@ export async function agnesChat(
       messages,
       max_tokens: Math.min(opts.maxTokens ?? 8000, 9000),
       stream: false,
-      web_search: opts.webSearch ?? false
+      web_search: opts.webSearch ?? false,
+      auto_search: opts.autoSearch ?? false,
+      search_only: opts.searchOnly ?? false
     },
     signal: opts.signal
   })
   const content = (data as any)?.choices?.[0]?.message?.content ?? ''
   const search = (data as any)?.search as SearchMeta | undefined
-  return { content, search }
+  const results = (data as any)?.results as string[] | undefined
+  return { content, search, results }
 }

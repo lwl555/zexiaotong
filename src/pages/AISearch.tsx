@@ -89,7 +89,7 @@ export default function AISearch() {
         title={cur.label}
         systemPrompt={cur.prompt}
         placeholder={cur.placeholder}
-        webSearch
+        autoSearch
         theme={cur.theme}
         pageKey="ai-search"
         channel={mode}

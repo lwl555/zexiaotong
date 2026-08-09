@@ -372,6 +372,41 @@ function s2(p: Promise<{ items: string[]; ok: boolean }>, src: string) {
   return p.then((r) => ({ ...r, src }))
 }
 
+// —— 检索决策器：让模型判断「这个问题是否需要检索最新公开资料才能准确回答」——
+// 纯历史 / 概念 / 常识 / 数学 / 创作 / 闲聊类无需检索；涉及具体院校 / 公司 / 城市当前信息、
+// 最新政策 / 实时数据 / 新闻类则需要。返回 true 才真正发起多源检索（省额度、降延迟）。
+async function decideSearch(q: string): Promise<boolean> {
+  if (!q) return false
+  try {
+    const r = await fetch(`${V9_BASE}/v1/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${V9_ANON}`
+      },
+      body: JSON.stringify({
+        model: V9_MODEL,
+        max_tokens: 8,
+        temperature: 0,
+        messages: [
+          {
+            role: 'system',
+            content:
+              '你是检索调度器。判断用户问题是否需要检索最新公开资料（院校/公司/城市当前信息、最新政策、实时数据、新闻、招录动态）才能准确回答。纯历史、概念、常识、数学计算、创作、闲聊无需检索。只回复一个词：NEED 或 NO。'
+          },
+          { role: 'user', content: q }
+        ]
+      })
+    })
+    const j = await r.json()
+    const t = String(j?.choices?.[0]?.message?.content || '').toUpperCase()
+    return t.includes('NEED')
+  } catch {
+    // 决策失败则默认检索（保持原行为，不退化成无资料作答）
+    return true
+  }
+}
+
 // 仅探测各源出网情况（调试用，不调用模型）
 async function probe(): Promise<Record<string, boolean>> {
   const q = '清华大学'
@@ -410,13 +445,23 @@ Deno.serve(async (req: Request) => {
   const messages: any[] = body.messages || []
   const maxTokens = Math.min(Math.max(body.max_tokens ?? 2000, 1600), 8192)
   const webSearch = !!body.web_search
+  const autoSearch = !!body.auto_search
+  const searchOnly = !!body.search_only
 
   // 把 system / 非 system 分开，避免污染
   const sysMessages = messages.filter((m) => m.role === 'system')
   const otherMessages = messages.filter((m) => m.role !== 'system')
 
   const rawUser = lastUserText(otherMessages)
-  const query = webSearch ? extractQuery(rawUser) : ''
+  const query = extractQuery(rawUser)
+
+  // 是否需要检索：auto_search 由模型判断；web_search 强制；否则不检索
+  let needSearch = false
+  if (autoSearch) {
+    needSearch = await decideSearch(query)
+  } else if (webSearch) {
+    needSearch = !!query
+  }
 
   let searchMeta: { ok: boolean; count: number; sources: string[]; image: { url: string; title: string } | null } = {
     ok: false,
@@ -424,27 +469,43 @@ Deno.serve(async (req: Request) => {
     sources: [] as string[],
     image: null
   }
+  let rawResults: string[] = []
 
-  if (webSearch && query) {
+  if (needSearch && query) {
     const ctx = await searchMulti(query)
     searchMeta = { ok: ctx.ok, count: ctx.results.length, sources: ctx.sources, image: null }
-    if (ctx.ok) {
+    rawResults = ctx.results
+    if (ctx.ok && !searchOnly) {
       sysMessages.push({
         role: 'system',
         content:
-          '你具备联网检索能力。以下是针对用户问题实时检索到的资料（来自网络，可能不保证 100% 最新，请批判性采用，优先采信可交叉验证的事实）：\n' +
+          '你具备查阅最新公开资料的能力。以下是针对用户问题检索到的资料（来自网络，可能不保证 100% 最新，请批判性采用，优先采信可交叉验证的事实）：\n' +
           '<search>\n' +
           ctx.results.join('\n') +
           '\n</search>\n' +
-          '要求：① 优先依据上述检索资料作答，并在关键事实后用「（来源：xxx）」标注；' +
+          '要求：① 优先依据上述资料作答，并在关键事实后用「（来源：xxx）」标注；' +
           '② 若资料不足以回答，明确说明「未检索到确切信息」，不要编造；' +
           '③ 涉及排名/分数/政策等易变数据，提醒用户以官方最新公布为准。'
       })
     }
   }
 
-  // 真实题图（与上游并行获取，失败不影响主回答）
-  const imagePromise = webSearch && query ? fetchLeadImage(query) : Promise.resolve(null)
+  // 真实题图（与检索并行获取，失败不影响主回答）
+  const imagePromise = needSearch && query ? fetchLeadImage(query) : Promise.resolve(null)
+
+  // —— 实时资讯模式：只返回检索结果，不调用生成模型（低延迟、直接展示来源）——
+  if (searchOnly) {
+    const image = await imagePromise.catch(() => null)
+    return json(
+      {
+        results: rawResults,
+        search: { ...searchMeta, image },
+        // 兼容 OpenAI 形状，避免前端误判
+        choices: [{ message: { content: '' } }]
+      },
+      200
+    )
+  }
 
   // 转发给现有 v9（Agnes）
   const upstream = await fetch(`${V9_BASE}/v1/chat/completions`, {

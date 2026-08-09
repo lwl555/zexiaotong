@@ -705,6 +705,37 @@ textarea { resize: vertical; min-height: 88px; }
 .chip:active { transform: translateY(1px); }
 .followups { margin-top: 16px; }
 
+/* ---------- 实时资讯台（文档工坊改造） ---------- */
+.info-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.info-tabs button {
+  font-family: inherit; font-size: 14px; cursor: pointer; padding: 9px 15px;
+  border-radius: 999px; background: var(--surface); color: var(--ink);
+  border: 1px solid var(--border); transition: all 0.15s ease;
+}
+.info-tabs button:hover { border-color: var(--accent); color: var(--accent); }
+.info-tabs button.active {
+  background: var(--accent); color: #fff; border-color: var(--accent);
+  font-weight: 600; box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.info-search { display: flex; gap: 10px; }
+.info-search input { flex: 1; }
+.info-search .btn { white-space: nowrap; }
+
+/* 检索结果分源展示 */
+.snippets { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.snippet {
+  display: flex; gap: 10px; align-items: flex-start;
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px; padding: 11px 13px; line-height: 1.55;
+}
+.snip-tag {
+  flex: none; font-size: 11px; font-weight: 700; letter-spacing: 0.3px;
+  color: var(--accent); background: var(--accent-soft);
+  padding: 2px 8px; border-radius: 999px; margin-top: 1px; white-space: nowrap;
+}
+.snip-text { font-size: 14px; color: var(--ink); }
+
 /* 停止生成按钮（替代发送按钮，出现于生成中） */
 .btn-stop {
   background: transparent; color: var(--danger);
