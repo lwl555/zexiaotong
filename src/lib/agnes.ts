@@ -26,7 +26,7 @@ function resolveAuthHeaders(): Record<string, string> {
 
 async function call<T = any>(
   path: string,
-  opts: { method?: string; body?: any }
+  opts: { method?: string; body?: any; signal?: AbortSignal }
 ): Promise<T> {
   const base = resolveBase()
   const url = `${base}${path}`
@@ -36,6 +36,11 @@ async function call<T = any>(
   }
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 180_000)
+  // 外部中断（如「停止生成」）：与超时共用一个 controller，任一触发即取消请求
+  if (opts.signal) {
+    if (opts.signal.aborted) controller.abort()
+    else opts.signal.addEventListener('abort', () => controller.abort(), { once: true })
+  }
   try {
     const res = await fetch(url, {
       method: opts.method || 'POST',
@@ -69,6 +74,8 @@ export interface ChatOptions {
   maxTokens?: number
   /** 开启服务端联网搜索（agnes-search 函数支持；为 true 时函数会先检索再作答） */
   webSearch?: boolean
+  /** 外部中断信号（如用户点击「停止生成」） */
+  signal?: AbortSignal
 }
 
 /** 函数返回的联网检索元数据（agnes-search 在响应体里附带） */
@@ -98,7 +105,8 @@ export async function agnesChat(
       max_tokens: Math.min(opts.maxTokens ?? 8000, 9000),
       stream: false,
       web_search: opts.webSearch ?? false
-    }
+    },
+    signal: opts.signal
   })
   const content = (data as any)?.choices?.[0]?.message?.content ?? ''
   const search = (data as any)?.search as SearchMeta | undefined

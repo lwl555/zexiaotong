@@ -690,6 +690,28 @@ textarea { resize: vertical; min-height: 88px; }
 /* 重要信息：加粗 + 标红（模型用 **...** 标记，前端解析） */
 .hot { color: #e11d48; font-weight: 700; }
 
+/* 快捷问题 / 追问 chips（暖编辑风：陶土主题色胶囊，复用 --theme） */
+.chips-wrap { margin-top: 14px; }
+.chips-label { font-size: 12px; color: var(--faint); margin: 2px 0 8px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  font-family: inherit; font-size: 13px; line-height: 1.3; cursor: pointer;
+  padding: 7px 13px; border-radius: 999px; white-space: nowrap;
+  background: var(--surface); color: var(--theme, var(--accent));
+  border: 1px solid color-mix(in srgb, var(--theme, var(--accent)) 32%, transparent);
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
+}
+.chip:hover { background: var(--theme-soft, var(--accent-soft)); border-color: var(--theme, var(--accent)); }
+.chip:active { transform: translateY(1px); }
+.followups { margin-top: 16px; }
+
+/* 停止生成按钮（替代发送按钮，出现于生成中） */
+.btn-stop {
+  background: transparent; color: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 42%, transparent);
+}
+.btn-stop:hover { background: #fef2f2; }
+
 /* ---------- 历史抽屉 ---------- */
 .drawer-mask {
   position: fixed; inset: 0; z-index: 60;

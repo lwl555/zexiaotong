@@ -7,3 +7,5 @@ dist-ssr
 .DS_Store
 .vite
 *.tsbuildinfo
+supabase/.temp/
+

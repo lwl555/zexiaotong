@@ -44,6 +44,10 @@ interface Props {
   exportable?: boolean
   exportName?: string
   exportTitle?: string
+  /** 空白态展示的示例快捷问题（点击直接发送） */
+  examples?: readonly string[]
+  /** AI 回复后展示的追问建议（点击作为下一条提问，沿用上下文） */
+  followups?: readonly string[]
 }
 
 interface Msg {
@@ -63,7 +67,9 @@ export default function AIChat({
   channel = 'school',
   exportable,
   exportName,
-  exportTitle
+  exportTitle,
+  examples,
+  followups
 }: Props) {
   const convId = `${pageKey}:${channel}`
   const [messages, setMessages] = useState<Msg[]>(() => {
@@ -77,6 +83,8 @@ export default function AIChat({
   const [error, setError] = useState('')
   const [searchMeta, setSearchMeta] = useState<SearchMeta | null>(null)
   const lastReply = useRef('')
+  const abortRef = useRef<AbortController | null>(null)
+  const endRef = useRef<HTMLDivElement>(null)
 
   // 切换子频道 / 功能页时，加载对应会话（接着对话）
   useEffect(() => {
@@ -89,6 +97,13 @@ export default function AIChat({
     setError('')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [convId])
+
+  // 新内容出现时自动滚到底部（仅当用户本就在底部附近，避免打断回看历史）
+  useEffect(() => {
+    const nearBottom =
+      window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 160
+    if (nearBottom) endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  }, [messages, loading])
 
   function persist(nextMsgs: Msg[], title: string) {
     const conv: Conversation = {
@@ -103,8 +118,8 @@ export default function AIChat({
     upsertConversation(conv)
   }
 
-  async function send() {
-    const text = input.trim()
+  async function send(override?: string) {
+    const text = (override ?? input).trim()
     if (!text || loading) return
     setError('')
     setSearchMeta(null)
@@ -115,10 +130,12 @@ export default function AIChat({
     persist(next, title)
     setInput('')
     setLoading(true)
+    const controller = new AbortController()
+    abortRef.current = controller
     try {
       const { content, search } = await agnesChat(
         [{ role: 'system', content: systemPrompt + '\n\n' + PROMPT_EMPHASIS }, ...next.map((m): ChatMsg => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }))],
-        { webSearch }
+        { webSearch, signal: controller.signal }
       )
       setSearchMeta(search ?? null)
       lastReply.current = content
@@ -141,13 +158,26 @@ export default function AIChat({
       }
       addQuery(q)
     } catch (e: any) {
+      // 用户主动「停止生成」会触发 AbortError，不当作错误提示
+      if (e?.name === 'AbortError') {
+        setError('')
+        return
+      }
       setError(String(e?.message || e))
     } finally {
       setLoading(false)
+      abortRef.current = null
     }
   }
 
+  function stop() {
+    abortRef.current?.abort()
+    abortRef.current = null
+  }
+
   function newChat() {
+    abortRef.current?.abort()
+    abortRef.current = null
     deleteConversation(convId)
     setMessages([])
     setConvTitle('')
@@ -192,6 +222,18 @@ export default function AIChat({
             <span className="note-sub">提示：检索来自公开网络，可能不保证 100% 最新；重大决策请以官方最新信息为准。若检索服务暂不可用，会自动降级为模型自身知识作答。对话会自动保存，可在右上角「🕘 历史」里接着聊。</span>
           </div>
         )}
+        {messages.length === 0 && !loading && examples && examples.length > 0 && (
+          <div className="chips-wrap">
+            <div className="chips-label">直接点试试：</div>
+            <div className="chips">
+              {examples.map((ex) => (
+                <button key={ex} className="chip" onClick={() => send(ex)}>
+                  {ex}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {messages.map((m, i) => (
           <div key={i} className={`msg ${m.role}`}>
             <div className="bubble">
@@ -223,6 +265,19 @@ export default function AIChat({
         )}
         {error && <div className="err">出错了：{error}</div>}
 
+        {messages.some((m) => m.role === 'ai') && !loading && followups && followups.length > 0 && (
+          <div className="followups">
+            <div className="chips-label">接着深挖：</div>
+            <div className="chips">
+              {followups.map((f) => (
+                <button key={f} className="chip" onClick={() => send(f)}>
+                  {f}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {exportable && lastReply.current && (
           <div className="toolbar">
             <button className="btn btn-ghost btn-sm" onClick={copy}>
@@ -236,6 +291,7 @@ export default function AIChat({
             </button>
           </div>
         )}
+        <div ref={endRef} />
       </div>
 
       <div className="chat-input">
@@ -243,11 +299,17 @@ export default function AIChat({
           value={input}
           placeholder={placeholder}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && send()}
+          onKeyDown={(e) => e.key === 'Enter' && !loading && send()}
         />
-        <button className="btn btn-primary" onClick={send} disabled={loading || !input.trim()}>
-          发送
-        </button>
+        {loading ? (
+          <button className="btn btn-stop" onClick={stop}>
+            停止
+          </button>
+        ) : (
+          <button className="btn btn-primary" onClick={() => send()} disabled={!input.trim()}>
+            发送
+          </button>
+        )}
       </div>
     </div>
   )
