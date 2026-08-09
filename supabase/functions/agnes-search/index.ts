@@ -191,7 +191,9 @@ async function searchDuckDuckGo(q: string): Promise<{ items: string[]; ok: boole
       'https://html.duckduckgo.com/html/?q=' + encodeURIComponent(q),
       { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; zexiaotong/1.0)' } }
     )
-    const html = await r.text()
+    const buf = await r.arrayBuffer()
+    let html = new TextDecoder('utf-8').decode(buf)
+    if (html.includes('�')) { try { html = new TextDecoder('gbk').decode(buf) } catch {} }
     const snippets: string[] = []
     const re = /<a[^>]*class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g
     let m: RegExpExecArray | null
@@ -242,7 +244,9 @@ async function searchGoogleNews(q: string): Promise<{ items: string[]; ok: boole
     const r = await fetchWithTimeout(url, {
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; zexiaotong/1.0)' }
     })
-    const xml = await r.text()
+    const buf = await r.arrayBuffer()
+    let xml = new TextDecoder('utf-8').decode(buf)
+    if (xml.includes('�')) { try { xml = new TextDecoder('gbk').decode(buf) } catch {} }
     const items: string[] = []
     const re = /<item>([\s\S]*?)<\/item>/g
     let m: RegExpExecArray | null
@@ -281,13 +285,18 @@ async function searchHackerNews(q: string): Promise<{ items: string[]; ok: boole
 }
 
 // Bing 网页搜索：通用网页摘要，覆盖面广，但偶有反爬挑战页（检测到就跳过）。
+// 注意：Bing 中文结果可能以 GBK 返回，Deno 默认按 UTF-8 解出乱码，故用 arrayBuffer 双解码兜底。
 async function searchBing(q: string): Promise<{ items: string[]; ok: boolean }> {
   try {
     const url = 'https://www.bing.com/search?q=' + encodeURIComponent(q) + '&setlang=zh-CN&cc=CN'
     const r = await fetchWithTimeout(url, {
       headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
     })
-    const html = await r.text()
+    const buf = await r.arrayBuffer()
+    let html = new TextDecoder('utf-8').decode(buf)
+    if (html.includes('�')) {
+      try { html = new TextDecoder('gbk').decode(buf) } catch { /* keep utf-8 */ }
+    }
     if (/verify you are human|CAPTCHA|异常访问|启用 JavaScript|are you a robot/i.test(html)) {
       return { items: [], ok: false }
     }
@@ -332,7 +341,7 @@ async function searchMulti(query: string): Promise<SearchResult> {
 
   const tasks: Promise<{ items: string[]; ok: boolean; src: string }>[] = []
 
-  // 有密钥则优先用可靠商业源
+  // 有密钥则优先用可靠商业源（Tavily 已配置，覆盖实时检索；中文经模型整理输出，规避上游偶发乱码）
   if (SEARCH_KEY) {
     const keySrc = SEARCH_PROVIDER === 'brave' ? 'brave' : SEARCH_PROVIDER === 'serper' ? 'serper' : 'tavily'
     const p = keySrc === 'brave' ? searchBrave : keySrc === 'serper' ? searchSerper : searchTavily
@@ -342,7 +351,9 @@ async function searchMulti(query: string): Promise<SearchResult> {
   // 动态 / 新闻源（最新信息，优先注入模型上下文）
   tasks.push(s2(searchGoogleNews(query), 'gnews'))
   tasks.push(s2(searchHackerNews(query), 'hn'))
-  tasks.push(s2(searchBing(query), 'bing'))
+  // 注：Bing 中文结果常返回 GBK，而 Edge(Deno) 运行时 TextDecoder 不支持 gbk，
+  // 解出乱码；中文检索已由 tavily(实时) + gnews(新闻) + 维基(百科) 充分覆盖，故移除 Bing。
+  // tasks.push(s2(searchBing(query), 'bing'))
   tasks.push(s2(searchReddit(query), 'reddit'))
 
   // 百科兜底源：维基（中/英，多候选并发）+ DuckDuckGo
@@ -455,9 +466,11 @@ Deno.serve(async (req: Request) => {
   const rawUser = lastUserText(otherMessages)
   const query = extractQuery(rawUser)
 
-  // 是否需要检索：auto_search 由模型判断；web_search 强制；否则不检索
+  // 是否需要检索：search_only 强制检索；auto_search 由模型判断；web_search 强制；否则不检索
   let needSearch = false
-  if (autoSearch) {
+  if (searchOnly) {
+    needSearch = !!query
+  } else if (autoSearch) {
     needSearch = await decideSearch(query)
   } else if (webSearch) {
     needSearch = !!query
