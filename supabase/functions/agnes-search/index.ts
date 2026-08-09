@@ -27,6 +27,13 @@ const V9_ANON =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndjbnNzeWlxaXR1Z3FmbWNiZGhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0MDEyNzUsImV4cCI6MjA5ODk3NzI3NX0.9EfbEr7BQhZtbOwHJ3IrkOy16kcaxlmzuJuV0A2Z8Eg'
 const V9_MODEL = 'agnes-2.0-flash'
 
+// 平台身份指令：在转发 v9 时强制注入到 system 最前，盖掉模型自带的「Agnes / Sapiens AI」
+// 等固有身份，确保所有路径下用户都只看到「择校通助手」，不泄露底层模型/供应商。
+const PLATFORM_IDENTITY = `你是「择校通」平台官方提供的 AI 助手，名字叫「择校通助手」。
+你的职责是帮助用户做择校、求职、搞钱相关的理性决策。
+【绝对纪律】严禁向用户透露你底层的模型名称、技术供应商或开发方（例如不得提及 Agnes、Sapiens、任何大模型或公司名）。
+若用户问你「是什么模型 / 谁开发的 / 你的训练数据」，只能回答：「我是择校通平台的 AI 助手，专门帮你做择校、求职与搞钱决策。」除此之外不要补充任何技术细节。`
+
 const SEARCH_KEY = Deno.env.get('SEARCH_API_KEY') || ''
 const SEARCH_PROVIDER = (Deno.env.get('SEARCH_PROVIDER') || '').toLowerCase()
 
@@ -88,8 +95,39 @@ function extractQuery(text: string): string {
   return q || text.trim()
 }
 
+// —— 检索片段相关性过滤 ——
+// 目的：剔除与问题主体无关的噪声片段（如某次出现的「廪学」乱入），避免污染生成模型。
+// 思路：抽取 query 的「去重汉字集合 + 年份 + 关键领域词」，保留的片段需满足其一：
+//   ① 与 query 共享的汉字数 ≥ 阈值（长 query 需 ≥2，极短 query 需全命中）；
+//   ② 命中 query 中的年份（如 2025）；
+//   ③ 命中 query 与片段共有的关键领域词（录取/薪资/政策…）。
+// 纯英文 / 纯数字 query（无汉字也无年份/关键词）则不做过滤，避免误杀。
+const KEYWORDS = [
+  '录取', '分数', '分数线', '成绩', '薪资', '工资', '待遇', '收入', '月薪', '年薪',
+  '招聘', '政策', '通知', '大学', '学院', '学校', '公司', '企业', '城市', '就业',
+  '专业', '高考', '本科', '专科', '研究生', '考研', '留学', '宿舍', '食堂', '学费',
+  '排名', '公办', '民办', '双一流', '985', '211', '专业组', '位次', '志愿', '批次'
+]
+function relevanceInfo(query: string) {
+  const qcjk = Array.from(new Set((query.match(/[一-龥]/g) || [])))
+  const years = query.match(/(?:19|20)\d{2}/g) || []
+  const kw = KEYWORDS.filter((k) => query.includes(k))
+  return { qcjk, years, kw }
+}
+function isRelevant(snippet: string, info: ReturnType<typeof relevanceInfo>): boolean {
+  if (info.qcjk.length === 0 && info.years.length === 0 && info.kw.length === 0) return true
+  const scjk = new Set((snippet.match(/[一-龥]/g) || []))
+  let shared = 0
+  for (const c of info.qcjk) if (scjk.has(c)) shared++
+  const need = info.qcjk.length <= 2 ? info.qcjk.length : 2
+  if (shared >= need) return true
+  if (info.years.some((y) => snippet.includes(y))) return true
+  if (info.kw.some((k) => snippet.includes(k))) return true
+  return false
+}
+
 // 单次带超时的 fetch
-async function fetchWithTimeout(url: string, opts: RequestInit = {}, ms = 9000): Promise<Response> {
+async function fetchWithTimeout(url: string, opts: RequestInit = {}, ms = 6000): Promise<Response> {
   const ctrl = new AbortController()
   const t = setTimeout(() => ctrl.abort(), ms)
   try {
@@ -366,16 +404,22 @@ async function searchMulti(query: string): Promise<SearchResult> {
   const dyn: string[] = []
   const wiki: string[] = []
   const seen = new Set<string>()
+  const rt = relevanceInfo(query)
   for (const s of settled) {
     if (s.ok && s.items.length) {
       const base = s.src.split(':')[0] // gnews / hn / bing / reddit / wiki-zh / wiki-en / ddg / tavily / brave / serper
       if (!sources.includes(base)) sources.push(base)
       const bucket = base === 'wiki-zh' || base === 'wiki-en' || base === 'ddg' ? wiki : dyn
-      for (const it of s.items) if (!seen.has(it)) { seen.add(it); bucket.push(it) }
+      for (const raw of s.items) {
+        if (raw.includes('�')) continue // 丢弃乱码片段，避免污染生成模型
+        const it = raw.length > 320 ? raw.slice(0, 320) + '…' : raw
+        if (!isRelevant(it, rt)) continue // 丢弃与问题主体无关的噪声片段
+        if (!seen.has(it)) { seen.add(it); bucket.push(it) }
+      }
     }
   }
-  // 动态源优先（最多 10 条），维基兜底（最多 6 条），合计 16 条上限
-  const merged = [...dyn.slice(0, 10), ...wiki.slice(0, 6)]
+  // 动态源优先（最多 12 条），维基兜底（最多 6 条），合计 18 条上限
+  const merged = [...dyn.slice(0, 12), ...wiki.slice(0, 6)]
   return { results: merged, sources, ok: merged.length > 0 }
 }
 
@@ -386,32 +430,73 @@ function s2(p: Promise<{ items: string[]; ok: boolean }>, src: string) {
 // —— 检索决策器：让模型判断「这个问题是否需要检索最新公开资料才能准确回答」——
 // 纯历史 / 概念 / 常识 / 数学 / 创作 / 闲聊类无需检索；涉及具体院校 / 公司 / 城市当前信息、
 // 最新政策 / 实时数据 / 新闻类则需要。返回 true 才真正发起多源检索（省额度、降延迟）。
+// 含具体实体 / 当前信息 / 政策 / 数据的线索词：命中则不应判为「无需检索」
+const ENTITY_KW = [
+  '大学', '学院', '学校', '公司', '企业', '城市', '省份', '省', '市', '县',
+  '政策', '分数线', '分数', '薪资', '工资', '招聘', '新闻', '就业', '专业',
+  '考研', '高考', '留学', '录取', '排名', '公办', '民办', '双一流', '本科', '专科', '202'
+]
+// 本地快检：明显无需检索的纯问题（纯算术 / 问候 / 纯创作 / 纯概念），直接判定「不检索」，
+// 省一次模型往返（模型判断调用在 Edge 内偶发超时，本地快检可兜底常见 trivial 场景，避免无谓检索与延迟）。
+function looksTrivial(q: string): boolean {
+  const t = (q || '').trim()
+  if (!t) return true
+  // 纯符号算术（1+1, 2*3, (1+2) 等）
+  if (new RegExp('^[\\d\\s.+*/=()-]+$').test(t)) return true
+  // 中文算术式：数字 + 运算符 + 数字，如「1加1等于几」「5乘以3是多少」
+  if (/\d+\s*(加|减|乘|除|加上|减去|乘以|除以)\s*\d+/.test(t)) return true
+  // 简单问候 / 致谢 / 闲聊（用字符串构造，避免 \b? 等写法在 Deno 解析下的问题）
+  if (new RegExp('^(你好|您好|hi|hello|hey|在吗|谢谢|感谢|thanks|再见|拜拜|哈喽|嗨)$', 'i').test(t)) return true
+  // 无具体实体线索时，纯创作 / 纯概念定义也无需检索
+  const hasEntity = ENTITY_KW.some((k) => t.includes(k))
+  if (!hasEntity) {
+    // 纯创作：写/作/编/画/翻译 + 创作对象（诗/故事/简历…）
+    if (/(写|作|编|创作|画|翻译|生成|描述).{0,10}(诗|词|故事|笑话|文章|作文|小说|歌|文案|简历|段子|绕口令|祝福语|演讲稿)/.test(t)) return true
+    // 纯概念定义：什么是 / 是什么意思 / 解释 / 怎么理解
+    if (/(什么是|是什么意思|的定义|解释一下|怎么理解|如何理解)/.test(t)) return true
+  }
+  return false
+}
+
 async function decideSearch(q: string): Promise<boolean> {
   if (!q) return false
+  if (looksTrivial(q)) return false
   try {
-    const r = await fetch(`${V9_BASE}/v1/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${V9_ANON}`
-      },
-      body: JSON.stringify({
-        model: V9_MODEL,
-        max_tokens: 8,
-        temperature: 0,
-        messages: [
-          {
+    const r = await fetchWithTimeout(
+      `${V9_BASE}/v1/chat/completions`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${V9_ANON}`
+        },
+        body: JSON.stringify({
+          model: V9_MODEL,
+          max_tokens: 64,
+          temperature: 0,
+          messages: [
+            {
             role: 'system',
             content:
-              '你是检索调度器。判断用户问题是否需要检索最新公开资料（院校/公司/城市当前信息、最新政策、实时数据、新闻、招录动态）才能准确回答。纯历史、概念、常识、数学计算、创作、闲聊无需检索。只回复一个词：NEED 或 NO。'
+              '你是检索调度器。判断用户问题是否需要检索最新公开资料才能准确回答。规则：除非用户问题明显是纯数学计算、纯概念定义、纯闲聊、纯创作（且不涉及任何具体实体/当前信息/政策/数据），否则回复 NEED。当用户提到具体学校/公司/城市/省份/政策/分数线/薪资/招聘/新闻/具体年份/当前事件，必须回复 NEED。只回复一个词：NEED 或 NO。'
           },
-          { role: 'user', content: q }
-        ]
-      })
-    })
+            { role: 'user', content: q }
+          ]
+        })
+      },
+      20000
+    )
     const j = await r.json()
-    const t = String(j?.choices?.[0]?.message?.content || '').toUpperCase()
-    return t.includes('NEED')
+    const msg = j?.choices?.[0]?.message || {}
+    // agnes-2.0-flash 是推理模型：tiny 预算下答案常落在 reasoning_content，content 可能为空。
+    // 同时读取两处，用 NEED / NO 信号判定，避免「content 为空 → 默认检索」的误判。
+    const combined = String(msg.content || '') + ' ' + String(msg.reasoning_content || '')
+    const hasNeed = /NEED|需要检索|必须检索|应.*检索|要检索/i.test(combined)
+    const hasNo = /NO|不需要检索|不检索|无需检索|不必检索/i.test(combined)
+    if (hasNeed) return true
+    if (hasNo) return false
+    // 命中不清则默认检索（保持原行为，不退化成无资料作答）
+    return true
   } catch {
     // 决策失败则默认检索（保持原行为，不退化成无资料作答）
     return true
@@ -520,7 +605,8 @@ Deno.serve(async (req: Request) => {
     )
   }
 
-  // 转发给现有 v9（Agnes）
+  // 转发给现有 v9（Agnes）—— 强制在最前注入平台身份，盖掉模型固有身份
+  sysMessages.unshift({ role: 'system', content: PLATFORM_IDENTITY })
   const upstream = await fetch(`${V9_BASE}/v1/chat/completions`, {
     method: 'POST',
     headers: {
