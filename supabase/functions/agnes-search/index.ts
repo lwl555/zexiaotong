@@ -152,6 +152,29 @@ async function fetchWithTimeout(url: string, opts: RequestInit = {}, ms = 15000)
   }
 }
 
+// ===== 维基图片抓取公用件 =====
+// 说明：Supabase Edge 共享出口 IP 易被维基限流（HTTP 429 Too Many Requests）。
+// 两条对策：① 合并请求（题图+英文标题一次拿，省一次往返）；② 所有维基请求经 wikiGetJSON
+// 走「合规 UA + 429 重试退避」，限流时退避 0.8/1.6/2.4s 后重试，可大幅救回被瞬时限流的请求。
+const WIKI_UA = 'zexiaotong/1.0 (https://lwl555.github.io/zexiaotong; contact: zexiaotong@example.com)'
+
+async function wikiGetJSON(url: string, ms = 15000, retries = 3): Promise<any | null> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const r = await fetchWithTimeout(url, { headers: { 'User-Agent': WIKI_UA, Accept: 'application/json' } }, ms)
+      if (r.status === 429) {
+        await new Promise((res) => setTimeout(res, 800 * (attempt + 1)))
+        continue
+      }
+      if (!r.ok) return null
+      return await r.json()
+    } catch {
+      await new Promise((res) => setTimeout(res, 800 * (attempt + 1)))
+    }
+  }
+  return null
+}
+
 // —— 各搜索源 ——
 
 async function searchTavily(q: string): Promise<{ items: string[]; ok: boolean }> {
@@ -262,51 +285,26 @@ async function searchDuckDuckGo(q: string): Promise<{ items: string[]; ok: boole
   }
 }
 
-// 维基百科题图（REST summary）：给 AI 报告配「真实学校/实体照片」。
-// 仅作点缀，失败不影响主回答。Edge 节点（悉尼）可稳定访问维基。
-// 增强：① 超时放宽到 10s（悉尼→维基偶发慢，6s 常被掐断导致拿不到图）；
-// ② 优先 thumbnail，缺失时回退 originalimage；③ 英文维基回退先用 langlinks
-// 取英文标题（直接拿中文 query 查 en 维基必然 404，故先翻译再取图）。
-async function fetchWikiThumb(lang: 'zh' | 'en', title: string): Promise<{ url: string; title: string } | null> {
-  try {
-    // 用 action API 的 pageimages 拿条目主图：比 REST summary 覆盖更广——
-    // 很多院校/公司条目在 REST summary 下 thumbnail 字段为空，但 pageimages 能拿到 pageimage。
-    // 该端点与已验证可达的 search API 同域同路径风格，悉尼节点稳定。
-    const url =
-      `https://${lang}.wikipedia.org/w/api.php?action=query&format=json` +
-      `&titles=${encodeURIComponent(title)}&prop=pageimages&piprop=thumbnail|original&pithumbsize=640&redirects=1`
-    const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'zexiaotong/1.0 (image)' } }, 15000)
-    if (!r.ok) return null
-    const j = await r.json()
-    const pages = j?.query?.pages || {}
-    for (const k of Object.keys(pages)) {
-      const p = pages[k]
-      const thumb = p?.thumbnail?.source || p?.original?.source
-      if (thumb) return { url: thumb, title: p?.title || title }
-    }
-  } catch {
-    /* ignore */
+// 一次请求同时拿：① 条目主图（pageimages）② 对端语言标题（langlinks）。
+// 合并二者省一次往返，降低对维基的请求数，从而减少 429 触发概率。
+async function fetchLeadAndEn(title: string, lang: 'zh' | 'en'): Promise<{ lead: { url: string; title: string } | null; otherTitle: string | null }> {
+  const otherLang = lang === 'zh' ? 'en' : 'zh'
+  const url =
+    `https://${lang}.wikipedia.org/w/api.php?action=query&format=json` +
+    `&titles=${encodeURIComponent(title)}&prop=pageimages|langlinks` +
+    `&piprop=thumbnail|original&pithumbsize=640&lllang=${otherLang}&lllimit=1&redirects=1`
+  const j = await wikiGetJSON(url)
+  const pages = j?.query?.pages || {}
+  let lead: { url: string; title: string } | null = null
+  let otherTitle: string | null = null
+  for (const k of Object.keys(pages)) {
+    const p = pages[k]
+    const thumb = p?.thumbnail?.source || p?.original?.source
+    if (thumb && !lead) lead = { url: thumb, title: p?.title || title }
+    const ll = (p?.langlinks || [])[0]
+    if (ll && ll['*']) otherTitle = ll['*']
   }
-  return null
-}
-
-// 从中文维基取该条目的英文标题（用于英文维基题图回退）
-async function fetchEnTitle(zhTitle: string): Promise<string | null> {
-  try {
-    const url =
-      'https://zh.wikipedia.org/w/api.php?action=query&format=json' +
-      `&titles=${encodeURIComponent(zhTitle)}&prop=langlinks&lllang=en&lllimit=1`
-    const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'zexiaotong/1.0 (image)' } }, 15000)
-    const j = await r.json()
-    const pages = j?.query?.pages || {}
-    for (const k of Object.keys(pages)) {
-      const ll = (pages[k]?.langlinks || [])[0]
-      if (ll && ll['*']) return ll['*']
-    }
-  } catch {
-    /* ignore */
-  }
-  return null
+  return { lead, otherTitle }
 }
 
 // 从用户原始文本提取最可能的「实体名」，用于题图检索。
@@ -339,15 +337,14 @@ async function fetchWikiImages(lang: 'zh' | 'en', title: string, max = 8): Promi
       `https://${lang}.wikipedia.org/w/api.php?action=query&format=json` +
       `&generator=images&titles=${encodeURIComponent(title)}&gimlimit=50` +
       `&prop=imageinfo&iiprop=url&iiurlwidth=640&redirects=1`
-    const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'zexiaotong/1.0 (image)' } }, 15000)
-    if (!r.ok) return []
-    const j = await r.json()
+    const j = await wikiGetJSON(url)
+    if (!j) return []
     const pages = j?.query?.pages || {}
     // 校园/生活/场景类图片才要；logo/地图/图标/文件类一律跳过。
     // 注意：特意加入「canteen/dormitory/食堂/宿舍/小吃」等**生活类**关键词——
     // 用户诉求是「接地气内部情报」，食堂/宿舍/小吃场景比图书馆/校门更贴合。
-    const SCENE = /(campus|校园|校区|图书馆|library|体育馆|gym|校门|门|楼|building|aerial|航拍|风景|scenery|lake|湖|广场|square|hall|堂|stadium|操场|center|centre|中心|park|园|garden|museum|馆|lab|实验|hospital|医院|bridge|桥|street|街|road|路|全景|panorama|夜景|庄|苑|canteen|dining|dormitory|宿舍|食堂|小吃|restaurant|food|cafe|student|餐|men|kitchen|厨房|snack|coffee)/i
-    const SKIP = /(logo|徽|icon|svg|map|地图|flag|旗|seal|章|question|问号|commons|文件|pdf|audio|ogg|video|play|star|星|symbol|符号|thumb|占位|placeholder|stub|小作品|disambig|消歧|redirect|重定向|模板|template|200px)/i
+  const SCENE = /(campus|校园|校区|图书馆|library|体育馆|gym|校门|门|楼|building|aerial|航拍|风景|scenery|lake|湖|广场|square|hall|堂|stadium|操场|center|centre|中心|park|园|garden|museum|馆|lab|实验|hospital|医院|bridge|桥|street|街|road|路|全景|panorama|夜景|庄|苑|canteen|dining|dormitory|宿舍|食堂|小吃|restaurant|food|cafe|student|餐|men|kitchen|厨房|snack|coffee)/i
+  const SKIP = /(logo|徽|icon|svg|map|地图|flag|旗|seal|章|stamp|印章|question|问号|commons|文件|pdf|audio|ogg|video|play|star|星|symbol|符号|thumb|占位|placeholder|stub|小作品|disambig|消歧|redirect|重定向|模板|template|200px)/i
     const out: { url: string; title: string }[] = []
     for (const k of Object.keys(pages)) {
       const p = pages[k]
@@ -378,11 +375,13 @@ async function fetchCommonsImages(query: string, max = 3): Promise<{ url: string
       `https://commons.wikimedia.org/w/api.php?action=query&format=json` +
       `&generator=search&gsrsearch=${encodeURIComponent(query)}&gsrnamespace=6&gsrlimit=${max}` +
       `&prop=imageinfo&iiprop=url&iiurlwidth=640&redirects=1`
-    const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'zexiaotong/1.0 (image)' } }, 15000)
-    if (!r.ok) return []
-    const j = await r.json()
+    const j = await wikiGetJSON(url)
+    if (!j) return []
     const pages = j?.query?.pages || {}
-    const SKIP = /(logo|icon|svg|map|flag|seal|question|commons|pdf|audio|video|star|symbol|stub|disambig|redirect|template|200px|diagram|graph|chart|emblem|coat|arms)/i
+    // 共享资源鱼龙混杂：既要「强拒噪声」（扫描书封/djvu/档案/印章等），也要「必须命中生活/校园关键词」，
+    // 否则 "Sichuan University canteen" 会搜到无关的旧书籍扫描件（实测出现过工程学会通信录 djvu）。
+    const SKIP = /(logo|icon|svg|map|flag|seal|stamp|章|question|commons|pdf|audio|video|star|symbol|stub|disambig|redirect|template|200px|diagram|graph|chart|emblem|coat|arms|djvu|tif|tiff|scan|book|cover|通信|档案|卷|册|page1|page2|封|影印|索引)/i
+    const REQUIRE = /(canteen|dormitory|食堂|宿舍|小吃|campus|library|student|food|dining|university|college|school|building|hall|gate|yard|apartment|restaurant|meal|kitchen|snack|coffee|咖啡|楼|馆|校|院|园|场)/i
     const out: { url: string; title: string }[] = []
     for (const k of Object.keys(pages)) {
       const p = pages[k]
@@ -392,7 +391,7 @@ async function fetchCommonsImages(query: string, max = 3): Promise<{ url: string
         .replace(/\.(jpg|jpeg|png|gif|svg|webp|JPG)$/i, '')
       const ii = p?.imageinfo?.[0]
       const thumb = ii?.thumburl || ii?.url
-      if (!thumb || SKIP.test(t)) continue
+      if (!thumb || SKIP.test(t) || !REQUIRE.test(t)) continue
       out.push({ url: thumb, title: t })
       if (out.length >= max) break
     }
@@ -405,10 +404,14 @@ async function fetchCommonsImages(query: string, max = 3): Promise<{ url: string
 // 取某实体的「题图 + 场景图」：
 //  - lead：条目主图（中文维基 pageimages，失败回退英文维基 langlinks）
 //  - scenes：条目相关校园/场景图（最多 4 张，过滤掉 logo/地图/图标等）
-async function fetchSchoolImages(entity: string): Promise<{ lead: { url: string; title: string } | null; scenes: { url: string; title: string }[] }> {
-  const enEntity = (await fetchEnTitle(entity)) || entity
-  let lead = await fetchWikiThumb('zh', entity)
-  if (!lead) lead = await fetchWikiThumb('en', enEntity)
+async function fetchSchoolImages(entity: string): Promise<ImgSet> {
+  const zh = await fetchLeadAndEn(entity, 'zh')
+  let lead = zh.lead
+  let enEntity = zh.otherTitle || entity
+  if (!lead && enEntity !== entity) {
+    const en = await fetchLeadAndEn(enEntity, 'en')
+    if (en.lead) lead = en.lead
+  }
 
   const scenes: { url: string; title: string }[] = []
   // 1) 生活类优先：commons 搜「食堂 / 宿舍」相关真实场景图（用户要的接地气内部情报）
@@ -427,6 +430,8 @@ async function fetchSchoolImages(entity: string): Promise<{ lead: { url: string;
   for (const s of wikiScenes) if (!scenes.some((x) => x.url === s.url)) scenes.push(s)
 
   if (lead) scenes = scenes.filter((s) => s.url !== lead!.url)
+  // 主图没拿到（如限流瞬间未命中）但有场景图时，取首图兜底，避免 lead 长期为空
+  if (!lead && scenes.length) lead = scenes[0]
   // 生活类（食堂/宿舍/小吃）排前面，更贴合「接地气内部情报」诉求
   const lifeRe = /(canteen|dining|dormitory|宿舍|食堂|小吃|restaurant|food|cafe|student|餐|kitchen|snack|coffee)/i
   scenes.sort((a, b) => (lifeRe.test(b.title) ? 1 : 0) - (lifeRe.test(a.title) ? 1 : 0))
