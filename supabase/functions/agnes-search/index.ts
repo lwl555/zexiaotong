@@ -429,10 +429,17 @@ async function fetchSchoolImages(entity: string): Promise<ImgSet> {
   }
   for (const s of wikiScenes) if (!scenes.some((x) => x.url === s.url)) scenes.push(s)
 
-  if (lead) scenes = scenes.filter((s) => s.url !== lead!.url)
+  // 用户诉求：只要有「学校门面 / 校门 / 牌坊 / 正门」图，就把它作为主图（lead）最显眼地展示。
+  const gateRe = /(gate|校门|大门|正门|牌坊|entrance|facade|[东南西北]门|main building|front view|正门)/i
+  const gate = scenes.find((s) => gateRe.test(s.title))
+  if (gate) {
+    lead = gate
+    scenes = scenes.filter((s) => s.url !== gate!.url)
+  }
   // 主图没拿到（如限流瞬间未命中）但有场景图时，取首图兜底，避免 lead 长期为空
   if (!lead && scenes.length) lead = scenes[0]
-  // 生活类（食堂/宿舍/小吃）排前面，更贴合「接地气内部情报」诉求
+  else if (lead) scenes = scenes.filter((s) => s.url !== lead!.url)
+  // 生活类（食堂/宿舍/小吃）排前面，更贴合「接地气内部情报」诉求；门面图已作 lead 单独展示
   const lifeRe = /(canteen|dining|dormitory|宿舍|食堂|小吃|restaurant|food|cafe|student|餐|kitchen|snack|coffee)/i
   scenes.sort((a, b) => (lifeRe.test(b.title) ? 1 : 0) - (lifeRe.test(a.title) ? 1 : 0))
   return { lead, scenes: scenes.slice(0, 4) }
@@ -664,6 +671,39 @@ async function probe(): Promise<Record<string, boolean>> {
 }
 
 Deno.serve(async (req: Request) => {
+  // 图片代理：服务端拉取维基图片再回传，绕开维基图床在部分网络下加载失败 / 被墙的问题。
+  // 函数域名（Supabase）国内可访问，比浏览器直连 upload.wikimedia.org 更稳。
+  // 仅放行维基系主机（*.wikipedia.org / *.wikimedia.org），避免被当成公开代理滥用。
+  if (req.method === 'GET') {
+    const reqUrl = new URL(req.url)
+    if (reqUrl.pathname.endsWith('/img')) {
+      const target = reqUrl.searchParams.get('u') || ''
+      let parsed: URL
+      try {
+        parsed = new URL(target)
+      } catch {
+        return new Response('bad url', { status: 400 })
+      }
+      if (!/(wikipedia|wikimedia)\.org$/.test(parsed.hostname)) {
+        return new Response('host not allowed', { status: 403 })
+      }
+      try {
+        const r = await fetch(parsed.toString(), { headers: { 'User-Agent': WIKI_UA } })
+        if (!r.ok) return new Response('upstream ' + r.status, { status: 502 })
+        return new Response(r.body, {
+          status: 200,
+          headers: {
+            'Content-Type': r.headers.get('content-type') || 'image/jpeg',
+            'Cache-Control': 'public, max-age=86400',
+            ...CORS
+          }
+        })
+      } catch {
+        return new Response('fetch failed', { status: 502 })
+      }
+    }
+  }
+
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   if (req.method !== 'POST') return json({ error: 'method not allowed' }, 405)
 

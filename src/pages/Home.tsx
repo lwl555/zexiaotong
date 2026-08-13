@@ -138,7 +138,7 @@ export default function Home() {
       {/* 实时数据条 */}
       <div className="stats">
         <div className="stat"><div className="n">8<span className="u">+</span></div><div className="lbl">在线工具</div></div>
-        <div className="stat"><div className="n">50<span className="u">%</span></div><div className="lbl">联网事实 / 50% AI 整理</div></div>
+        <div className="stat"><div className="n">100<span className="u">%</span></div><div className="lbl">联网检索事实底座 · +50% AI 整理</div></div>
         <div className="stat"><div className="n">5</div><div className="lbl">检索数据源</div></div>
         <div className="stat"><div className="n">7×24</div><div className="lbl">免登录可用</div></div>
       </div>
@@ -216,7 +216,7 @@ export default function Home() {
 
       {/* 免责声明 */}
       <div className="disclaimer">
-        <b>关于数据：</b>答案 = <b>联网检索到的真实事实（约 50%）</b> + <b>AI 自身知识的整理与对比（约 50%）</b>。
+        <b>关于数据：</b>答案 = <b>联网检索到的真实事实（事实底座 100% 来自检索）</b> + <b>AI 自身知识的组织与对比（约 50% 附加值，标【AI 整理】）</b>。
         凡事实均标注来源，凡 AI 自己的判断均标注"AI 整理"，查不到的标"暂无法确认"，绝不编造。
         涉及择校、求职、搞钱等重大决策，请以官方招生网、企业官方信息与实地核实为准。
       </div>

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, type SyntheticEvent } from 'react'
 import { agnesChat, ChatMsg, SearchMeta } from '../lib/agnes'
 import {
   Conversation,
@@ -37,6 +37,29 @@ function sceneLabel(title: string): string {
   if (/(lake|湖|garden|园|park|广场|square|campus|校园|aerial|航拍|panorama)/.test(t)) return '校园风光'
   if (/(hall|堂|center|centre|中心|building|楼|lab|实验|museum|馆|hospital|医院|bridge|桥|street|街|road|路)/.test(t)) return '校园建筑'
   return '校园实景'
+}
+
+// 图片走 Edge Function 代理：服务端拉维基图回传，绕开维基图床在部分网络下加载失败 / 被墙的问题。
+// 开发态（无 VITE_AGNES_BASE）直接用维基原始 URL。
+function imgProxy(url: string): string {
+  const FN = ((import.meta as any).env?.VITE_AGNES_BASE as string | undefined)?.replace(/\/+$/, '') || ''
+  return FN ? `${FN}/img?u=${encodeURIComponent(url)}` : url
+}
+// 图片彻底加载失败时的兜底占位（内联 SVG，避免浏览器破图 icon）
+const IMG_FALLBACK =
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200"><rect width="100%" height="100%" fill="#f1e9e1"/><text x="50%" y="50%" font-size="14" fill="#9a7b5f" text-anchor="middle" dominant-baseline="middle" font-family="sans-serif">图片暂无法加载</text></svg>'
+  )
+// 第一张失败→回退直连维基原图；再失败→占位 SVG
+function onImgError(e: SyntheticEvent<HTMLImageElement>, rawUrl: string) {
+  const el = e.currentTarget
+  if (!el.dataset.tried) {
+    el.dataset.tried = '1'
+    el.src = rawUrl
+  } else {
+    el.src = IMG_FALLBACK
+  }
 }
 
 import { renderReport, ThemeKey } from './Report'
@@ -132,7 +155,7 @@ export default function AIChat({
       pageKey,
       channel,
       title: title || '未命名对话',
-      messages: nextMsgs.map((m) => ({ role: m.role, content: m.content, image: m.image ?? null })),
+      messages: nextMsgs.map((m) => ({ role: m.role, content: m.content, image: m.image ?? null, reasoning: m.reasoning ?? null, images: m.images ?? null })),
       createdAt: convCreated,
       updatedAt: Date.now()
     }
@@ -182,6 +205,7 @@ export default function AIChat({
         search: search ?? null,
         image: search?.image ?? null,
         images: search?.images ?? null,
+        reasoning: reasoning ?? null,
         createdAt: Date.now()
       }
       addQuery(q)
@@ -278,7 +302,8 @@ export default function AIChat({
                 <>
                   {m.image?.url && (
                     <figure className="lead-photo">
-                      <img src={m.image.url} alt={m.image.title || '配图'} loading="lazy" referrerPolicy="no-referrer" />
+                      <img src={imgProxy(m.image.url)} alt={m.image.title || '配图'} loading="lazy" referrerPolicy="no-referrer"
+                        onError={(e) => onImgError(e, m.image!.url)} />
                       <figcaption>配图 · {m.image.title || '真实资料图'}</figcaption>
                     </figure>
                   )}
@@ -292,7 +317,8 @@ export default function AIChat({
                     <div className="scene-strip">
                       {m.images.map((img, i) => (
                         <figure key={i} className="scene-thumb">
-                          <img src={img.url} alt={sceneLabel(img.title)} loading="lazy" referrerPolicy="no-referrer" />
+                          <img src={imgProxy(img.url)} alt={sceneLabel(img.title)} loading="lazy" referrerPolicy="no-referrer"
+                            onError={(e) => onImgError(e, img.url)} />
                           <figcaption>{sceneLabel(img.title)}</figcaption>
                         </figure>
                       ))}

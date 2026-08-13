@@ -21,7 +21,7 @@ export default function About() {
         <h3 style={{ marginTop: 0, fontFamily: 'var(--serif)' }}>我们的原则</h3>
         <ul style={{ paddingLeft: 18, lineHeight: 1.9 }}>
           <li><b>只说大实话</b> —— 不为了流量写"考上就稳了""年薪百万"之类的废话。</li>
-          <li><b>联网与 AI 整理各占一半</b> —— 凡事实，必标来源；凡 AI 自己的判断，必标"AI 整理"。</li>
+          <li><b>事实底座 100% 来自联网检索，AI 仅做组织与对比（约 50% 附加值）</b> —— 凡事实，必标来源；凡 AI 自己的判断，必标"AI 整理"。</li>
           <li><b>查不到的标"暂无法确认"</b> —— 绝不编造比例、人数、分数线、薪资。</li>
           <li><b>多轮对话与历史</b> —— 支持上下文，接着聊，永远在你手边。</li>
         </ul>

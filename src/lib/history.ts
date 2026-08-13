@@ -32,6 +32,8 @@ export interface QueryRecord {
   search?: SearchMeta | null
   image?: { url: string; title: string } | null
   images?: { url: string; title: string }[] | null
+  /** 模型内部思考过程（仅供参考），可空 */
+  reasoning?: string | null
   createdAt: number
 }
 
