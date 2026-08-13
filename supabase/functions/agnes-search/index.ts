@@ -249,18 +249,82 @@ async function searchDuckDuckGo(q: string): Promise<{ items: string[]; ok: boole
 
 // 维基百科题图（REST summary）：给 AI 报告配「真实学校/实体照片」。
 // 仅作点缀，失败不影响主回答。Edge 节点（悉尼）可稳定访问维基。
-async function fetchLeadImage(q: string): Promise<{ url: string; title: string } | null> {
-  for (const lang of ['zh', 'en'] as const) {
-    try {
-      const url = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(q)}`
-      const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'zexiaotong/1.0 (image)' } }, 6000)
-      if (!r.ok) continue
-      const j = await r.json()
-      const thumb = j?.thumbnail?.source
-      if (thumb) return { url: thumb, title: j?.title || q }
-    } catch {
-      /* ignore */
+// 增强：① 超时放宽到 10s（悉尼→维基偶发慢，6s 常被掐断导致拿不到图）；
+// ② 优先 thumbnail，缺失时回退 originalimage；③ 英文维基回退先用 langlinks
+// 取英文标题（直接拿中文 query 查 en 维基必然 404，故先翻译再取图）。
+async function fetchWikiThumb(lang: 'zh' | 'en', title: string): Promise<{ url: string; title: string } | null> {
+  try {
+    // 用 action API 的 pageimages 拿条目主图：比 REST summary 覆盖更广——
+    // 很多院校/公司条目在 REST summary 下 thumbnail 字段为空，但 pageimages 能拿到 pageimage。
+    // 该端点与已验证可达的 search API 同域同路径风格，悉尼节点稳定。
+    const url =
+      `https://${lang}.wikipedia.org/w/api.php?action=query&format=json` +
+      `&titles=${encodeURIComponent(title)}&prop=pageimages&piprop=thumbnail|original&pithumbsize=640&redirects=1`
+    const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'zexiaotong/1.0 (image)' } }, 10000)
+    if (!r.ok) return null
+    const j = await r.json()
+    const pages = j?.query?.pages || {}
+    for (const k of Object.keys(pages)) {
+      const p = pages[k]
+      const thumb = p?.thumbnail?.source || p?.original?.source
+      if (thumb) return { url: thumb, title: p?.title || title }
     }
+  } catch {
+    /* ignore */
+  }
+  return null
+}
+
+// 从中文维基取该条目的英文标题（用于英文维基题图回退）
+async function fetchEnTitle(zhTitle: string): Promise<string | null> {
+  try {
+    const url =
+      'https://zh.wikipedia.org/w/api.php?action=query&format=json' +
+      `&titles=${encodeURIComponent(zhTitle)}&prop=langlinks&lllang=en&lllimit=1`
+    const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'zexiaotong/1.0 (image)' } }, 10000)
+    const j = await r.json()
+    const pages = j?.query?.pages || {}
+    for (const k of Object.keys(pages)) {
+      const ll = (pages[k]?.langlinks || [])[0]
+      if (ll && ll['*']) return ll['*']
+    }
+  } catch {
+    /* ignore */
+  }
+  return null
+}
+
+// 从用户原始文本提取最可能的「实体名」，用于题图检索。
+// 维基 pageimages 需要精确标题，不能直接用检索 query——后者是去停用词后的长串残留
+// （如「四大板块详细分析浙江大学」），查维基会 missing 拿不到图。
+// 从用户原始文本提取最可能的「实体名」，用于题图检索。
+// 维基 pageimages 需要精确标题，不能直接用检索 query（去停用词后的长串残留）。
+// 做法：先复用 extractQuery 把指令词（如「分析」）替换成空格，使「浙江大学」成为独立
+// token，再从清洗后的 token 里挑末尾带实体后缀的短 token。比脆弱的正则重叠匹配稳得多。
+function extractEntity(text: string): string {
+  const cleaned = extractQuery(text || '')
+  const tokens = cleaned.split(/\s+/).filter(Boolean)
+  for (const tok of tokens) {
+    if (/(大学|学院|学校|公司|企业|集团|医院|银行|电视台|日报|市|省|县|新区)$/.test(tok) && tok.length <= 8) {
+      return tok
+    }
+  }
+  // 退路：直接从清洗文本抓「≤6 汉字 + 后缀」
+  const m = cleaned.match(/[一-龥]{1,6}(大学|学院|学校|公司|企业|集团|医院|银行|电视台|日报|市|省|县|新区)/)
+  if (m) return m[0]
+  const han = tokens.filter((x) => /^[一-龥]+$/.test(x)).sort((a, b) => b.length - a.length)
+  return han[0] || (text || '').trim()
+}
+
+async function fetchLeadImage(q: string): Promise<{ url: string; title: string } | null> {
+  // 1) 中文维基精确匹配（最稳，覆盖绝大多数中国院校/公司/城市）
+  const zh = await fetchWikiThumb('zh', q)
+  if (zh) return zh
+  // 2) 英文维基回退：先经 langlinks 取英文标题，再取题图（直接拿中文 query 查 en 维基会 404）
+  const enTitle = await fetchEnTitle(q)
+  if (enTitle) {
+    const en = await fetchWikiThumb('en', enTitle)
+    if (en) return en
   }
   return null
 }
@@ -589,7 +653,7 @@ Deno.serve(async (req: Request) => {
   }
 
   // 真实题图（与检索并行获取，失败不影响主回答）
-  const imagePromise = needSearch && query ? fetchLeadImage(query) : Promise.resolve(null)
+  const imagePromise = needSearch && rawUser ? fetchLeadImage(extractEntity(rawUser)) : Promise.resolve(null)
 
   // —— 实时资讯模式：只返回检索结果，不调用生成模型（低延迟、直接展示来源）——
   if (searchOnly) {
