@@ -80,12 +80,14 @@ function stripHtml(s: string): string {
 // 例：「用三句话介绍浙江大学，并说明它的一个明显优点和一个明显缺点」→「浙江大学」
 const QUERY_STOP = [
   '请用', '请', '帮我', '分析一下', '分析', '评估', '推荐', '查一下', '查询', '查', '看一下', '看看',
-  '介绍', '说明', '对比', '比较', '总结', '生成', '写', '用三句话', '用一句话', '简述', '概述',
+  '介绍',   '说明', '对比', '比较', '总结', '生成', '写', '用三句话', '用一句话', '简述', '概述',
   '说一下', '讲讲', '谈谈', '说大实话', '直说', '拆解', '深度', '维度', '多维度', '核心', '主要',
   '包括', '包含', '关于', '针对', '对于', '明显', '真实信息', '情况', '怎么样', '如何',
   '是否', '吗', '呢', '的', '了', '我', '我们', '想', '要', '需要', '一份', '报告', '简历',
-  '并', '和', '与', '及', '它', '他们', '一个', '一些', '这个', '那个', '该', '院校', '学校', '公司', '城市', '找工作', '就业', '优缺点', '优点', '缺点', '亮点', '重点', '避雷', '坑'
+  '该', '院校', '学校', '公司', '城市', '找工作', '就业', '优缺点', '优点', '缺点', '亮点', '重点', '避雷', '坑'
 ]
+// 注意：「并 / 和 / 与 / 及」是连接词，不是停用词，删了会破坏实体识别（如「宿舍和食堂」变「宿舍 食堂」，
+// 让 AI 把检索关键词误当作用户原话引用，参见 2026-08-13 截图 bug）。从 QUERY_STOP 中移除。
 function extractQuery(text: string): string {
   let q = text || ''
   q = q.replace(/[「」『』""''【】\[\]（）()《》<>]/g, ' ')
@@ -102,26 +104,39 @@ function extractQuery(text: string): string {
 //   ② 命中 query 中的年份（如 2025）；
 //   ③ 命中 query 与片段共有的关键领域词（录取/薪资/政策…）。
 // 纯英文 / 纯数字 query（无汉字也无年份/关键词）则不做过滤，避免误杀。
-const KEYWORDS = [
-  '录取', '分数', '分数线', '成绩', '薪资', '工资', '待遇', '收入', '月薪', '年薪',
-  '招聘', '政策', '通知', '大学', '学院', '学校', '公司', '企业', '城市', '就业',
-  '专业', '高考', '本科', '专科', '研究生', '考研', '留学', '宿舍', '食堂', '学费',
-  '排名', '公办', '民办', '双一流', '985', '211', '专业组', '位次', '志愿', '批次'
+// 真有区分力的「具体数据/事实线索词」。**不放通用领域词**（「大学/公司/城市/就业」太宽，
+// 任何财经/职场/政策文章都可能提一嘴「大学」「公司」「就业」，命中就过审会漏掉真正的无关噪声）。
+const STOP_HAN = new Set('的了是我你他她它们这那一个一些这个那个和与及并或也都很就还把被让使给从到在'.split(''))
+const DOMAIN_KW = [
+  '录取', '分数线', '投档', '调档', '位次', '批次', '志愿',
+  '薪资', '年薪', '月薪', '起薪', '工资', '待遇',
+  '保研', '保研率', '考研率',
+  '学费', '住宿费', '住宿', '食堂', '宿舍', '澡堂', '浴室',
+  '公办', '民办', '双一流', '985', '211', '一本', '二本', '专科',
+  '校招', '社招', 'offer', '裁员', '应届',
+  '高考', '留学', '深造率'
 ]
 function relevanceInfo(query: string) {
-  const qcjk = Array.from(new Set((query.match(/[一-龥]/g) || [])))
+  // 主体 token：query 中的连续汉字串（去单字停用词），保留原序作为短句单元
+  const tokens = (query.match(/[一-龥]+/g) || []).filter((t) => t.length >= 2 && ![...t].every((c) => STOP_HAN.has(c)))
   const years = query.match(/(?:19|20)\d{2}/g) || []
-  const kw = KEYWORDS.filter((k) => query.includes(k))
-  return { qcjk, years, kw }
+  const kw = DOMAIN_KW.filter((k) => query.includes(k))
+  return { tokens, years, kw }
 }
 function isRelevant(snippet: string, info: ReturnType<typeof relevanceInfo>): boolean {
-  if (info.qcjk.length === 0 && info.years.length === 0 && info.kw.length === 0) return true
-  const scjk = new Set((snippet.match(/[一-龥]/g) || []))
-  let shared = 0
-  for (const c of info.qcjk) if (scjk.has(c)) shared++
-  const need = info.qcjk.length <= 2 ? info.qcjk.length : 2
-  if (shared >= need) return true
+  // query 没提取出任何有意义 token（纯数字/英文/太碎）：不过滤，避免误杀
+  if (info.tokens.length === 0 && info.years.length === 0 && info.kw.length === 0) return true
+  // 0) 强相关：snippet 直接包含 query 完整主体（去空格拼接），直接过
+  const flat = info.tokens.join('')
+  if (flat && flat.length >= 2 && snippet.includes(flat)) return true
+  // 1) 短语匹配：snippet 必须包含 query 中某个 token 的**完整连续子串**（非单字命中），
+  //    且该 token 至少 2 汉字（避免「美/大/学」这种单字高频字混入误判）
+  for (const tok of info.tokens) {
+    if (tok.length >= 2 && snippet.includes(tok)) return true
+  }
+  // 2) 弱相关兜底：query 含明确年份，snippet 也含该年份
   if (info.years.some((y) => snippet.includes(y))) return true
+  // 3) 弱相关兜底：query 含具体数据线索词，snippet 也含该词
   if (info.kw.some((k) => snippet.includes(k))) return true
   return false
 }
@@ -641,13 +656,16 @@ Deno.serve(async (req: Request) => {
       sysMessages.push({
         role: 'system',
         content:
-          '你具备查阅最新公开资料的能力。以下是针对用户问题检索到的资料（来自网络，可能不保证 100% 最新，请批判性采用，优先采信可交叉验证的事实）：\n' +
+          '你具备查阅最新公开资料的能力。\n' +
+          `【用户原话】${rawUser}\n` +
+          '以下是针对用户原话检索到的资料（来自网络，可能不保证 100% 最新，请批判性采用，优先采信可交叉验证的事实）：\n' +
           '<search>\n' +
           ctx.results.join('\n') +
           '\n</search>\n' +
           '要求：① 优先依据上述资料作答，并在关键事实后用「（来源：xxx）」标注；' +
           '② 若资料不足以回答，明确说明「未检索到确切信息」，不要编造；' +
-          '③ 涉及排名/分数/政策等易变数据，提醒用户以官方最新公布为准。'
+          '③ 涉及排名/分数/政策等易变数据，提醒用户以官方最新公布为准；' +
+          '④ 引用用户原话时务必使用上面【用户原话】字段里的完整字句，不要把检索片段里的 query 拼接词当成用户原话。'
       })
     }
   }
