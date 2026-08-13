@@ -213,8 +213,14 @@ export default function AIChat({
         {(webSearch || autoSearch) && searchMeta && !searchMeta.ok && (
           <span className="meta warn">⚠️ 公开资料暂时无法获取，已按已有知识作答</span>
         )}
-        {(webSearch || autoSearch) && !searchMeta && !loading && <span className="meta">· 待检索</span>}
-        {loading && <span className="meta">· 生成中…</span>}
+        {(webSearch || autoSearch) && !searchMeta && !loading && (
+          <span className="meta">· {autoSearch ? 'AI 将自动判断是否联网检索' : '待检索'}</span>
+        )}
+        {loading && (
+          <span className="meta">
+            🌐 {(webSearch || autoSearch) ? '正在联网检索并分析最新资料…' : '生成中…'}
+          </span>
+        )}
       </div>
 
       <div className="panel-body">
@@ -261,7 +267,7 @@ export default function AIChat({
           <div className="msg ai">
             <div className="bubble">
               <div className="loading">
-                <span className="spinner" /> {webSearch ? '正在联网检索并分析…' : `正在${messages.some((m) => m.role === 'user') ? '拆解分析' : '准备'}…`}
+                <span className="spinner" /> {webSearch || autoSearch ? '🌐 正在联网检索并分析最新资料…' : `正在${messages.some((m) => m.role === 'user') ? '拆解分析' : '准备'}…`}
               </div>
             </div>
           </div>
