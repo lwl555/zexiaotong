@@ -22,7 +22,7 @@ const ROUTE_TITLES: Record<string, string> = {
 
 // 顶部主导航（克制：4 个核心）
 export const primaryNav: { to: string; label: string; icon: string; live?: boolean; end?: boolean }[] = [
-  { to: '/', label: '首页', icon: '🏠', end: true },
+  { to: '/', label: '首页', icon: '', end: true },
   { to: '/ai-search', label: 'AI百事通', icon: '🧭', live: true },
   { to: '/ai-tutor', label: 'AI择校导师', icon: '', live: true },
   { to: '/document-workshop', label: '文档工坊', icon: '', live: true }

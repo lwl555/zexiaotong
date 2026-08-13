@@ -4,7 +4,7 @@ const toolCards = [
   { to: '/ai-search?tab=school', ic: '🔍', title: '查院校', desc: '多维度拆解：数据、食堂、住宿、就业、优缺点 全摊开。' },
   { to: '/ai-search?tab=by-company', ic: '🏢', title: '查公司', desc: '薪资结构、加班、福利、坑点 直接说不编。' },
   { to: '/ai-search?tab=by-city', ic: '🌆', title: '按城市找工作', desc: '产业 / 薪资 / 房价 / 机会 一站说清。' },
-  { to: '/ai-tutor', ic: '🎯', title: 'AI择校导师', desc: '填分数和位次，AI 按冲稳保三档给具体推荐。' },
+  { to: '/ai-tutor', ic: '', title: 'AI择校导师', desc: '填分数和位次，AI 按冲稳保三档给具体推荐。' },
   { to: '/document-workshop', ic: '', title: '文档工坊', desc: 'AI 一键生成报告 / 简历 / 避雷清单，导出 Word。' },
   { to: '/warnings', ic: '⚠️', title: '避雷清单', desc: '记下学校 / 公司的真实缺点，公共看板，人人可加。' },
   { to: '/money', ic: '💰', title: '搞钱项目', desc: '兼职 / 副业 / 创业 项目聚合，发现身边真实机会。' },

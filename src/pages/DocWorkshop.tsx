@@ -27,7 +27,7 @@ const TABS = [
   },
   {
     key: 'life',
-    label: '🏠 生活学习',
+    label: '生活学习',
     theme: 'by-city' as ThemeKey,
     prompt: '请侧重「生活与学习」视角：城市生活成本、租房物价、校园食宿、学习环境与通勤等真实细节。',
     placeholder: '输入城市或话题，如：成都生活成本',
