@@ -207,13 +207,13 @@ export default function AIChat({
         <button className="head-btn" onClick={newChat} title="清空当前对话，重新开始">
           新建对话
         </button>
-        {webSearch && searchMeta?.ok && (
+        {(webSearch || autoSearch) && searchMeta?.ok && (
           <span className="meta ok">🌐 已参考 {searchMeta.count} 条公开资料（{searchMeta.sources.map(srcLabel).join(' · ')}）</span>
         )}
-        {webSearch && searchMeta && !searchMeta.ok && (
+        {(webSearch || autoSearch) && searchMeta && !searchMeta.ok && (
           <span className="meta warn">⚠️ 公开资料暂时无法获取，已按已有知识作答</span>
         )}
-        {webSearch && !searchMeta && !loading && <span className="meta">· 待检索</span>}
+        {(webSearch || autoSearch) && !searchMeta && !loading && <span className="meta">· 待检索</span>}
         {loading && <span className="meta">· 生成中…</span>}
       </div>
 
