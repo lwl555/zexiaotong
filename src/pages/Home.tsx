@@ -28,7 +28,7 @@ const features = [
 ]
 
 const scenes = [
-  { ic: '🎓', t: '高考家庭', d: '分数、位次、兴趣、城市——填进来，AI 按冲稳保给出可比较的院校清单，每条都说为什么。' },
+  { ic: '', t: '高考家庭', d: '分数、位次、兴趣、城市——填进来，AI 按冲稳保给出可比较的院校清单，每条都说为什么。' },
   { ic: '🏢', t: '即将入职 / 跳槽', d: '查公司值不值得去：薪资结构、五险一金、加班、部门差异，一次说清而不是套话。' },
   { ic: '🌆', t: '换城市找工作', d: '看一个城市的产业、薪资、生活成本、机会点，并和 2-3 个对标城市横向比。' },
   { ic: '📚', t: '在校生选课 / 转专业', d: '了解学校的真实口碑、食宿、保研与就业去向——哪些数字是注水、哪些是含金量。' },
@@ -50,7 +50,7 @@ export default function Home() {
           </p>
           <div className="hero-cta">
             <Link to="/ai-search?tab=school" className="cta primary">🧭 开始一次查询</Link>
-            <Link to="/ai-tutor" className="cta ghost">🎓 试试择校导师</Link>
+            <Link to="/ai-tutor" className="cta ghost">试试择校导师</Link>
           </div>
         </div>
         <figure className="hero-figure">
