@@ -25,7 +25,7 @@ export const primaryNav: { to: string; label: string; icon: string; live?: boole
   { to: '/', label: '首页', icon: '🏠', end: true },
   { to: '/ai-search', label: 'AI百事通', icon: '🧭', live: true },
   { to: '/ai-tutor', label: 'AI择校导师', icon: '🎓', live: true },
-  { to: '/document-workshop', label: '文档工坊', icon: '📝', live: true }
+  { to: '/document-workshop', label: '文档工坊', icon: '', live: true }
 ]
 
 // 「更多」下拉里收纳的次要工具
