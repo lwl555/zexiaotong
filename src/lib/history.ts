@@ -6,6 +6,10 @@ export interface StoredMsg {
   role: 'user' | 'ai'
   content: string
   image?: { url: string; title: string } | null
+  /** 模型内部思考过程（仅供参考），可空 */
+  reasoning?: string | null
+  /** 真实场景图（最多 4 张），可空 */
+  images?: { url: string; title: string }[] | null
 }
 
 export interface Conversation {
@@ -27,6 +31,7 @@ export interface QueryRecord {
   answer: string
   search?: SearchMeta | null
   image?: { url: string; title: string } | null
+  images?: { url: string; title: string }[] | null
   createdAt: number
 }
 

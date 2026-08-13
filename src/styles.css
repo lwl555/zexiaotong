@@ -544,6 +544,41 @@ textarea { resize: vertical; min-height: 88px; }
 }
 .lead-photo figcaption { font-size: 12px; color: var(--faint); margin-top: 6px; }
 
+/* AI 思考过程（推理内容，可折叠） */
+.reasoning {
+  margin: 0 0 14px; border: 1px dashed var(--border-strong);
+  border-radius: 10px; background: var(--bg); overflow: hidden;
+}
+.reasoning > summary {
+  cursor: pointer; padding: 9px 14px; font-size: 13px; font-weight: 600;
+  color: var(--muted); user-select: none; list-style: none;
+}
+.reasoning > summary::-webkit-details-marker { display: none; }
+.reasoning > summary::before { content: "▸ "; }
+.reasoning[open] > summary::before { content: "▾ "; }
+.reasoning-body {
+  padding: 0 14px 12px; font-size: 13px; line-height: 1.65; color: var(--muted);
+  white-space: pre-wrap; word-break: break-word; max-height: 320px; overflow: auto;
+  border-top: 1px solid var(--border); padding-top: 10px;
+}
+
+/* 学校/实体场景图横向滑动条 */
+.scene-strip {
+  display: flex; gap: 8px; overflow-x: auto; margin: 0 0 14px; padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+.scene-thumb {
+  margin: 0; flex: 0 0 auto; width: 150px;
+  border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--bg);
+}
+.scene-thumb img {
+  width: 100%; height: 100px; object-fit: cover; display: block;
+}
+.scene-thumb figcaption {
+  font-size: 11px; color: var(--faint); padding: 5px 7px; line-height: 1.3;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+
 /* ---------- 报告：板块着色 + 彩色标签 ---------- */
 .report { font-size: 14.5px; }
 .rep-lead { color: var(--fg); font-size: 15px; margin: 0 0 16px; line-height: 1.7; }

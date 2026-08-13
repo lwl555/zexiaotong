@@ -57,6 +57,10 @@ interface Msg {
   content: string
   /** 该条 AI 回复对应的真实题图（学校/实体照片），来自维基百科 */
   image?: { url: string; title: string } | null
+  /** 模型内部思考过程（推理过程），可空 */
+  reasoning?: string | null
+  /** 真实场景图（最多 4 张），可空 */
+  images?: { url: string; title: string }[] | null
 }
 
 export default function AIChat({
@@ -77,7 +81,7 @@ export default function AIChat({
   const convId = `${pageKey}:${channel}`
   const [messages, setMessages] = useState<Msg[]>(() => {
     const c = getConversation(convId)
-    return c ? c.messages.map((m: StoredMsg) => ({ role: m.role, content: m.content, image: m.image ?? null })) : []
+    return c ? c.messages.map((m: StoredMsg) => ({ role: m.role, content: m.content, image: m.image ?? null, reasoning: m.reasoning ?? null, images: m.images ?? null })) : []
   })
   const [convTitle, setConvTitle] = useState<string>(() => getConversation(convId)?.title ?? '')
   const [convCreated, setConvCreated] = useState<number>(() => getConversation(convId)?.createdAt ?? Date.now())
@@ -92,7 +96,7 @@ export default function AIChat({
   // 切换子频道 / 功能页时，加载对应会话（接着对话）
   useEffect(() => {
     const c = getConversation(convId)
-    setMessages(c ? c.messages.map((m: StoredMsg) => ({ role: m.role, content: m.content, image: m.image ?? null })) : [])
+    setMessages(c ? c.messages.map((m: StoredMsg) => ({ role: m.role, content: m.content, image: m.image ?? null, reasoning: m.reasoning ?? null, images: m.images ?? null })) : [])
     setConvTitle(c?.title ?? '')
     setConvCreated(c?.createdAt ?? Date.now())
     setSearchMeta(null)
@@ -136,13 +140,19 @@ export default function AIChat({
     const controller = new AbortController()
     abortRef.current = controller
     try {
-      const { content, search } = await agnesChat(
+      const { content, search, reasoning } = await agnesChat(
         [{ role: 'system', content: `${SYSTEM_IDENTITY}\n\n${systemPrompt}\n\n${PROMPT_EMPHASIS}` }, ...next.map((m): ChatMsg => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }))],
         { webSearch: (webSearch || autoSearch) ?? false, autoSearch, signal: controller.signal }
       )
       setSearchMeta(search ?? null)
       lastReply.current = content
-      const aiMsg: Msg = { role: 'ai' as const, content, image: search?.image ?? null }
+      const aiMsg: Msg = {
+        role: 'ai' as const,
+        content,
+        image: search?.image ?? null,
+        images: search?.images ?? null,
+        reasoning: reasoning ?? null
+      }
       const merged = [...next, aiMsg]
       setMessages(merged)
       persist(merged, title)
@@ -157,6 +167,7 @@ export default function AIChat({
         answer: content,
         search: search ?? null,
         image: search?.image ?? null,
+        images: search?.images ?? null,
         createdAt: Date.now()
       }
       addQuery(q)
@@ -256,6 +267,22 @@ export default function AIChat({
                       <img src={m.image.url} alt={m.image.title || '配图'} loading="lazy" referrerPolicy="no-referrer" />
                       <figcaption>配图 · {m.image.title || '真实资料图'}</figcaption>
                     </figure>
+                  )}
+                  {m.reasoning ? (
+                    <details className="reasoning">
+                      <summary>🤔 AI 思考过程（内部推理，仅供参考）</summary>
+                      <div className="reasoning-body">{m.reasoning}</div>
+                    </details>
+                  ) : null}
+                  {m.images && m.images.length > 0 && (
+                    <div className="scene-strip">
+                      {m.images.map((img, i) => (
+                        <figure key={i} className="scene-thumb">
+                          <img src={img.url} alt={img.title || '场景图'} loading="lazy" referrerPolicy="no-referrer" />
+                          <figcaption>{img.title}</figcaption>
+                        </figure>
+                      ))}
+                    </div>
                   )}
                   <div className="report">{renderReport(m.content, theme)}</div>
                 </>

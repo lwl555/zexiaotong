@@ -142,7 +142,7 @@ function isRelevant(snippet: string, info: ReturnType<typeof relevanceInfo>): bo
 }
 
 // 单次带超时的 fetch
-async function fetchWithTimeout(url: string, opts: RequestInit = {}, ms = 6000): Promise<Response> {
+async function fetchWithTimeout(url: string, opts: RequestInit = {}, ms = 15000): Promise<Response> {
   const ctrl = new AbortController()
   const t = setTimeout(() => ctrl.abort(), ms)
   try {
@@ -170,7 +170,7 @@ async function searchTavily(q: string): Promise<{ items: string[]; ok: boolean }
           language: 'zh'
         })
       },
-      12000
+      25000
     )
     const j = await r.json()
     const items = (j.results || [])
@@ -210,7 +210,7 @@ async function searchSerper(q: string): Promise<{ items: string[]; ok: boolean }
         headers: { 'X-API-KEY': SEARCH_KEY, 'Content-Type': 'application/json' },
         body: JSON.stringify({ q, gl: 'cn', hl: 'zh-cn' })
       },
-      12000
+      25000
     )
     const j = await r.json()
     const items = (j.organic || [])
@@ -275,7 +275,7 @@ async function fetchWikiThumb(lang: 'zh' | 'en', title: string): Promise<{ url: 
     const url =
       `https://${lang}.wikipedia.org/w/api.php?action=query&format=json` +
       `&titles=${encodeURIComponent(title)}&prop=pageimages&piprop=thumbnail|original&pithumbsize=640&redirects=1`
-    const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'zexiaotong/1.0 (image)' } }, 10000)
+    const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'zexiaotong/1.0 (image)' } }, 15000)
     if (!r.ok) return null
     const j = await r.json()
     const pages = j?.query?.pages || {}
@@ -296,7 +296,7 @@ async function fetchEnTitle(zhTitle: string): Promise<string | null> {
     const url =
       'https://zh.wikipedia.org/w/api.php?action=query&format=json' +
       `&titles=${encodeURIComponent(zhTitle)}&prop=langlinks&lllang=en&lllimit=1`
-    const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'zexiaotong/1.0 (image)' } }, 10000)
+    const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'zexiaotong/1.0 (image)' } }, 15000)
     const j = await r.json()
     const pages = j?.query?.pages || {}
     for (const k of Object.keys(pages)) {
@@ -331,17 +331,66 @@ function extractEntity(text: string): string {
   return han[0] || (text || '').trim()
 }
 
-async function fetchLeadImage(q: string): Promise<{ url: string; title: string } | null> {
-  // 1) 中文维基精确匹配（最稳，覆盖绝大多数中国院校/公司/城市）
-  const zh = await fetchWikiThumb('zh', q)
-  if (zh) return zh
-  // 2) 英文维基回退：先经 langlinks 取英文标题，再取题图（直接拿中文 query 查 en 维基会 404）
-  const enTitle = await fetchEnTitle(q)
-  if (enTitle) {
-    const en = await fetchWikiThumb('en', enTitle)
-    if (en) return en
+// 从维基「图片生成器」拉取条目相关图片，按校园/场景关键词过滤，返回缩略图列表（最多 max 张）。
+// 用于给学校/实体报告配「真实场景图」（图书馆/校门/操场/航拍等），不止一张 logo。
+async function fetchWikiImages(lang: 'zh' | 'en', title: string, max = 4): Promise<{ url: string; title: string }[]> {
+  try {
+    const url =
+      `https://${lang}.wikipedia.org/w/api.php?action=query&format=json` +
+      `&generator=images&titles=${encodeURIComponent(title)}&gimlimit=50` +
+      `&prop=imageinfo&iiprop=url&iiurlwidth=640&redirects=1`
+    const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'zexiaotong/1.0 (image)' } }, 15000)
+    if (!r.ok) return []
+    const j = await r.json()
+    const pages = j?.query?.pages || {}
+    // 校园/场景类图片才要；logo/地图/图标/文件类一律跳过
+    const SCENE = /(campus|校园|校区|图书馆|library|体育馆|gym|校门|门|楼|building|aerial|航拍|风景|scenery|lake|湖|广场|square|hall|堂|stadium|操场|center|centre|中心|park|园|garden|museum|馆|lab|实验|hospital|医院|bridge|桥|street|街|road|路|全景|panorama|夜景|庄|苑)/i
+    const SKIP = /(logo|徽|icon|svg|map|地图|flag|旗|seal|章|question|问号|commons|文件|pdf|audio|ogg|video|play|star|星|symbol|符号|thumb|占位|placeholder|stub|小作品|disambig|消歧|redirect|重定向|模板|template|200px)/i
+    const out: { url: string; title: string }[] = []
+    for (const k of Object.keys(pages)) {
+      const p = pages[k]
+      const t = p?.title || ''
+      const ii = p?.imageinfo?.[0]
+      const thumb = ii?.thumburl || ii?.url
+      if (!thumb) continue
+      if (SKIP.test(t)) continue
+      if (!SCENE.test(t)) continue
+      out.push({ url: thumb, title: t.replace(/^File:/, '').replace(/_/g, ' ') })
+      if (out.length >= max) break
+    }
+    return out
+  } catch {
+    return []
   }
-  return null
+}
+
+// 取某实体的「题图 + 场景图」：
+//  - lead：条目主图（中文维基 pageimages，失败回退英文维基 langlinks）
+//  - scenes：条目相关校园/场景图（最多 4 张，过滤掉 logo/地图/图标等）
+async function fetchSchoolImages(entity: string): Promise<{ lead: { url: string; title: string } | null; scenes: { url: string; title: string }[] }> {
+  let lead = await fetchWikiThumb('zh', entity)
+  if (!lead) {
+    const en = await fetchEnTitle(entity)
+    if (en) lead = await fetchWikiThumb('en', en)
+  }
+  let scenes = await fetchWikiImages('zh', entity)
+  if (scenes.length < 2 && lead) {
+    const en = (await fetchEnTitle(entity)) || entity
+    const enScenes = await fetchWikiImages('en', en)
+    const seen = new Set(scenes.map((s) => s.url))
+    for (const s of enScenes) if (!seen.has(s.url)) scenes.push(s)
+  }
+  if (lead) scenes = scenes.filter((s) => s.url !== lead!.url)
+  return { lead, scenes: scenes.slice(0, 4) }
+}
+
+// 剥离模型思考过程中可能泄露底层模型/供应商身份的词（保持平台「择校通助手」身份纯净）。
+function stripIdentity(s: string): string {
+  return s
+    .replace(/agnes[-_]?2\.0[-_]?flash/gi, '')
+    .replace(/\b(agnes|sapiens|deepseek|openai|chatgpt|gpt[- ]?\d|claude|gemini|qwen|ernie|kimi)\b/gi, '')
+    .replace(/我是[^。\n]{0,40}?(模型|大模型|AI 助手|人工智能)/g, '')
+    .slice(0, 8000)
 }
 
 interface SearchResult {
@@ -537,50 +586,9 @@ function looksTrivial(q: string): boolean {
   return false
 }
 
-async function decideSearch(q: string): Promise<boolean> {
-  if (!q) return false
-  if (looksTrivial(q)) return false
-  try {
-    const r = await fetchWithTimeout(
-      `${V9_BASE}/v1/chat/completions`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${V9_ANON}`
-        },
-        body: JSON.stringify({
-          model: V9_MODEL,
-          max_tokens: 64,
-          temperature: 0,
-          messages: [
-            {
-            role: 'system',
-            content:
-              '你是检索调度器。判断用户问题是否需要检索最新公开资料才能准确回答。规则：除非用户问题明显是纯数学计算、纯概念定义、纯闲聊、纯创作（且不涉及任何具体实体/当前信息/政策/数据），否则回复 NEED。当用户提到具体学校/公司/城市/省份/政策/分数线/薪资/招聘/新闻/具体年份/当前事件，必须回复 NEED。只回复一个词：NEED 或 NO。'
-          },
-            { role: 'user', content: q }
-          ]
-        })
-      },
-      20000
-    )
-    const j = await r.json()
-    const msg = j?.choices?.[0]?.message || {}
-    // agnes-2.0-flash 是推理模型：tiny 预算下答案常落在 reasoning_content，content 可能为空。
-    // 同时读取两处，用 NEED / NO 信号判定，避免「content 为空 → 默认检索」的误判。
-    const combined = String(msg.content || '') + ' ' + String(msg.reasoning_content || '')
-    const hasNeed = /NEED|需要检索|必须检索|应.*检索|要检索/i.test(combined)
-    const hasNo = /NO|不需要检索|不检索|无需检索|不必检索/i.test(combined)
-    if (hasNeed) return true
-    if (hasNo) return false
-    // 命中不清则默认检索（保持原行为，不退化成无资料作答）
-    return true
-  } catch {
-    // 决策失败则默认检索（保持原行为，不退化成无资料作答）
-    return true
-  }
-}
+// 注：原 decideSearch（模型判断「是否检索」）已废弃——用户要求「100% 联网检索」，
+// 凡有实质查询（非纯问候/算术/创作）一律检索，不再用模型二次判定（既慢又曾误判漏检）。
+// 见下方请求入口的 autoSearch 分支。
 
 // 仅探测各源出网情况（调试用，不调用模型）
 async function probe(): Promise<Record<string, boolean>> {
@@ -630,27 +638,33 @@ Deno.serve(async (req: Request) => {
   const rawUser = lastUserText(otherMessages)
   const query = extractQuery(rawUser)
 
-  // 是否需要检索：search_only 强制检索；auto_search 由模型判断；web_search 强制；否则不检索
+  // 是否需要检索：search_only 强制检索；auto_search 改为「100% 联网检索」（仅纯问候/算术/创作这类
+  // 无意义查询跳过，避免浪费外部检索额度与无谓延迟；凡涉及具体学校/公司/城市/政策/数据的实质问题一律检索）；
+  // web_search 强制；否则不检索。
   let needSearch = false
   if (searchOnly) {
     needSearch = !!query
   } else if (autoSearch) {
-    needSearch = await decideSearch(query)
+    needSearch = query ? !looksTrivial(query) : false
   } else if (webSearch) {
     needSearch = !!query
   }
 
-  let searchMeta: { ok: boolean; count: number; sources: string[]; image: { url: string; title: string } | null } = {
-    ok: false,
-    count: 0,
-    sources: [] as string[],
-    image: null
-  }
+  type ImgSet = { lead: { url: string; title: string } | null; scenes: { url: string; title: string }[] }
+  const EMPTY_IMG: ImgSet = { lead: null, scenes: [] }
+
+  let searchMeta: {
+    ok: boolean
+    count: number
+    sources: string[]
+    image: { url: string; title: string } | null
+    images: { url: string; title: string }[]
+  } = { ok: false, count: 0, sources: [], image: null, images: [] }
   let rawResults: string[] = []
 
   if (needSearch && query) {
     const ctx = await searchMulti(query)
-    searchMeta = { ok: ctx.ok, count: ctx.results.length, sources: ctx.sources, image: null }
+    searchMeta = { ok: ctx.ok, count: ctx.results.length, sources: ctx.sources, image: null, images: [] }
     rawResults = ctx.results
     if (ctx.ok && !searchOnly) {
       sysMessages.push({
@@ -670,16 +684,17 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  // 真实题图（与检索并行获取，失败不影响主回答）
-  const imagePromise = needSearch && rawUser ? fetchLeadImage(extractEntity(rawUser)) : Promise.resolve(null)
+  // 真实学校/实体图（题图 + 场景图）。与检索、生成并行获取，失败不影响主回答。
+  const imagePromise: Promise<ImgSet> =
+    needSearch && rawUser ? fetchSchoolImages(extractEntity(rawUser)) : Promise.resolve(EMPTY_IMG)
 
   // —— 实时资讯模式：只返回检索结果，不调用生成模型（低延迟、直接展示来源）——
   if (searchOnly) {
-    const image = await imagePromise.catch(() => null)
+    const imgs = await imagePromise.catch(() => EMPTY_IMG)
     return json(
       {
         results: rawResults,
-        search: { ...searchMeta, image },
+        search: { ...searchMeta, image: imgs.lead, images: imgs.scenes },
         // 兼容 OpenAI 形状，避免前端误判
         choices: [{ message: { content: '' } }]
       },
@@ -705,8 +720,15 @@ Deno.serve(async (req: Request) => {
   })
 
   const data = await upstream.json().catch(() => ({}))
-  const image = await imagePromise.catch(() => null)
-  // 把搜索元数据（含真实题图）附到返回体，供前端诚实标注与配图
-  const enriched = { ...data, search: { ...searchMeta, image } }
+  const imgs = await imagePromise.catch(() => EMPTY_IMG)
+  // 抽取模型内部思考（reasoning_content），剥离可能泄露底层模型身份的词，附到返回体供前端展示「AI 思考过程」
+  const rawReasoning = (data as any)?.choices?.[0]?.message?.reasoning_content || ''
+  const reasoning = rawReasoning ? stripIdentity(rawReasoning) : ''
+  // 把搜索元数据（含真实题图 + 场景图）与思考过程附到返回体，供前端诚实标注与配图
+  const enriched = {
+    ...data,
+    search: { ...searchMeta, image: imgs.lead, images: imgs.scenes },
+    reasoning
+  }
   return json(enriched, upstream.status)
 })

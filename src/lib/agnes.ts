@@ -87,15 +87,19 @@ export interface SearchMeta {
   ok: boolean
   count: number
   sources: string[]
-  /** 针对查询实体的真实题图（维基百科），用于报告配图；可能为空 */
+  /** 针对查询实体的真实题图（维基百科主图），用于报告配图；可能为空 */
   image?: { url: string; title: string } | null
+  /** 针对查询实体的真实场景图（维基百科校园/场景图，最多 4 张），用于报告内展示；可能为空 */
+  images?: { url: string; title: string }[]
 }
 
-/** chat 返回：正文 + 可选的检索元数据 + 可选的纯检索结果（search_only 模式） */
+/** chat 返回：正文 + 可选的检索元数据 + 可选的纯检索结果（search_only 模式）+ 可选的思考过程 */
 export interface ChatResult {
   content: string
   search?: SearchMeta
   results?: string[]
+  /** 模型内部推理过程（reasoning_content），已剥离可能的身份泄露词；可能为空 */
+  reasoning?: string
 }
 
 /** OpenAI 兼容 chat/completions，返回正文与检索元数据。 */
@@ -118,5 +122,6 @@ export async function agnesChat(
   const content = (data as any)?.choices?.[0]?.message?.content ?? ''
   const search = (data as any)?.search as SearchMeta | undefined
   const results = (data as any)?.results as string[] | undefined
-  return { content, search, results }
+  const reasoning = (data as any)?.reasoning as string | undefined
+  return { content, search, results, reasoning }
 }
