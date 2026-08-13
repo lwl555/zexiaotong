@@ -333,7 +333,7 @@ function extractEntity(text: string): string {
 
 // 从维基「图片生成器」拉取条目相关图片，按校园/场景关键词过滤，返回缩略图列表（最多 max 张）。
 // 用于给学校/实体报告配「真实场景图」（图书馆/校门/操场/航拍等），不止一张 logo。
-async function fetchWikiImages(lang: 'zh' | 'en', title: string, max = 4): Promise<{ url: string; title: string }[]> {
+async function fetchWikiImages(lang: 'zh' | 'en', title: string, max = 8): Promise<{ url: string; title: string }[]> {
   try {
     const url =
       `https://${lang}.wikipedia.org/w/api.php?action=query&format=json` +
@@ -343,19 +343,57 @@ async function fetchWikiImages(lang: 'zh' | 'en', title: string, max = 4): Promi
     if (!r.ok) return []
     const j = await r.json()
     const pages = j?.query?.pages || {}
-    // 校园/场景类图片才要；logo/地图/图标/文件类一律跳过
-    const SCENE = /(campus|校园|校区|图书馆|library|体育馆|gym|校门|门|楼|building|aerial|航拍|风景|scenery|lake|湖|广场|square|hall|堂|stadium|操场|center|centre|中心|park|园|garden|museum|馆|lab|实验|hospital|医院|bridge|桥|street|街|road|路|全景|panorama|夜景|庄|苑)/i
+    // 校园/生活/场景类图片才要；logo/地图/图标/文件类一律跳过。
+    // 注意：特意加入「canteen/dormitory/食堂/宿舍/小吃」等**生活类**关键词——
+    // 用户诉求是「接地气内部情报」，食堂/宿舍/小吃场景比图书馆/校门更贴合。
+    const SCENE = /(campus|校园|校区|图书馆|library|体育馆|gym|校门|门|楼|building|aerial|航拍|风景|scenery|lake|湖|广场|square|hall|堂|stadium|操场|center|centre|中心|park|园|garden|museum|馆|lab|实验|hospital|医院|bridge|桥|street|街|road|路|全景|panorama|夜景|庄|苑|canteen|dining|dormitory|宿舍|食堂|小吃|restaurant|food|cafe|student|餐|men|kitchen|厨房|snack|coffee)/i
     const SKIP = /(logo|徽|icon|svg|map|地图|flag|旗|seal|章|question|问号|commons|文件|pdf|audio|ogg|video|play|star|星|symbol|符号|thumb|占位|placeholder|stub|小作品|disambig|消歧|redirect|重定向|模板|template|200px)/i
     const out: { url: string; title: string }[] = []
     for (const k of Object.keys(pages)) {
       const p = pages[k]
-      const t = p?.title || ''
+      const t = (p?.title || '')
+        .replace(/^File:/, '')
+        .replace(/_/g, ' ')
+        .replace(/\.(jpg|jpeg|png|gif|svg|webp|JPG)$/i, '') // 清洗文件后缀，避免 alt 文本出现「.JPG」
       const ii = p?.imageinfo?.[0]
       const thumb = ii?.thumburl || ii?.url
       if (!thumb) continue
       if (SKIP.test(t)) continue
       if (!SCENE.test(t)) continue
-      out.push({ url: thumb, title: t.replace(/^File:/, '').replace(/_/g, ' ') })
+      out.push({ url: thumb, title: t })
+      if (out.length >= max) break
+    }
+    return out
+  } catch {
+    return []
+  }
+}
+
+// 从维基共享资源（commons）按关键词搜图片，专门补「接地气」生活类场景（食堂/宿舍/小吃）。
+// 维基条目主页 generator=images 多挂校园/图书馆图，食堂/宿舍图常散落在 commons 分类里，故单独搜。
+// 失败不影响主流程（catch 返回空）。
+async function fetchCommonsImages(query: string, max = 3): Promise<{ url: string; title: string }[]> {
+  try {
+    const url =
+      `https://commons.wikimedia.org/w/api.php?action=query&format=json` +
+      `&generator=search&gsrsearch=${encodeURIComponent(query)}&gsrnamespace=6&gsrlimit=${max}` +
+      `&prop=imageinfo&iiprop=url&iiurlwidth=640&redirects=1`
+    const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'zexiaotong/1.0 (image)' } }, 15000)
+    if (!r.ok) return []
+    const j = await r.json()
+    const pages = j?.query?.pages || {}
+    const SKIP = /(logo|icon|svg|map|flag|seal|question|commons|pdf|audio|video|star|symbol|stub|disambig|redirect|template|200px|diagram|graph|chart|emblem|coat|arms)/i
+    const out: { url: string; title: string }[] = []
+    for (const k of Object.keys(pages)) {
+      const p = pages[k]
+      const t = (p?.title || '')
+        .replace(/^File:/, '')
+        .replace(/_/g, ' ')
+        .replace(/\.(jpg|jpeg|png|gif|svg|webp|JPG)$/i, '')
+      const ii = p?.imageinfo?.[0]
+      const thumb = ii?.thumburl || ii?.url
+      if (!thumb || SKIP.test(t)) continue
+      out.push({ url: thumb, title: t })
       if (out.length >= max) break
     }
     return out
@@ -368,19 +406,30 @@ async function fetchWikiImages(lang: 'zh' | 'en', title: string, max = 4): Promi
 //  - lead：条目主图（中文维基 pageimages，失败回退英文维基 langlinks）
 //  - scenes：条目相关校园/场景图（最多 4 张，过滤掉 logo/地图/图标等）
 async function fetchSchoolImages(entity: string): Promise<{ lead: { url: string; title: string } | null; scenes: { url: string; title: string }[] }> {
+  const enEntity = (await fetchEnTitle(entity)) || entity
   let lead = await fetchWikiThumb('zh', entity)
-  if (!lead) {
-    const en = await fetchEnTitle(entity)
-    if (en) lead = await fetchWikiThumb('en', en)
-  }
-  let scenes = await fetchWikiImages('zh', entity)
-  if (scenes.length < 2 && lead) {
-    const en = (await fetchEnTitle(entity)) || entity
-    const enScenes = await fetchWikiImages('en', en)
+  if (!lead) lead = await fetchWikiThumb('en', enEntity)
+
+  const scenes: { url: string; title: string }[] = []
+  // 1) 生活类优先：commons 搜「食堂 / 宿舍」相关真实场景图（用户要的接地气内部情报）
+  const lifeSets = await Promise.all([
+    fetchCommonsImages(`${enEntity} canteen`, 2),
+    fetchCommonsImages(`${enEntity} dormitory`, 2)
+  ])
+  for (const set of lifeSets) for (const s of set) scenes.push(s)
+  // 2) 校园/图书馆兜底：维基条目主页图（中→英）
+  const wikiScenes = await fetchWikiImages('zh', entity)
+  if (wikiScenes.length < 3) {
+    const enScenes = await fetchWikiImages('en', enEntity)
     const seen = new Set(scenes.map((s) => s.url))
-    for (const s of enScenes) if (!seen.has(s.url)) scenes.push(s)
+    for (const s of enScenes) if (!seen.has(s.url)) wikiScenes.push(s)
   }
+  for (const s of wikiScenes) if (!scenes.some((x) => x.url === s.url)) scenes.push(s)
+
   if (lead) scenes = scenes.filter((s) => s.url !== lead!.url)
+  // 生活类（食堂/宿舍/小吃）排前面，更贴合「接地气内部情报」诉求
+  const lifeRe = /(canteen|dining|dormitory|宿舍|食堂|小吃|restaurant|food|cafe|student|餐|kitchen|snack|coffee)/i
+  scenes.sort((a, b) => (lifeRe.test(b.title) ? 1 : 0) - (lifeRe.test(a.title) ? 1 : 0))
   return { lead, scenes: scenes.slice(0, 4) }
 }
 

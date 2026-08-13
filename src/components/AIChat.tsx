@@ -25,6 +25,20 @@ const SRC_LABEL: Record<string, string> = {
   serper: 'Serper'
 }
 const srcLabel = (s: string) => SRC_LABEL[s] || s
+
+// 维基图片标题 → 中文场景标签（避免直接展示英文文件名，降低认知成本）
+function sceneLabel(title: string): string {
+  const t = (title || '').toLowerCase()
+  if (/(canteen|dining|食堂|餐|food|cafe|coffee|snack|小吃|restaurant|kitchen|厨房|men)/.test(t)) return '食堂美食'
+  if (/(dormitory|宿舍|dorm|hostel|apartment|公寓|住)/.test(t)) return '宿舍生活'
+  if (/(library|图书馆|book)/.test(t)) return '图书馆'
+  if (/(stadium|gym|体育馆|操场|sport|体育|field)/.test(t)) return '体育场馆'
+  if (/(gate|校门|entrance)/.test(t)) return '校门'
+  if (/(lake|湖|garden|园|park|广场|square|campus|校园|aerial|航拍|panorama)/.test(t)) return '校园风光'
+  if (/(hall|堂|center|centre|中心|building|楼|lab|实验|museum|馆|hospital|医院|bridge|桥|street|街|road|路)/.test(t)) return '校园建筑'
+  return '校园实景'
+}
+
 import { renderReport, ThemeKey } from './Report'
 import { exportDocx } from '../lib/docx'
 import { PROMPT_EMPHASIS, SYSTEM_IDENTITY } from '../lib/prompts'
@@ -278,8 +292,8 @@ export default function AIChat({
                     <div className="scene-strip">
                       {m.images.map((img, i) => (
                         <figure key={i} className="scene-thumb">
-                          <img src={img.url} alt={img.title || '场景图'} loading="lazy" referrerPolicy="no-referrer" />
-                          <figcaption>{img.title}</figcaption>
+                          <img src={img.url} alt={sceneLabel(img.title)} loading="lazy" referrerPolicy="no-referrer" />
+                          <figcaption>{sceneLabel(img.title)}</figcaption>
                         </figure>
                       ))}
                     </div>
