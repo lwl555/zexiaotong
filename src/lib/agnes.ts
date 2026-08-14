@@ -42,23 +42,49 @@ async function call<T = any>(
     else opts.signal.addEventListener('abort', () => controller.abort(), { once: true })
   }
   try {
-    const res = await fetch(url, {
-      method: opts.method || 'POST',
-      headers,
-      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
-      signal: controller.signal
-    })
-    if (!res.ok) {
-      let msg = `HTTP ${res.status}`
+    let lastErr: any
+    // 网络瞬时错误（Failed to fetch / DNS / 5xx）自动重试，指数退避
+    // 给用户最稳定的体验，避免一次抖动就显示「出错」
+    for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const t = await res.text()
-        if (t) msg += ` ${t.slice(0, 300)}`
-      } catch {}
-      throw new Error(msg)
+        const res = await fetch(url, {
+          method: opts.method || 'POST',
+          headers,
+          body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+          signal: controller.signal
+        })
+        if (!res.ok) {
+          // 5xx 视为可重试；4xx 直接抛出（用户输入问题，重试无意义）
+          if (res.status >= 500 && attempt < 2) {
+            lastErr = new Error(`HTTP ${res.status}`)
+            await new Promise((r) => setTimeout(r, 600 * Math.pow(2, attempt)))
+            continue
+          }
+          let msg = `HTTP ${res.status}`
+          try {
+            const t = await res.text()
+            if (t) msg += ` ${t.slice(0, 300)}`
+          } catch {}
+          throw new Error(msg)
+        }
+        const ct = res.headers.get('content-type') || ''
+        if (ct.includes('application/json')) return (await res.json()) as T
+        return (await res.text()) as unknown as T
+      } catch (e: any) {
+        // 用户主动中止：不重试
+        if (e?.name === 'AbortError') throw e
+        // 浏览器原生网络错误（Failed to fetch / DNS / net::ERR_*)：可重试
+        const msg = String(e?.message || e)
+        const isNetwork = /Failed to fetch|NetworkError|net::ERR|fetch failed|TypeError: fetch/i.test(msg)
+        if (isNetwork && attempt < 2) {
+          lastErr = e
+          await new Promise((r) => setTimeout(r, 600 * Math.pow(2, attempt)))
+          continue
+        }
+        throw e
+      }
     }
-    const ct = res.headers.get('content-type') || ''
-    if (ct.includes('application/json')) return (await res.json()) as T
-    return (await res.text()) as unknown as T
+    throw lastErr || new Error('retry exhausted')
   } finally {
     clearTimeout(timer)
   }
