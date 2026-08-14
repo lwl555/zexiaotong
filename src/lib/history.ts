@@ -1,6 +1,6 @@
 // 历史对话 & 查询记录——localStorage 持久化。
 // 目的：刷新 / 切换页面不丢，支持「接着对话」与「查询记录点击看详情」。
-import { SearchMeta } from './agnes'
+import { SearchMeta, LinkInfo } from './agnes'
 
 export interface StoredMsg {
   role: 'user' | 'ai'
@@ -10,6 +10,8 @@ export interface StoredMsg {
   reasoning?: string | null
   /** 真实场景图（最多 4 张），可空 */
   images?: { url: string; title: string }[] | null
+  /** 检索到的真实参考链接（可点击打开 / 复制），可空 */
+  links?: LinkInfo[] | null
 }
 
 export interface Conversation {
@@ -32,6 +34,8 @@ export interface QueryRecord {
   search?: SearchMeta | null
   image?: { url: string; title: string } | null
   images?: { url: string; title: string }[] | null
+  /** 检索到的真实参考链接（可点击打开 / 复制），可空 */
+  links?: LinkInfo[] | null
   /** 模型内部思考过程（仅供参考），可空 */
   reasoning?: string | null
   createdAt: number

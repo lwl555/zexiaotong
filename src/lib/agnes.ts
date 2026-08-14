@@ -108,11 +108,21 @@ export interface ChatOptions {
   signal?: AbortSignal
 }
 
+/** 一条可点击的参考链接（后端检索时抓取的真实 URL） */
+export interface LinkInfo {
+  title: string
+  url: string
+  /** 来源标记：tavily / bing / wiki-zh / gnews / reddit / ddg / tavily-social / bing-social ... */
+  source: string
+}
+
 /** 函数返回的联网检索元数据（agnes-search 在响应体里附带） */
 export interface SearchMeta {
   ok: boolean
   count: number
   sources: string[]
+  /** 检索到的真实参考链接（可点击打开 / 复制），可能为空 */
+  links?: LinkInfo[]
   /** 针对查询实体的真实题图（维基百科主图），用于报告配图；可能为空 */
   image?: { url: string; title: string } | null
   /** 针对查询实体的真实场景图（维基百科校园/场景图，最多 4 张），用于报告内展示；可能为空 */

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, type SyntheticEvent } from 'react'
-import { agnesChat, ChatMsg, SearchMeta } from '../lib/agnes'
+import { agnesChat, ChatMsg, SearchMeta, LinkInfo } from '../lib/agnes'
 import {
   Conversation,
   StoredMsg,
@@ -64,7 +64,7 @@ function onImgError(e: SyntheticEvent<HTMLImageElement>, rawUrl: string) {
 
 import { renderReport, ThemeKey } from './Report'
 import { exportDocx } from '../lib/docx'
-import { PROMPT_EMPHASIS, SYSTEM_IDENTITY, BLUNT_RULE, FRESHNESS_RULE } from '../lib/prompts'
+import { PROMPT_EMPHASIS, SYSTEM_IDENTITY, BLUNT_RULE, FRESHNESS_RULE, LINKS_LOCATION_RULE } from '../lib/prompts'
 
 // 联网 / 思考阶段的提示文案（按已等待时长切换，纯前端 heuristics，仅用于安抚"没卡住"）
 function phaseOf(ms: number): string {
@@ -105,6 +105,8 @@ interface Msg {
   reasoning?: string | null
   /** 真实场景图（最多 4 张），可空 */
   images?: { url: string; title: string }[] | null
+  /** 检索到的真实参考链接（可点击打开 / 复制），可空 */
+  links?: LinkInfo[] | null
 }
 
 export default function AIChat({
@@ -125,7 +127,7 @@ export default function AIChat({
   const convId = `${pageKey}:${channel}`
   const [messages, setMessages] = useState<Msg[]>(() => {
     const c = getConversation(convId)
-    return c ? c.messages.map((m: StoredMsg) => ({ role: m.role, content: m.content, image: m.image ?? null, reasoning: m.reasoning ?? null, images: m.images ?? null })) : []
+    return c ? c.messages.map((m: StoredMsg) => ({ role: m.role, content: m.content, image: m.image ?? null, reasoning: m.reasoning ?? null, images: m.images ?? null, links: m.links ?? null })) : []
   })
   const [convTitle, setConvTitle] = useState<string>(() => getConversation(convId)?.title ?? '')
   const [convCreated, setConvCreated] = useState<number>(() => getConversation(convId)?.createdAt ?? Date.now())
@@ -151,7 +153,7 @@ export default function AIChat({
   // 切换子频道 / 功能页时，加载对应会话（接着对话）
   useEffect(() => {
     const c = getConversation(convId)
-    setMessages(c ? c.messages.map((m: StoredMsg) => ({ role: m.role, content: m.content, image: m.image ?? null, reasoning: m.reasoning ?? null, images: m.images ?? null })) : [])
+    setMessages(c ? c.messages.map((m: StoredMsg) => ({ role: m.role, content: m.content, image: m.image ?? null, reasoning: m.reasoning ?? null, images: m.images ?? null, links: m.links ?? null })) : [])
     setConvTitle(c?.title ?? '')
     setConvCreated(c?.createdAt ?? Date.now())
     setSearchMeta(null)
@@ -173,7 +175,7 @@ export default function AIChat({
       pageKey,
       channel,
       title: title || '未命名对话',
-      messages: nextMsgs.map((m) => ({ role: m.role, content: m.content, image: m.image ?? null, reasoning: m.reasoning ?? null, images: m.images ?? null })),
+      messages: nextMsgs.map((m) => ({ role: m.role, content: m.content, image: m.image ?? null, reasoning: m.reasoning ?? null, images: m.images ?? null, links: m.links ?? null })),
       createdAt: convCreated,
       updatedAt: Date.now()
     }
@@ -204,7 +206,7 @@ export default function AIChat({
       const now = new Date()
       const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`
       const freshness = FRESHNESS_RULE.replace('{DATE}', dateStr)
-      const systemContent = `${SYSTEM_IDENTITY}\n\n${systemPrompt}\n\n${BLUNT_RULE}\n\n${freshness}\n\n${PROMPT_EMPHASIS}`
+      const systemContent = `${SYSTEM_IDENTITY}\n\n${systemPrompt}\n\n${BLUNT_RULE}\n\n${freshness}\n\n${LINKS_LOCATION_RULE}\n\n${PROMPT_EMPHASIS}`
       const { content, search, reasoning } = await agnesChat(
         [{ role: 'system', content: systemContent }, ...next.map((m): ChatMsg => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }))],
         { webSearch: (webSearch || autoSearch) ?? false, autoSearch, signal: controller.signal }
@@ -222,6 +224,7 @@ export default function AIChat({
         content: safeContent,
         image: search?.image ?? null,
         images: search?.images ?? null,
+        links: search?.links ?? null,
         reasoning: reasoning ?? null
       }
       const merged = [...next, aiMsg]
@@ -239,6 +242,7 @@ export default function AIChat({
         search: search ?? null,
         image: search?.image ?? null,
         images: search?.images ?? null,
+        links: search?.links ?? null,
         reasoning: reasoning ?? null,
         createdAt: Date.now()
       }
@@ -282,6 +286,13 @@ export default function AIChat({
     if (!lastReply.current) return
     try {
       await navigator.clipboard.writeText(lastReply.current)
+    } catch {}
+  }
+
+  // 复制单条参考链接（点击「复制」按钮时调用）
+  function copyLink(url: string) {
+    try {
+      navigator.clipboard.writeText(url)
     } catch {}
   }
 
@@ -351,6 +362,33 @@ export default function AIChat({
                       <div className="reasoning-body">{m.reasoning}</div>
                     </details>
                   ) : null}
+                  {m.links && m.links.length > 0 && (
+                    <div className="links-card">
+                      <div className="links-head">
+                        🔗 相关链接与地点（点击打开 · 可复制）
+                        <span className="links-count">{m.links.length} 条</span>
+                      </div>
+                      <ul className="links-list">
+                        {m.links.map((lk, i) => (
+                          <li key={i} className="link-item">
+                            <a
+                              className="link-url"
+                              href={lk.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title={lk.url}
+                            >
+                              <span className="link-src">{srcLabel(lk.source)}</span>
+                              <span className="link-title">{lk.title || lk.url}</span>
+                            </a>
+                            <button className="link-copy" onClick={() => copyLink(lk.url)} title="复制链接">
+                              复制
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   {m.images && m.images.length > 0 && (
                     <div className="scene-strip">
                       {m.images.map((img, i) => (

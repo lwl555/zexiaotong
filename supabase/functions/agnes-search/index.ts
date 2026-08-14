@@ -210,12 +210,14 @@ async function searchTavily(q: string, domains?: string[]): Promise<{ items: str
       25000
     )
     const j = await r.json()
-    const items = (j.results || [])
-      .slice(0, 8)
-      .map((x: any) => `- ${x.title}：${stripHtml(x.content || x.snippet || '')}`)
-    return { items, ok: items.length > 0 }
+    const results = (j.results || []).slice(0, 8)
+    const items = results.map((x: any) => `- ${x.title}：${stripHtml(x.content || x.snippet || '')}`)
+    const links: LinkInfo[] = results
+      .filter((x: any) => x.url)
+      .map((x: any) => ({ title: stripHtml(x.title || ''), url: String(x.url), source: 'tavily' }))
+    return { items, ok: items.length > 0, links }
   } catch {
-    return { items: [], ok: false }
+    return { items: [], ok: false, links: [] }
   }
 }
 
@@ -229,12 +231,12 @@ async function searchBrave(q: string): Promise<{ items: string[]; ok: boolean }>
       12000
     )
     const j = await r.json()
-    const items = (j.web?.results || [])
-      .slice(0, 6)
-      .map((x: any) => `- ${x.title}：${stripHtml(x.description || '')}`)
-    return { items, ok: items.length > 0 }
+    const results = (j.web?.results || []).slice(0, 6)
+    const items = results.map((x: any) => `- ${x.title}：${stripHtml(x.description || '')}`)
+    const links: LinkInfo[] = results.filter((x: any) => x.url).map((x: any) => ({ title: stripHtml(x.title || ''), url: String(x.url), source: 'brave' }))
+    return { items, ok: items.length > 0, links }
   } catch {
-    return { items: [], ok: false }
+    return { items: [], ok: false, links: [] }
   }
 }
 
@@ -250,12 +252,12 @@ async function searchSerper(q: string): Promise<{ items: string[]; ok: boolean }
       25000
     )
     const j = await r.json()
-    const items = (j.organic || [])
-      .slice(0, 6)
-      .map((x: any) => `- ${x.title}：${stripHtml(x.snippet || '')}`)
-    return { items, ok: items.length > 0 }
+    const results = (j.organic || []).slice(0, 6)
+    const items = results.map((x: any) => `- ${x.title}：${stripHtml(x.snippet || '')}`)
+    const links: LinkInfo[] = results.filter((x: any) => x.link).map((x: any) => ({ title: stripHtml(x.title || ''), url: String(x.link), source: 'serper' }))
+    return { items, ok: items.length > 0, links }
   } catch {
-    return { items: [], ok: false }
+    return { items: [], ok: false, links: [] }
   }
 }
 
@@ -266,12 +268,14 @@ async function searchWikipedia(q: string, lang: 'zh' | 'en'): Promise<{ items: s
       `&srsearch=${encodeURIComponent(q)}&srlimit=5&srprop=snippet&format=json`
     const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'zexiaotong/1.0 (search)' } })
     const j = await r.json()
-    const items = (j.query?.search || [])
-      .slice(0, 5)
-      .map((x: any) => `- ${x.title}：${stripHtml(x.snippet || '')}`)
-    return { items, ok: items.length > 0 }
+    const results = (j.query?.search || []).slice(0, 5)
+    const items = results.map((x: any) => `- ${x.title}：${stripHtml(x.snippet || '')}`)
+    const links: LinkInfo[] = results
+      .filter((x: any) => x.title)
+      .map((x: any) => ({ title: x.title, url: `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(x.title)}`, source: `wiki-${lang}` }))
+    return { items, ok: items.length > 0, links }
   } catch {
-    return { items: [], ok: false }
+    return { items: [], ok: false, links: [] }
   }
 }
 
@@ -285,6 +289,7 @@ async function searchDuckDuckGo(q: string): Promise<{ items: string[]; ok: boole
     let html = new TextDecoder('utf-8').decode(buf)
     if (html.includes('�')) { try { html = new TextDecoder('gbk').decode(buf) } catch {} }
     const snippets: string[] = []
+    const links: LinkInfo[] = []
     const re = /<a[^>]*class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g
     let m: RegExpExecArray | null
     let i = 0
@@ -293,9 +298,22 @@ async function searchDuckDuckGo(q: string): Promise<{ items: string[]; ok: boole
       if (txt) snippets.push('- ' + txt)
       i++
     }
-    return { items: snippets, ok: snippets.length > 0 }
+    // 结果链接：DDG 用 /l/?uddg=<encoded> 包装，需解出真实 URL
+    const reA = /<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g
+    let ma: RegExpExecArray | null
+    let li = 0
+    while ((ma = reA.exec(html)) !== null && li < 6) {
+      let href = ma[1]
+      const um = href.match(/[?&]uddg=([^&]+)/)
+      if (um) { try { href = decodeURIComponent(um[1]) } catch {} }
+      else if (href.startsWith('//')) href = 'https:' + href
+      const title = stripHtml(ma[2]) || href
+      if (/^https?:\/\//.test(href)) links.push({ title, url: href, source: 'ddg' })
+      li++
+    }
+    return { items: snippets, ok: snippets.length > 0, links }
   } catch {
-    return { items: [], ok: false }
+    return { items: [], ok: false, links: [] }
   }
 }
 
@@ -464,9 +482,17 @@ function stripIdentity(s: string): string {
     .slice(0, 8000)
 }
 
+// 检索返回的可点击参考链接（标题 + 真实 URL + 来源标记），供前端渲染「相关链接」卡片。
+interface LinkInfo {
+  title: string
+  url: string
+  source: string
+}
+
 interface SearchResult {
   results: string[]
   sources: string[]
+  links: LinkInfo[]
   ok: boolean
 }
 
@@ -485,6 +511,7 @@ async function searchGoogleNews(q: string): Promise<{ items: string[]; ok: boole
     let xml = new TextDecoder('utf-8').decode(buf)
     if (xml.includes('�')) { try { xml = new TextDecoder('gbk').decode(buf) } catch {} }
     const items: string[] = []
+    const links: LinkInfo[] = []
     const re = /<item>([\s\S]*?)<\/item>/g
     let m: RegExpExecArray | null
     let i = 0
@@ -492,13 +519,15 @@ async function searchGoogleNews(q: string): Promise<{ items: string[]; ok: boole
       const block = m[1]
       const title = (block.match(/<title>([\s\S]*?)<\/title>/) || [])[1] || ''
       const src = (block.match(/<source[^>]*>([\s\S]*?)<\/source>/) || [])[1] || ''
+      const link = (block.match(/<link>([\s\S]*?)<\/link>/) || [])[1] || ''
       const t = stripHtml(title).replace(/\s+-\s+[^-]+$/, '') // 去掉末尾 " - 来源"
       if (t) items.push('- 【新闻】' + t + (src ? `（${stripHtml(src)}）` : ''))
+      if (link) links.push({ title: t || '新闻', url: stripHtml(link), source: 'gnews' })
       i++
     }
-    return { items, ok: items.length > 0 }
+    return { items, ok: items.length > 0, links }
   } catch {
-    return { items: [], ok: false }
+    return { items: [], ok: false, links: [] }
   }
 }
 
@@ -508,16 +537,18 @@ async function searchHackerNews(q: string): Promise<{ items: string[]; ok: boole
     const url = 'https://hn.algolia.com/api/v1/search?query=' + encodeURIComponent(q) + '&hitsPerPage=5'
     const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'zexiaotong/1.0' } })
     const j = await r.json()
-    const items = (j.hits || [])
-      .slice(0, 5)
-      .map((h: any) => {
-        const pts = h.points != null ? `（👍${h.points}）` : ''
-        const d = h.created_at ? ` ${String(h.created_at).slice(0, 10)}` : ''
-        return `- 【讨论】${stripHtml(h.title || '')}${pts}${d}`
-      })
-    return { items, ok: items.length > 0 }
+    const hits = (j.hits || []).slice(0, 5)
+    const items = hits.map((h: any) => {
+      const pts = h.points != null ? `（👍${h.points}）` : ''
+      const d = h.created_at ? ` ${String(h.created_at).slice(0, 10)}` : ''
+      return `- 【讨论】${stripHtml(h.title || '')}${pts}${d}`
+    })
+    const links: LinkInfo[] = hits
+      .filter((h: any) => h.objectID)
+      .map((h: any) => ({ title: stripHtml(h.title || ''), url: `https://news.ycombinator.com/item?id=${h.objectID}`, source: 'hn' }))
+    return { items, ok: items.length > 0, links }
   } catch {
-    return { items: [], ok: false }
+    return { items: [], ok: false, links: [] }
   }
 }
 
@@ -539,6 +570,7 @@ async function searchBing(q: string, siteScope?: string): Promise<{ items: strin
       return { items: [], ok: false }
     }
     const snippets: string[] = []
+    const links: LinkInfo[] = []
     const re = /<li class="b_algo"[\s\S]*?<p[^>]*>([\s\S]*?)<\/p>/g
     let m: RegExpExecArray | null
     let i = 0
@@ -547,9 +579,16 @@ async function searchBing(q: string, siteScope?: string): Promise<{ items: strin
       if (txt && txt.length > 15) snippets.push('- ' + txt.slice(0, 200))
       i++
     }
-    return { items: snippets, ok: snippets.length > 0 }
+    // 结果链接：b_algo 块内第一个 h2>a 的 href 即真实地址
+    const reA = /<li class="b_algo"[\s\S]*?<h2><a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g
+    let ma: RegExpExecArray | null
+    while ((ma = reA.exec(html)) !== null && links.length < 6) {
+      const href = ma[1]
+      if (/^https?:\/\//.test(href)) links.push({ title: stripHtml(ma[2]) || href, url: href, source: 'bing' })
+    }
+    return { items: snippets, ok: snippets.length > 0, links }
   } catch {
-    return { items: [], ok: false }
+    return { items: [], ok: false, links: [] }
   }
 }
 
@@ -586,16 +625,18 @@ async function searchReddit(q: string): Promise<{ items: string[]; ok: boolean }
     const url = 'https://www.reddit.com/search.json?q=' + encodeURIComponent(q) + '&limit=5&sort=relevance'
     const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'zexiaotong/1.0 by researcher' } })
     const j = await r.json()
-    const items = (j.data?.children || [])
-      .slice(0, 5)
-      .map((c: any) => {
-        const d = c.data || {}
-        const txt = String(d.selftext || d.title || '').slice(0, 180)
-        return `- 【社区】r/${d.subreddit || '?'}：${stripHtml(txt)}`
-      })
-    return { items, ok: items.length > 0 }
+    const children = (j.data?.children || []).slice(0, 5)
+    const items = children.map((c: any) => {
+      const d = c.data || {}
+      const txt = String(d.selftext || d.title || '').slice(0, 180)
+      return `- 【社区】r/${d.subreddit || '?'}：${stripHtml(txt)}`
+    })
+    const links: LinkInfo[] = children
+      .filter((c: any) => c.data?.permalink)
+      .map((c: any) => ({ title: stripHtml(String(c.data.title || '').slice(0, 80)), url: `https://www.reddit.com${c.data.permalink}`, source: 'reddit' }))
+    return { items, ok: items.length > 0, links }
   } catch {
-    return { items: [], ok: false }
+    return { items: [], ok: false, links: [] }
   }
 }
 
@@ -646,6 +687,10 @@ async function searchMulti(query: string): Promise<SearchResult> {
   const social: string[] = [] // 社媒/UGC 专项池：保证抖音/小红书等内容有独立配额，不被通用结果淹没
   const seen = new Set<string>()
   const rt = relevanceInfo(query)
+  // 收集可点击参考链接（去重 + 过滤搜索引擎自身包装/跳转噪音），供前端「相关链接」卡片使用
+  const links: LinkInfo[] = []
+  const seenLinks = new Set<string>()
+  const isNoiseLink = (u: string) => /(duckduckgo\.com\/l\/|bing\.com\/ck\/|google\.com\/url|news\.google\.com\/rss|bing\.com\/search|baidu\.com)/.test(u)
   for (const s of settled) {
     if (s.ok && s.items.length) {
       const base = s.src.split(':')[0] // gnews / hn / bing / reddit / wiki-zh / wiki-en / ddg / tavily / brave / serper / tavily-social / bing-social
@@ -661,6 +706,13 @@ async function searchMulti(query: string): Promise<SearchResult> {
         if (!s.relaxed && !isRelevant(it, rt)) continue // 社媒域作用域结果已按 query 过滤，跳过通用相关性门禁
         if (!seen.has(it)) { seen.add(it); bucket.push(it) }
       }
+    }
+    // 链接独立收集：即便片段被相关性门禁过滤，真实来源链接仍对用户有用
+    for (const lk of s.links || []) {
+      if (!lk?.url || seenLinks.has(lk.url) || isNoiseLink(lk.url)) continue
+      try { new URL(lk.url) } catch { continue }
+      seenLinks.add(lk.url)
+      links.push(lk)
     }
   }
   // 通用动态源（最多 14）+ 社媒/UGC 专项（固定 6 条配额）+ 维基兜底（最多 8），合计 28 条上限
@@ -679,11 +731,13 @@ async function searchMulti(query: string): Promise<SearchResult> {
     }
     if (relaxed.length) merged = [...merged, ...relaxed].slice(0, 32)
   }
-  return { results: merged, sources, ok: merged.length > 0 }
+  // 参考链接上限：优先保留社媒/UGC（用户明确要的抖音/小红书等）与新闻，整体最多 16 条
+  if (links.length > 16) links.length = 16
+  return { results: merged, sources, links, ok: merged.length > 0 }
 }
 
-function s2(p: Promise<{ items: string[]; ok: boolean }>, src: string, relaxed = false) {
-  return p.then((r) => ({ ...r, src, relaxed }))
+function s2(p: Promise<{ items: string[]; ok: boolean; links?: LinkInfo[] }>, src: string, relaxed = false) {
+  return p.then((r) => ({ ...r, src, relaxed, links: r.links || [] }))
 }
 
 // —— 检索决策器：让模型判断「这个问题是否需要检索最新公开资料才能准确回答」——
@@ -831,16 +885,21 @@ Deno.serve(async (req: Request) => {
     ok: boolean
     count: number
     sources: string[]
+    links: LinkInfo[]
     image: { url: string; title: string } | null
     images: { url: string; title: string }[]
-  } = { ok: false, count: 0, sources: [], image: null, images: [] }
+  } = { ok: false, count: 0, sources: [], links: [], image: null, images: [] }
   let rawResults: string[] = []
 
   if (needSearch && query) {
     const ctx = await searchMulti(query)
-    searchMeta = { ok: ctx.ok, count: ctx.results.length, sources: ctx.sources, image: null, images: [] }
+    searchMeta = { ok: ctx.ok, count: ctx.results.length, sources: ctx.sources, links: ctx.links, image: null, images: [] }
     rawResults = ctx.results
     if (ctx.ok && !searchOnly) {
+      const linkBlock = ctx.links.length
+        ? '\n【检索到的参考链接（请在回答末尾「相关链接与地点」板块中如实引用，标注来源；不要编造未列出的链接）：】\n' +
+          ctx.links.slice(0, 10).map((l, i) => `${i + 1}. （${l.source}）${l.title} ${l.url}`).join('\n') + '\n'
+        : ''
       sysMessages.push({
         role: 'system',
         content:
@@ -850,10 +909,12 @@ Deno.serve(async (req: Request) => {
           '<search>\n' +
           ctx.results.join('\n') +
           '\n</search>\n' +
+          linkBlock +
           '要求：① 优先依据上述资料作答，并在关键事实后用「（来源：xxx）」标注；' +
           '② 若资料不足以回答，明确说明「未检索到确切信息」，不要编造；' +
           '③ 涉及排名/分数/政策等易变数据，提醒用户以官方最新公布为准；' +
-          '④ 引用用户原话时务必使用上面【用户原话】字段里的完整字句，不要把检索片段里的 query 拼接词当成用户原话。'
+          '④ 引用用户原话时务必使用上面【用户原话】字段里的完整字句，不要把检索片段里的 query 拼接词当成用户原话；' +
+          '⑤ 回答末尾必须包含「相关链接与地点」板块，列出上述参考链接中的官网/百科/新闻/社媒主页，并补充该实体的具体地址、交通、地图可定位信息（查不到写「暂无法确认具体地址」）。'
       })
     }
   }
