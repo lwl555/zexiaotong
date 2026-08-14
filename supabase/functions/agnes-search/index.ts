@@ -152,6 +152,32 @@ function isRelevant(snippet: string, info: ReturnType<typeof relevanceInfo>): bo
   return false
 }
 
+// 链接相关性：title+url 必须命中至少 1 个 query 主体 token（剔除「肺癌论文」这种跟学校完全不沾边的噪声）；
+// 维基百科 / 官方政府 / 教育域名天然权威，绕过过滤（即便主题相关度低，对用户仍有定位价值）。
+const OFFICIAL_HOST = /(\.gov(\.cn)?|\.edu(\.cn)?$|\.edu\.cn|wikipedia\.org|linkedin\.com|github\.com)/i
+function isLinkRelevant(lk: LinkInfo, info: ReturnType<typeof relevanceInfo>): boolean {
+  if (info.tokens.length === 0 && info.years.length === 0 && info.kw.length === 0) return true
+  if (OFFICIAL_HOST.test(lk.url)) return true
+  const text = ((lk.title || '') + ' ' + lk.url).toLowerCase()
+  for (const tok of info.tokens) if (tok.length >= 2 && text.includes(tok.toLowerCase())) return true
+  for (const y of info.years) if (text.includes(y)) return true
+  for (const k of info.kw) if (text.includes(k)) return true
+  return false
+}
+
+// 链接展示优先级：维基百科（最权威的实体信息）> 官方域名 > 社媒（用户明确要抖音/小红书等）> 新闻 / 社区 > 通用搜索
+function linkPriority(lk: LinkInfo): number {
+  const s = lk.source
+  if (s === 'wiki-zh' || s === 'wiki-en') return 0
+  if (OFFICIAL_HOST.test(lk.url)) return 1
+  if (s === 'tavily-social' || s === 'bing-social') return 2
+  if (s === 'gnews' || s === 'reddit' || s === 'hn') return 3
+  return 4
+}
+function sortLinks(arr: LinkInfo[]): LinkInfo[] {
+  return [...arr].sort((a, b) => linkPriority(a) - linkPriority(b))
+}
+
 // 单次带超时的 fetch
 async function fetchWithTimeout(url: string, opts: RequestInit = {}, ms = 15000): Promise<Response> {
   const ctrl = new AbortController()
@@ -731,9 +757,11 @@ async function searchMulti(query: string): Promise<SearchResult> {
     }
     if (relaxed.length) merged = [...merged, ...relaxed].slice(0, 32)
   }
-  // 参考链接上限：优先保留社媒/UGC（用户明确要的抖音/小红书等）与新闻，整体最多 16 条
-  if (links.length > 16) links.length = 16
-  return { results: merged, sources, links, ok: merged.length > 0 }
+  // 参考链接：相关性去噪（query 主体 token 必须命中，否则丢；维基 / 官方域名天然保留）→ 安全网（<2 条放宽避免完全空卡）→ 按权威度排序 → 上限 6 条
+  let linksFiltered = links.filter((lk) => isLinkRelevant(lk, rt))
+  if (linksFiltered.length < 2 && links.length >= 2) linksFiltered = links.slice() // 安全网：去噪后过少就放宽
+  const linksFinal = sortLinks(linksFiltered).slice(0, 6)
+  return { results: merged, sources, links: linksFinal, ok: merged.length > 0 }
 }
 
 function s2(p: Promise<{ items: string[]; ok: boolean; links?: LinkInfo[] }>, src: string, relaxed = false) {

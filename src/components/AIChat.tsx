@@ -16,13 +16,16 @@ const SRC_LABEL: Record<string, string> = {
   gnews: '新闻',
   hn: '技术讨论',
   bing: '网页',
+  'bing-social': '社媒',
   reddit: '社区',
   'wiki-zh': '维基(中)',
   'wiki-en': '维基(英)',
   ddg: 'DuckDuckGo',
-  tavily: '实时检索',
+  tavily: '综合检索',
+  'tavily-social': '社媒',
   brave: 'Brave',
-  serper: 'Serper'
+  serper: 'Serper',
+  baidu: '百度'
 }
 const srcLabel = (s: string) => SRC_LABEL[s] || s
 
