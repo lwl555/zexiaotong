@@ -19,7 +19,9 @@ interface Props {
 export default function Layout({ primaryNav, moreNav, children }: Props) {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const moreRef = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
   const nav = useNavigate()
 
   // 点外面关掉「更多」下拉
@@ -32,6 +34,17 @@ export default function Layout({ primaryNav, moreNav, children }: Props) {
     return () => document.removeEventListener('mousedown', onDoc)
   }, [moreOpen])
 
+  // 点外面关掉移动端汉堡菜单
+  useEffect(() => {
+    if (!menuOpen) return
+    const onDoc = (e: MouseEvent) => {
+      const t = e.target as HTMLElement
+      if (menuRef.current && !menuRef.current.contains(t) && !t.closest('.hamburger')) setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [menuOpen])
+
   return (
     <div className="shell">
       <header className="topbar">
@@ -42,8 +55,8 @@ export default function Layout({ primaryNav, moreNav, children }: Props) {
             <span className="brand-text">择校通</span>
           </NavLink>
 
-          {/* 中：4 个主链接 + 「更多」下拉 */}
-          <nav className="nav">
+          {/* 中：4 个主链接 + 「更多」下拉（仅在桌面显示，窄屏由汉堡菜单接管） */}
+          <nav className="nav desktop-nav">
             {primaryNav.map((n) => (
               <NavLink
                 key={n.to}
@@ -85,7 +98,7 @@ export default function Layout({ primaryNav, moreNav, children }: Props) {
             </div>
           </nav>
 
-          {/* 右：克制 — 历史按钮 + 头像下拉（含 uid） */}
+          {/* 右：克制 — 历史按钮 + 头像下拉（含 uid）+ 汉堡（仅窄屏显示） */}
           <div className="topbar-right">
             <button
               className="ghost-btn"
@@ -97,8 +110,37 @@ export default function Layout({ primaryNav, moreNav, children }: Props) {
             <div className="avatar" onClick={() => nav('/about')} title="关于本站">
               兄
             </div>
+            <button
+              className={'hamburger' + (menuOpen ? ' open' : '')}
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-label="打开菜单"
+              aria-expanded={menuOpen}
+            >
+              <span />
+              <span />
+              <span />
+            </button>
           </div>
         </div>
+
+        {/* 移动端下拉菜单：收纳全部导航（主 + 更多），窄屏替代桌面横排 */}
+        {menuOpen && (
+          <div className="mobile-menu" ref={menuRef}>
+            {[...primaryNav, ...moreNav].map((n) => (
+              <NavLink
+                key={n.to}
+                to={n.to}
+                end={n.end}
+                className={({ isActive }) => 'mobile-menu-item' + (isActive ? ' active' : '')}
+                onClick={() => setMenuOpen(false)}
+              >
+                {n.icon && <span className="ic">{n.icon}</span>}
+                <span className="lbl">{n.label}</span>
+                {n.live && <span className="live-dot" />}
+              </NavLink>
+            ))}
+          </div>
+        )}
       </header>
 
       <main className="container">{children}</main>

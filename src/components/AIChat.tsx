@@ -64,7 +64,14 @@ function onImgError(e: SyntheticEvent<HTMLImageElement>, rawUrl: string) {
 
 import { renderReport, ThemeKey } from './Report'
 import { exportDocx } from '../lib/docx'
-import { PROMPT_EMPHASIS, SYSTEM_IDENTITY } from '../lib/prompts'
+import { PROMPT_EMPHASIS, SYSTEM_IDENTITY, BLUNT_RULE, FRESHNESS_RULE } from '../lib/prompts'
+
+// 联网 / 思考阶段的提示文案（按已等待时长切换，纯前端 heuristics，仅用于安抚"没卡住"）
+function phaseOf(ms: number): string {
+  if (ms < 4000) return '🌐 正在联网检索真实资料…'
+  if (ms < 16000) return '🤔 AI 正在分析、对比、提炼优缺点…'
+  return '✍️ 正在生成直白结论…'
+}
 
 interface Props {
   title: string
@@ -129,6 +136,17 @@ export default function AIChat({
   const lastReply = useRef('')
   const abortRef = useRef<AbortController | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
+  // 联网 / 思考阶段的实时计时与阶段提示
+  const [elapsedMs, setElapsedMs] = useState(0)
+  const startRef = useRef<number>(0)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // 组件卸载时清掉计时器，避免泄漏
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
+  }, [])
 
   // 切换子频道 / 功能页时，加载对应会话（接着对话）
   useEffect(() => {
@@ -174,11 +192,21 @@ export default function AIChat({
     persist(next, title)
     setInput('')
     setLoading(true)
+    // 启动"已等待时长"计时器（每 250ms 刷新一次）
+    startRef.current = Date.now()
+    setElapsedMs(0)
+    if (timerRef.current) clearInterval(timerRef.current)
+    timerRef.current = setInterval(() => setElapsedMs(Date.now() - startRef.current), 250)
     const controller = new AbortController()
     abortRef.current = controller
     try {
+      // 动态注入当前日期，让模型据此判断信息时效性；并强制直白 + 时效标注
+      const now = new Date()
+      const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`
+      const freshness = FRESHNESS_RULE.replace('{DATE}', dateStr)
+      const systemContent = `${SYSTEM_IDENTITY}\n\n${systemPrompt}\n\n${BLUNT_RULE}\n\n${freshness}\n\n${PROMPT_EMPHASIS}`
       const { content, search, reasoning } = await agnesChat(
-        [{ role: 'system', content: `${SYSTEM_IDENTITY}\n\n${systemPrompt}\n\n${PROMPT_EMPHASIS}` }, ...next.map((m): ChatMsg => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }))],
+        [{ role: 'system', content: systemContent }, ...next.map((m): ChatMsg => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }))],
         { webSearch: (webSearch || autoSearch) ?? false, autoSearch, signal: controller.signal }
       )
       setSearchMeta(search ?? null)
@@ -217,6 +245,10 @@ export default function AIChat({
       }
       setError(String(e?.message || e))
     } finally {
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+        timerRef.current = null
+      }
       setLoading(false)
       abortRef.current = null
     }
@@ -333,8 +365,20 @@ export default function AIChat({
         {loading && (
           <div className="msg ai">
             <div className="bubble">
-              <div className="loading">
-                <span className="spinner" /> {webSearch || autoSearch ? '🌐 正在联网检索并分析最新资料…' : `正在${messages.some((m) => m.role === 'user') ? '拆解分析' : '准备'}…`}
+              <div className="thinking-status">
+                <div className="ts-row">
+                  <span className="ts-phase">
+                    <span className="ts-spinner" />
+                    {webSearch || autoSearch ? phaseOf(elapsedMs) : `正在${messages.some((m) => m.role === 'user') ? '拆解分析' : '准备'}…`}
+                  </span>
+                  <span className="ts-time">⏱ 已等待 {(elapsedMs / 1000).toFixed(1)}s</span>
+                </div>
+                <div className="ts-eta">
+                  预计约 15–45 秒（联网检索 + AI 思考，首次或复杂问题会更久）· 没卡住，正在为你查证
+                </div>
+                <div className="ts-bar">
+                  <span className="ts-bar-fill" />
+                </div>
               </div>
             </div>
           </div>

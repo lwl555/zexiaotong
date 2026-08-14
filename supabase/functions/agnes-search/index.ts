@@ -116,9 +116,20 @@ const DOMAIN_KW = [
   '校招', '社招', 'offer', '裁员', '应届',
   '高考', '留学', '深造率'
 ]
+// 问句框架词（出现于 query 首尾、不属于实体/事实本身）：剥离后派生「主体」匹配锚点，
+// 避免「浙江大学怎么样」因整句严格匹配把相关结果全丢掉。
+const FRAME_LEAD = /^(我想知道|我想了解一下|我想问|请问|问下|帮我|麻烦|查一下|搜一下|了解下|我想|看下|说说)/
+const FRAME_TAIL = /(怎么样|如何|怎么|怎么选|如何选|选哪个|选什么|怎么办|哪些好|哪个好|好吗|好不好|行不行|可以吗|值得吗|吗|呢|是什么|是啥|评价|口碑|介绍|推荐|对比|分析|查询|了解|值得|呀|啊|哦|哈|呗|嘛)$/g
 function relevanceInfo(query: string) {
   // 主体 token：query 中的连续汉字串（去单字停用词），保留原序作为短句单元
-  const tokens = (query.match(/[一-龥]+/g) || []).filter((t) => t.length >= 2 && ![...t].every((c) => STOP_HAN.has(c)))
+  const base = (query.match(/[一-龥]+/g) || []).filter((t) => t.length >= 2 && ![...t].every((c) => STOP_HAN.has(c)))
+  // 派生「主体」：剥掉问句框架词，让「浙江大学怎么样」→「浙江大学」成为匹配锚点
+  const subjects: string[] = []
+  for (const t of base) {
+    const s = t.replace(FRAME_LEAD, '').replace(FRAME_TAIL, '').replace(FRAME_TAIL, '')
+    if (s.length >= 2 && !base.includes(s) && !subjects.includes(s)) subjects.push(s)
+  }
+  const tokens = [...base, ...subjects]
   const years = query.match(/(?:19|20)\d{2}/g) || []
   const kw = DOMAIN_KW.filter((k) => query.includes(k))
   return { tokens, years, kw }
@@ -414,13 +425,9 @@ async function fetchSchoolImages(entity: string): Promise<ImgSet> {
   }
 
   const scenes: { url: string; title: string }[] = []
-  // 1) 生活类优先：commons 搜「食堂 / 宿舍」相关真实场景图（用户要的接地气内部情报）
-  const lifeSets = await Promise.all([
-    fetchCommonsImages(`${enEntity} canteen`, 2),
-    fetchCommonsImages(`${enEntity} dormitory`, 2)
-  ])
-  for (const set of lifeSets) for (const s of set) scenes.push(s)
-  // 2) 校园/图书馆兜底：维基条目主页图（中→英）
+  // 校园/图书馆等场景图：维基条目主页图（中→英兜底）。
+  // 注：commons 搜「食堂/宿舍」对中文院校命中极低且每个 entity 白吃 2 次请求，极易触发维基 429 导致整组图丢失，
+  // 故不再调用 commons，聚焦维基主图更稳（用户诉求「只要是学校的都发出来 + 门面为主」已能满足）。
   const wikiScenes = await fetchWikiImages('zh', entity)
   if (wikiScenes.length < 3) {
     const enScenes = await fetchWikiImages('en', enEntity)
@@ -542,6 +549,33 @@ async function searchBing(q: string): Promise<{ items: string[]; ok: boolean }> 
   }
 }
 
+// 百度网页搜索：中文覆盖面最广的通用源。数据中心 IP 偶发安全验证页（检测到就跳过），
+// 同样存在 GBK 返回问题，用 arrayBuffer 双解码兜底；解析失败时优雅返回空。
+async function searchBaidu(q: string): Promise<{ items: string[]; ok: boolean }> {
+  try {
+    const url = 'https://www.baidu.com/s?wd=' + encodeURIComponent(q) + '&rn=10'
+    const r = await fetchWithTimeout(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+    })
+    const buf = await r.arrayBuffer()
+    let html = new TextDecoder('utf-8').decode(buf)
+    if (html.includes('�')) { try { html = new TextDecoder('gbk').decode(buf) } catch {} }
+    if (/安全验证|百度安全验证|wappass|请输入验证码|网络不给力/i.test(html)) {
+      return { items: [], ok: false }
+    }
+    const snippets: string[] = []
+    const re = /<div class="c-abstract[^"]*"[^>]*>([\s\S]*?)<\/div>|<span class="content-right[^"]*"[^>]*>([\s\S]*?)<\/span>/g
+    let m: RegExpExecArray | null
+    while ((m = re.exec(html)) !== null && snippets.length < 6) {
+      const txt = stripHtml(m[1] || m[2] || '')
+      if (txt && txt.length > 15) snippets.push('- ' + txt.slice(0, 200))
+    }
+    return { items: snippets, ok: snippets.length > 0 }
+  } catch {
+    return { items: [], ok: false }
+  }
+}
+
 // Reddit 社区讨论：真实用户观点，对「体验」「口碑」「避雷」类问题有价值。
 async function searchReddit(q: string): Promise<{ items: string[]; ok: boolean }> {
   try {
@@ -578,9 +612,10 @@ async function searchMulti(query: string): Promise<SearchResult> {
   // 动态 / 新闻源（最新信息，优先注入模型上下文）
   tasks.push(s2(searchGoogleNews(query), 'gnews'))
   tasks.push(s2(searchHackerNews(query), 'hn'))
-  // 注：Bing 中文结果常返回 GBK，而 Edge(Deno) 运行时 TextDecoder 不支持 gbk，
-  // 解出乱码；中文检索已由 tavily(实时) + gnews(新闻) + 维基(百科) 充分覆盖，故移除 Bing。
-  // tasks.push(s2(searchBing(query), 'bing'))
+  // 通用网页源（中文覆盖面广）：Bing + 百度。二者对数据中心 IP 偶发验证页/限流，
+  // 检测到即跳过，不影响其他源；GBK 返回已用 arrayBuffer 双解码兜底。
+  tasks.push(s2(searchBing(query), 'bing'))
+  tasks.push(s2(searchBaidu(query), 'baidu'))
   tasks.push(s2(searchReddit(query), 'reddit'))
 
   // 百科兜底源：维基（中/英，多候选并发）+ DuckDuckGo
@@ -607,8 +642,22 @@ async function searchMulti(query: string): Promise<SearchResult> {
       }
     }
   }
-  // 动态源优先（最多 12 条），维基兜底（最多 6 条），合计 18 条上限
-  const merged = [...dyn.slice(0, 12), ...wiki.slice(0, 6)]
+  // 动态源优先（最多 14 条），维基兜底（最多 6 条），合计 20 条上限
+  let merged: string[] = [...dyn.slice(0, 14), ...wiki.slice(0, 6)]
+  // 安全网：若相关性过滤后结果过少（易致「查不到」），放宽门禁，避免空答
+  if (merged.length < 5) {
+    const seenR = new Set(merged)
+    const relaxed: string[] = []
+    for (const s of settled) {
+      if (!s.ok) continue
+      for (const raw of s.items) {
+        if (raw.includes('�')) continue
+        const it = raw.length > 320 ? raw.slice(0, 320) + '…' : raw
+        if (!seenR.has(it)) { seenR.add(it); relaxed.push(it) }
+      }
+    }
+    if (relaxed.length) merged = [...merged, ...relaxed].slice(0, 20)
+  }
   return { results: merged, sources, ok: merged.length > 0 }
 }
 
@@ -688,7 +737,15 @@ Deno.serve(async (req: Request) => {
         return new Response('host not allowed', { status: 403 })
       }
       try {
-        const r = await fetch(parsed.toString(), { headers: { 'User-Agent': WIKI_UA } })
+        // 去掉维基自动追加的 utm 跟踪参数，并用浏览器 UA（维基对数据中心/自定义 UA 的图床常返回 403）
+        const cleanTarget = parsed.toString().replace(/[?&]utm_[^&]+/g, '').replace(/\?$/, '')
+        const r = await fetch(cleanTarget, {
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            Accept: 'image/avif,image/webp,image/png,image/*,*/*;q=0.8'
+          }
+        })
         if (!r.ok) return new Response('upstream ' + r.status, { status: 502 })
         return new Response(r.body, {
           status: 200,
