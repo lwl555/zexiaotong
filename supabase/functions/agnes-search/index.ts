@@ -188,27 +188,30 @@ async function wikiGetJSON(url: string, ms = 15000, retries = 3): Promise<any | 
 
 // —— 各搜索源 ——
 
-async function searchTavily(q: string): Promise<{ items: string[]; ok: boolean }> {
+async function searchTavily(q: string, domains?: string[]): Promise<{ items: string[]; ok: boolean }> {
   try {
+    const body: any = {
+      api_key: SEARCH_KEY,
+      query: q,
+      // advanced 深度返回更长、更详细的正文片段；域作用域检索（社媒）必用 advanced 以拿到真实帖子内容
+      search_depth: domains && domains.length ? 'advanced' : 'advanced',
+      max_results: 8,
+      include_answer: false,
+      language: 'zh'
+    }
+    if (domains && domains.length) body.include_domains = domains
     const r = await fetchWithTimeout(
       'https://api.tavily.com/search',
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          api_key: SEARCH_KEY,
-          query: q,
-          search_depth: 'basic',
-          max_results: 6,
-          include_answer: false,
-          language: 'zh'
-        })
+        body: JSON.stringify(body)
       },
       25000
     )
     const j = await r.json()
     const items = (j.results || [])
-      .slice(0, 6)
+      .slice(0, 8)
       .map((x: any) => `- ${x.title}：${stripHtml(x.content || x.snippet || '')}`)
     return { items, ok: items.length > 0 }
   } catch {
@@ -520,9 +523,10 @@ async function searchHackerNews(q: string): Promise<{ items: string[]; ok: boole
 
 // Bing 网页搜索：通用网页摘要，覆盖面广，但偶有反爬挑战页（检测到就跳过）。
 // 注意：Bing 中文结果可能以 GBK 返回，Deno 默认按 UTF-8 解出乱码，故用 arrayBuffer 双解码兜底。
-async function searchBing(q: string): Promise<{ items: string[]; ok: boolean }> {
+async function searchBing(q: string, siteScope?: string): Promise<{ items: string[]; ok: boolean }> {
   try {
-    const url = 'https://www.bing.com/search?q=' + encodeURIComponent(q) + '&setlang=zh-CN&cc=CN'
+    const qFull = siteScope ? `${q} ${siteScope}` : q
+    const url = 'https://www.bing.com/search?q=' + encodeURIComponent(qFull) + '&setlang=zh-CN&cc=CN'
     const r = await fetchWithTimeout(url, {
       headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
     })
@@ -595,6 +599,11 @@ async function searchReddit(q: string): Promise<{ items: string[]; ok: boolean }
   }
 }
 
+// 社媒/UGC 作用域：搜索引擎已收录抖音/小红书/B站/知乎/微博的公开页，用域作用域拉真实 UGC
+// （合规、免签名；直爬这些平台需登录态+请求签名，serverless 架构做不到，且违背 ToS）
+const SOCIAL_DOMAINS = ['xiaohongshu.com', 'douyin.com', 'bilibili.com', 'zhihu.com', 'weibo.com', 'tieba.baidu.com', 'douban.com']
+const SOCIAL_SITE_SCOPE = '(site:xiaohongshu.com OR site:douyin.com OR site:bilibili.com OR site:zhihu.com OR site:weibo.com OR site:tieba.baidu.com)'
+
 // 多源并发检索，收集任意成功源的结果
 async function searchMulti(query: string): Promise<SearchResult> {
   const tokens = query.split(' ').filter(Boolean)
@@ -603,10 +612,17 @@ async function searchMulti(query: string): Promise<SearchResult> {
   const tasks: Promise<{ items: string[]; ok: boolean; src: string }>[] = []
 
   // 有密钥则优先用可靠商业源（Tavily 已配置，覆盖实时检索；中文经模型整理输出，规避上游偶发乱码）
+  let keySrc = 'tavily'
   if (SEARCH_KEY) {
-    const keySrc = SEARCH_PROVIDER === 'brave' ? 'brave' : SEARCH_PROVIDER === 'serper' ? 'serper' : 'tavily'
+    keySrc = SEARCH_PROVIDER === 'brave' ? 'brave' : SEARCH_PROVIDER === 'serper' ? 'serper' : 'tavily'
     const p = keySrc === 'brave' ? searchBrave : keySrc === 'serper' ? searchSerper : searchTavily
     tasks.push(s2(p(query), keySrc))
+  }
+  // 社媒/UGC 专项检索：把抖音/小红书/B站/知乎/微博的公开内容纳入（经搜索引擎收录，合规免签名）。
+  // 这些结果已按 query + 域名双重过滤，故标记 relaxed=true 跳过通用相关性门禁（避免「浙大」≠「浙江大学」误杀）。
+  tasks.push(s2(searchBing(query, SOCIAL_SITE_SCOPE), 'bing-social', true))
+  if (keySrc === 'tavily') {
+    tasks.push(s2(searchTavily(query, SOCIAL_DOMAINS), 'tavily-social', true))
   }
 
   // 动态 / 新闻源（最新信息，优先注入模型上下文）
@@ -627,23 +643,28 @@ async function searchMulti(query: string): Promise<SearchResult> {
   const sources: string[] = []
   const dyn: string[] = []
   const wiki: string[] = []
+  const social: string[] = [] // 社媒/UGC 专项池：保证抖音/小红书等内容有独立配额，不被通用结果淹没
   const seen = new Set<string>()
   const rt = relevanceInfo(query)
   for (const s of settled) {
     if (s.ok && s.items.length) {
-      const base = s.src.split(':')[0] // gnews / hn / bing / reddit / wiki-zh / wiki-en / ddg / tavily / brave / serper
+      const base = s.src.split(':')[0] // gnews / hn / bing / reddit / wiki-zh / wiki-en / ddg / tavily / brave / serper / tavily-social / bing-social
       if (!sources.includes(base)) sources.push(base)
-      const bucket = base === 'wiki-zh' || base === 'wiki-en' || base === 'ddg' ? wiki : dyn
+      const bucket = base === 'wiki-zh' || base === 'wiki-en' || base === 'ddg'
+        ? wiki
+        : base === 'tavily-social' || base === 'bing-social'
+        ? social
+        : dyn
       for (const raw of s.items) {
         if (raw.includes('�')) continue // 丢弃乱码片段，避免污染生成模型
         const it = raw.length > 320 ? raw.slice(0, 320) + '…' : raw
-        if (!isRelevant(it, rt)) continue // 丢弃与问题主体无关的噪声片段
+        if (!s.relaxed && !isRelevant(it, rt)) continue // 社媒域作用域结果已按 query 过滤，跳过通用相关性门禁
         if (!seen.has(it)) { seen.add(it); bucket.push(it) }
       }
     }
   }
-  // 动态源优先（最多 14 条），维基兜底（最多 6 条），合计 20 条上限
-  let merged: string[] = [...dyn.slice(0, 14), ...wiki.slice(0, 6)]
+  // 通用动态源（最多 14）+ 社媒/UGC 专项（固定 6 条配额）+ 维基兜底（最多 8），合计 28 条上限
+  let merged: string[] = [...dyn.slice(0, 14), ...social.slice(0, 6), ...wiki.slice(0, 8)]
   // 安全网：若相关性过滤后结果过少（易致「查不到」），放宽门禁，避免空答
   if (merged.length < 5) {
     const seenR = new Set(merged)
@@ -656,13 +677,13 @@ async function searchMulti(query: string): Promise<SearchResult> {
         if (!seenR.has(it)) { seenR.add(it); relaxed.push(it) }
       }
     }
-    if (relaxed.length) merged = [...merged, ...relaxed].slice(0, 20)
+    if (relaxed.length) merged = [...merged, ...relaxed].slice(0, 32)
   }
   return { results: merged, sources, ok: merged.length > 0 }
 }
 
-function s2(p: Promise<{ items: string[]; ok: boolean }>, src: string) {
-  return p.then((r) => ({ ...r, src }))
+function s2(p: Promise<{ items: string[]; ok: boolean }>, src: string, relaxed = false) {
+  return p.then((r) => ({ ...r, src, relaxed }))
 }
 
 // —— 检索决策器：让模型判断「这个问题是否需要检索最新公开资料才能准确回答」——
@@ -777,7 +798,9 @@ Deno.serve(async (req: Request) => {
   }
 
   const messages: any[] = body.messages || []
-  const maxTokens = Math.min(Math.max(body.max_tokens ?? 2000, 1600), 8192)
+  // 推理模型需要足够预算：max_tokens=2000 时 reasoning_content 经常把预算吃光，content 变空。
+  // 默认抬到 6000（上限 8192），让 reasoning 和 content 都有空间。
+  const maxTokens = Math.min(Math.max(body.max_tokens ?? 6000, 6000), 8192)
   const webSearch = !!body.web_search
   const autoSearch = !!body.auto_search
   const searchOnly = !!body.search_only
@@ -872,9 +895,41 @@ Deno.serve(async (req: Request) => {
 
   const data = await upstream.json().catch(() => ({}))
   const imgs = await imagePromise.catch(() => EMPTY_IMG)
+
+  // —— 防御：推理模型偶发"reasoning 把 token 吃光 / 输出截断"，导致 content 为空但 reasoning 还在 ——
+  // 现象：用户看到的"AI 思考过程"有内容，正文却空白。
+  // 修复：检测到 content 为空且 reasoning 非空时，自动用更小预算、强制简短指令重试一次，
+  //       同时把模型在 reasoning 里"自导自演"的伪 <search> 标签过滤掉，避免暴露内部检索机制。
+  let content = (data as any)?.choices?.[0]?.message?.content ?? ''
+  if (!content?.trim()) {
+    try {
+      const retryMsgs = [
+        ...sysMessages,
+        { role: 'user' as const, content: rawUser + '\n\n【系统提示】上一轮回复因输出截断为空，请直接给出完整答案，不要再做内部检索模拟。' }
+      ]
+      const retry = await fetch(`${V9_BASE}/v1/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${V9_ANON}` },
+        body: JSON.stringify({ model: V9_MODEL, messages: retryMsgs, max_tokens: 4000, stream: false, temperature: 0.7 })
+      })
+      const rd = await retry.json().catch(() => ({}))
+      const rcontent = rd?.choices?.[0]?.message?.content ?? ''
+      if (rcontent?.trim()) {
+        content = rcontent
+        // 把重试拿到的 content 合并回 data，让前端走正常渲染路径
+        ;(data as any).choices = (data as any).choices || [{}]
+        ;(data as any).choices[0].message = { ...((data as any).choices[0].message || {}), content: rcontent }
+      }
+    } catch {
+      // 重试失败也无所谓，至少不返空白
+    }
+  }
+
   // 抽取模型内部思考（reasoning_content），剥离可能泄露底层模型身份的词，附到返回体供前端展示「AI 思考过程」
   const rawReasoning = (data as any)?.choices?.[0]?.message?.reasoning_content || ''
-  const reasoning = rawReasoning ? stripIdentity(rawReasoning) : ''
+  // 过滤掉模型在 reasoning 里"自导自演"的伪 <search> 标签——它不是真检索结果，是模型模拟的动作，会误导用户
+  const cleanedReasoning = rawReasoning.replace(/<search>[\s\S]*?<\/search>/g, '').replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+  const reasoning = cleanedReasoning ? stripIdentity(cleanedReasoning) : ''
   // 把搜索元数据（含真实题图 + 场景图）与思考过程附到返回体，供前端诚实标注与配图
   const enriched = {
     ...data,

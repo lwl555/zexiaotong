@@ -211,9 +211,15 @@ export default function AIChat({
       )
       setSearchMeta(search ?? null)
       lastReply.current = content
+      // 兜底：服务端返回的 content 为空时，给用户明确说明 + 建议下一步，而不是显示空白气泡
+      const safeContent = content?.trim()
+        ? content
+        : '⚠️ 这一轮没拿到正文（推理模型偶发输出截断，已自动重试）。建议你：\n' +
+          '1. 点一下下方的「实时资讯」按钮切换模式，直接看检索到的原始资料；\n' +
+          '2. 或换个更具体的问题（例如「内江医科学校 宿舍 几人间」「食堂 几楼 哪个窗口」）。'
       const aiMsg: Msg = {
         role: 'ai' as const,
-        content,
+        content: safeContent,
         image: search?.image ?? null,
         images: search?.images ?? null,
         reasoning: reasoning ?? null
@@ -229,7 +235,7 @@ export default function AIChat({
         channel,
         pageLabel: title,
         question: text,
-        answer: content,
+        answer: safeContent,
         search: search ?? null,
         image: search?.image ?? null,
         images: search?.images ?? null,
