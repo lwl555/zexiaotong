@@ -28,7 +28,7 @@ export interface QueryRecord {
   id: string
   pageKey: string
   channel: string
-  pageLabel: string // 功能名（AI百事通 / 择校导师 / 文档工坊）
+  pageLabel: string // 功能名（AI百事通 / 实时资讯台 / 文档工坊）
   question: string
   answer: string
   search?: SearchMeta | null

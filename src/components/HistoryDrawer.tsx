@@ -5,7 +5,7 @@ import { renderReport, ThemeKey } from './Report'
 
 const PAGE_LABEL: Record<string, string> = {
   'ai-search': 'AI百事通',
-  'ai-tutor': '择校导师',
+  'ai-tutor': '实时资讯台',
   'document-workshop': '文档工坊'
 }
 const CHANNEL_LABEL: Record<string, string> = {

@@ -13,7 +13,7 @@ import About from './pages/About'
 const ROUTE_TITLES: Record<string, string> = {
   '/': '择校通',
   '/ai-search': '择校通 · AI百事通',
-  '/ai-tutor': '择校通 · AI择校导师',
+  '/ai-tutor': '择校通 · 实时资讯台',
   '/document-workshop': '择校通 · 文档工坊',
   '/warnings': '择校通 · 避雷清单',
   '/money': '择校通 · 搞钱项目',
@@ -24,7 +24,7 @@ const ROUTE_TITLES: Record<string, string> = {
 export const primaryNav: { to: string; label: string; icon: string; live?: boolean; end?: boolean }[] = [
   { to: '/', label: '首页', icon: '', end: true },
   { to: '/ai-search', label: 'AI百事通', icon: '🧭', live: true },
-  { to: '/ai-tutor', label: 'AI择校导师', icon: '', live: true },
+  { to: '/ai-tutor', label: '实时资讯台', icon: '', live: true },
   { to: '/document-workshop', label: '文档工坊', icon: '', live: true }
 ]
 

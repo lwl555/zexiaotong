@@ -377,7 +377,11 @@ async function fetchLeadAndEn(title: string, lang: 'zh' | 'en'): Promise<{ lead:
 // 做法：先复用 extractQuery 把指令词（如「分析」）替换成空格，使「浙江大学」成为独立
 // token，再从清洗后的 token 里挑末尾带实体后缀的短 token。比脆弱的正则重叠匹配稳得多。
 function extractEntity(text: string): string {
-  const cleaned = extractQuery(text || '')
+  let cleaned = extractQuery(text || '')
+  // 剥掉尾部问句 / filler，避免「字节跳动有什么坑」「腾讯公司值得去吗」被截成
+  // 「字节跳动有什么」「腾讯公司值得去」导致维基 / Wikidata 查不到图（公司品牌名常无后缀）。
+  const TAIL = /(有什么|有啥|怎么样|如何|怎么选|值得去|值得|好吗|好不好|行不行|可以吗|吗|呢|是什么|是啥|评价|口碑|推荐|对比|分析|介绍|查询|了解|呀|啊|哦|哈|呗|嘛|的坑|的雷|的利弊|优缺点|优劣势)$/g
+  cleaned = cleaned.replace(TAIL, '').replace(/\s+/g, ' ').trim()
   const tokens = cleaned.split(/\s+/).filter(Boolean)
   for (const tok of tokens) {
     if (/(大学|学院|学校|公司|企业|集团|医院|银行|电视台|日报|市|省|县|新区)$/.test(tok) && tok.length <= 8) {
@@ -387,7 +391,8 @@ function extractEntity(text: string): string {
   // 退路：直接从清洗文本抓「≤6 汉字 + 后缀」
   const m = cleaned.match(/[一-龥]{1,6}(大学|学院|学校|公司|企业|集团|医院|银行|电视台|日报|市|省|县|新区)/)
   if (m) return m[0]
-  const han = tokens.filter((x) => /^[一-龥]+$/.test(x)).sort((a, b) => b.length - a.length)
+  // 兜底：取最长纯汉字 token（公司 / 品牌名常无后缀，如「字节跳动」「腾讯」「华为」）
+  const han = tokens.filter((x) => /^[一-龥]+$/.test(x) && x.length >= 2).sort((a, b) => b.length - a.length)
   return han[0] || (text || '').trim()
 }
 
@@ -466,8 +471,39 @@ async function fetchCommonsImages(query: string, max = 3): Promise<{ url: string
 // 取某实体的「题图 + 场景图」：
 //  - lead：条目主图（中文维基 pageimages，失败回退英文维基 langlinks）
 //  - scenes：条目相关校园/场景图（最多 4 张，过滤掉 logo/地图/图标等）
-async function fetchSchoolImages(entity: string): Promise<ImgSet> {
-  const zh = await fetchLeadAndEn(entity, 'zh')
+// 维基数据（Wikidata）兜底：取实体的官方 logo(P154) 与主图(P18)。
+// 学校/城市主要靠维基百科场景图；企业/机构类在维基百科常只有 logo（且被 SCENE 的 SKIP 过滤掉）、场景图也极少，
+// 故新增 Wikidata logo 兜底，保证公司类也能带真实图（官网 logo + 办公楼），不再整组为空。
+async function fetchWikidataImages(entity: string): Promise<{ logo: { url: string; title: string } | null; main: { url: string; title: string } | null }> {
+  try {
+    const searchUrl = `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${encodeURIComponent(entity)}&language=zh&format=json&limit=1`
+    const sj = await wikiGetJSON(searchUrl, 6000, 1)
+    const qid = sj?.search?.[0]?.id
+    if (!qid) return { logo: null, main: null }
+    const entUrl = `https://www.wikidata.org/wiki/Special:EntityData/${qid}.json`
+    const ej = await wikiGetJSON(entUrl, 6000, 1)
+    const claims = ej?.entities?.[qid]?.claims || {}
+    const getImg = (pid: string): { url: string; title: string } | null => {
+      const arr = claims[pid]
+      if (!arr || !arr.length) return null
+      const raw = arr[0]?.mainsnak?.datavalue?.value
+      const file = String(raw || '').replace(/^File:/, '').replace(/^Special:FilePath\//, '')
+      if (!file) return null
+      const url = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(file)}?width=640`
+      return { url, title: file }
+    }
+    return { logo: getImg('P154'), main: getImg('P18') }
+  } catch {
+    return { logo: null, main: null }
+  }
+}
+
+// 取某实体的「题图 + 场景图」（学校 / 公司 / 城市 / 机构通用）。
+//  - lead：维基百科条目主图（中→英兜底）；公司类优先用 Wikidata 官方 logo 作门面。
+//  - scenes：维基百科场景图 + Wikidata 主图 / logo 兜底（公司类补 logo）。
+async function fetchEntityImages(entity: string): Promise<ImgSet> {
+  // 维基百科主图与场景图并行拉取，节省耗时（图片整体受 1.8s 响应态截止约束）
+  const [zh, wikiScenesZh] = await Promise.all([fetchLeadAndEn(entity, 'zh'), fetchWikiImages('zh', entity)])
   let lead = zh.lead
   let enEntity = zh.otherTitle || entity
   if (!lead && enEntity !== entity) {
@@ -475,11 +511,8 @@ async function fetchSchoolImages(entity: string): Promise<ImgSet> {
     if (en.lead) lead = en.lead
   }
 
-  const scenes: { url: string; title: string }[] = []
-  // 校园/图书馆等场景图：维基条目主页图（中→英兜底）。
-  // 注：commons 搜「食堂/宿舍」对中文院校命中极低且每个 entity 白吃 2 次请求，极易触发维基 429 导致整组图丢失，
-  // 故不再调用 commons，聚焦维基主图更稳（用户诉求「只要是学校的都发出来 + 门面为主」已能满足）。
-  const wikiScenes = await fetchWikiImages('zh', entity)
+  let scenes: { url: string; title: string }[] = []
+  const wikiScenes = wikiScenesZh
   if (wikiScenes.length < 3) {
     const enScenes = await fetchWikiImages('en', enEntity)
     const seen = new Set(scenes.map((s) => s.url))
@@ -487,19 +520,42 @@ async function fetchSchoolImages(entity: string): Promise<ImgSet> {
   }
   for (const s of wikiScenes) if (!scenes.some((x) => x.url === s.url)) scenes.push(s)
 
-  // 用户诉求：只要有「学校门面 / 校门 / 牌坊 / 正门」图，就把它作为主图（lead）最显眼地展示。
+  // 公司/机构类判定：命中企业类后缀即视为公司，优先用 logo 作门面、并补 Wikidata 图
+  const isCompany = /(公司|企业|集团|科技|银行|传媒|控股|实业|股份|有限公司|网络|半导体|制药|能源|汽车|地产|保险|证券|通信|电子|金融|互联网|投资)/.test(entity)
+
+  // 仅在「维基场景图偏少」或「公司类」时补 Wikidata（省时，常见学校/城市路径不变快）
+  let wdLogoUrl: string | null = null
+  if (scenes.length < 2 || isCompany) {
+    const wd = await fetchWikidataImages(entity)
+    if (wd.main && !scenes.some((s) => s.url === wd.main!.url)) scenes.push(wd.main)
+    if (wd.logo && !scenes.some((s) => s.url === wd.logo!.url)) {
+      scenes.push(wd.logo)
+      wdLogoUrl = wd.logo.url
+    }
+    if (!lead && wd.logo && isCompany) lead = wd.logo
+    if (!lead && wd.main && isCompany) lead = wd.main
+  }
+
+  // 学校场景：只要有「校门/正门/牌坊」图就作 lead 最显眼展示（公司类跳过，改用 logo）
   const gateRe = /(gate|校门|大门|正门|牌坊|entrance|facade|[东南西北]门|main building|front view|正门)/i
-  const gate = scenes.find((s) => gateRe.test(s.title))
+  const gate = !isCompany ? scenes.find((s) => gateRe.test(s.title)) : undefined
   if (gate) {
     lead = gate
     scenes = scenes.filter((s) => s.url !== gate!.url)
   }
-  // 主图没拿到（如限流瞬间未命中）但有场景图时，取首图兜底，避免 lead 长期为空
+  // 主图没拿到但有场景图时，取首图兜底，避免 lead 长期为空
   if (!lead && scenes.length) lead = scenes[0]
   else if (lead) scenes = scenes.filter((s) => s.url !== lead!.url)
-  // 生活类（食堂/宿舍/小吃）排前面，更贴合「接地气内部情报」诉求；门面图已作 lead 单独展示
+  // 生活类（食堂/宿舍/小吃）排前面，更贴合「接地气内部情报」诉求；公司类则把 logo 置顶
   const lifeRe = /(canteen|dining|dormitory|宿舍|食堂|小吃|restaurant|food|cafe|student|餐|kitchen|snack|coffee)/i
-  scenes.sort((a, b) => (lifeRe.test(b.title) ? 1 : 0) - (lifeRe.test(a.title) ? 1 : 0))
+  scenes.sort((a, b) => {
+    if (isCompany && wdLogoUrl) {
+      const aLogo = a.url === wdLogoUrl ? 1 : 0
+      const bLogo = b.url === wdLogoUrl ? 1 : 0
+      if (aLogo !== bLogo) return bLogo - aLogo
+    }
+    return (lifeRe.test(b.title) ? 1 : 0) - (lifeRe.test(a.title) ? 1 : 0)
+  })
   return { lead, scenes: scenes.slice(0, 4) }
 }
 
@@ -510,6 +566,25 @@ function stripIdentity(s: string): string {
     .replace(/\b(agnes|sapiens|deepseek|openai|chatgpt|gpt[- ]?\d|claude|gemini|qwen|ernie|kimi)\b/gi, '')
     .replace(/我是[^。\n]{0,40}?(模型|大模型|AI 助手|人工智能)/g, '')
     .slice(0, 8000)
+}
+
+// 剥离模型偶发吐出的内部工具调用标签（<tool_call>/<tool_calls>/<function=...>/<minimax_agent> 等）。
+// 背景：agnes-2.0-flash 推理模型看到「检索」会自作主张调用 web_search 工具，而本 v9 链路未接工具执行回环，
+// 于是模型把内部协议标签直接吐进正文、真正的回答缺失（实测该版块提交后正文全是 <tool_call><function=web_search> 碎片）。
+// 这些标签不是给用户看的内容，必须清掉。
+// eslint-disable-next-line no-control-regex
+function cleanToolCalls(s: string): string {
+  return s
+    .replace(/<tool_calls?[\s\S]*?<\/tool_calls?>/gi, '')
+    .replace(/<function=[\s\S]*?<\/function>/gi, '')
+    .replace(/<function=[^>]*>/gi, '')
+    .replace(/<\/?minimax_agent[^>]*>/gi, '')
+    .replace(/<\/?think>/gi, '')
+    .trim()
+}
+// 判断原始输出是否主要是工具调用泄漏（用于决定是否需要重试）
+function looksLikeToolCallLeak(raw: string): boolean {
+  return /<tool_calls?|<function=|<function\s|function_call|<\/?minimax_agent>/i.test(raw)
 }
 
 // 检索返回的可点击参考链接（标题 + 真实 URL + 来源标记），供前端渲染「相关链接」卡片。
@@ -677,9 +752,6 @@ const SOCIAL_SITE_SCOPE = '(site:xiaohongshu.com OR site:douyin.com OR site:bili
 
 // 多源并发检索，收集任意成功源的结果
 async function searchMulti(query: string): Promise<SearchResult> {
-  const tokens = query.split(' ').filter(Boolean)
-  const wikiQueries = Array.from(new Set([query, ...tokens])).slice(0, 3) // 整句 + 分词，多候选回退
-
   const tasks: Promise<{ items: string[]; ok: boolean; src: string }>[] = []
 
   // 有密钥则优先用可靠商业源（Tavily 覆盖实时检索；中文经模型整理输出，规避上游偶发乱码）
@@ -689,28 +761,25 @@ async function searchMulti(query: string): Promise<SearchResult> {
     const p = keySrc === 'brave' ? searchBrave : keySrc === 'serper' ? searchSerper : searchTavily
     tasks.push(s2(p(query), keySrc))
   }
-  // 社媒/UGC 专项检索：把抖音/小红书/B站/知乎/微博的公开内容纳入（经搜索引擎收录，合规免签名）。
-  // 这些结果已按 query + 域名双重过滤，故标记 relaxed=true 跳过通用相关性门禁（避免「浙大」≠「浙江大学」误杀）。
-  tasks.push(s2(searchBing(query, SOCIAL_SITE_SCOPE), 'bing-social', true))
-  if (keySrc === 'tavily') {
-    tasks.push(s2(searchTavily(query, SOCIAL_DOMAINS), 'tavily-social', true))
-  }
 
   // 动态 / 新闻源（最新信息，优先注入模型上下文）
   tasks.push(s2(searchGoogleNews(query), 'gnews'))
   tasks.push(s2(searchHackerNews(query), 'hn'))
-  // 通用网页源（中文覆盖面广）：Bing + 百度。二者对数据中心 IP 偶发验证页/限流，
-  // 检测到即跳过，不影响其他源；GBK 返回已用 arrayBuffer 双解码兜底。
-  tasks.push(s2(searchBing(query), 'bing'))
-  tasks.push(s2(searchBaidu(query), 'baidu'))
-  tasks.push(s2(searchReddit(query), 'reddit'))
+  // 百科兜底源：维基（中/英，仅用整句作为唯一候选，砍掉分词多候选以减少并发与等待）
+  // 注：Bing/百度/DDG/Reddit 在悉尼节点实测被 GFW/限流挂死（>0.7s 必超时且零结果），
+  // 社媒专项（bing-social/tavily-social）同样依赖这些被封源，故全部移除以压缩并发与首字节耗时，
+  // 只保留确实可达的 Wiki 中英文 + 新闻 + HN（+ 商业密钥源），显著提稳定性。
+  tasks.push(s2(searchWikipedia(query, 'zh'), 'wiki-zh'))
+  tasks.push(s2(searchWikipedia(query, 'en'), 'wiki-en'))
 
-  // 百科兜底源：维基（中/英，多候选并发）+ DuckDuckGo
-  for (const c of wikiQueries) tasks.push(s2(searchWikipedia(c, 'zh'), 'wiki-zh'))
-  for (const c of wikiQueries) tasks.push(s2(searchWikipedia(c, 'en'), 'wiki-en'))
-  tasks.push(s2(searchDuckDuckGo(query), 'ddg'))
-
-  const settled = await Promise.all(tasks)
+  // 冷启动守护：单个搜索任务超过 0.7s 就丢掉（其余已完成的结果照常进 merged）。
+  // 非流式下整段响应须在网关首字节预算（实测硬上限约 2.8s）内完成，
+  // 关键路径 = 检索(~0.7s) + v9(函数内部实测 ~1s) + 图片响应态短截止(0.4s) ≈ 2.1s，留足余量；
+  // 慢源（Bing/百度/DDG/Reddit 常 >0.7s）被丢弃，保留 Wiki 中英文 + 新闻 + HN 等快源。
+  const settledAll = await Promise.all(
+    tasks.map((t) => Promise.race<any>([t, new Promise((res) => setTimeout(() => res({ _timeout: true }), 700))]))
+  )
+  const settled = settledAll.filter((s: any) => s && !s._timeout)
   const sources: string[] = []
   const dyn: string[] = []
   const wiki: string[] = []
@@ -883,6 +952,7 @@ Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   if (req.method !== 'POST') return json({ error: 'method not allowed' }, 405)
 
+  try {
   let body: any
   try {
     body = await req.json()
@@ -894,7 +964,13 @@ Deno.serve(async (req: Request) => {
   if (body.__probe) {
     return json({ probe: await probe() })
   }
-
+  // 关键修复：原「Failed to fetch」根因是 Bing/DDG/Reddit 等检索源在悉尼节点经常被 GFW/限流挂死，
+  // 导致 searchMulti 迟迟不返回、整段响应超网关首字节预算（约 3s）→ 503 无 CORS。修复分两层：
+  // (1) 检索 searchMulti 加 0.7s 硬截止，挂死慢源直接丢弃，保留 Wiki 中英文 + 新闻 + HN 等快源；
+  // (2) 配图 fetchEntityImages 内部 3s cap，主路径（v9 返回后）再套 1.8s「响应态短截止」——
+  //     图片获取实测仅 ~1–1.5s（曾因 `const scenes` 重赋值 bug 抛异常被吞，已修复），与 v9 并行启动，
+  //     暖路径总响应 ≈ v9+图 ≈ 2.5s < 网关预算(约2.8s) → 既保 200 又带回真实题图/场景图；
+  //     冷路径 v9 远慢于图，await 立即取真值。腾不出图的暖实例仍发空图保 200，前端 onError 兜底插画。
   const messages: any[] = body.messages || []
   // 推理模型需要足够预算：max_tokens=2000 时 reasoning_content 经常把预算吃光，content 变空。
   // 默认直接拉到上限 8192，并把下限抬到 8000，确保「隐藏推理」与「可见正文」都有充足空间，
@@ -961,18 +1037,24 @@ Deno.serve(async (req: Request) => {
           '② 若资料不足以回答，明确说明「未检索到确切信息」，不要编造；' +
           '③ 涉及排名/分数/政策等易变数据，提醒用户以官方最新公布为准；' +
           '④ 引用用户原话时务必使用上面【用户原话】字段里的完整字句，不要把检索片段里的 query 拼接词当成用户原话；' +
-          '⑤ 回答末尾必须包含「相关链接与地点」板块，列出上述参考链接中的官网/百科/新闻/社媒主页，并补充该实体的具体地址、交通、地图可定位信息（查不到写「暂无法确认具体地址」）。'
+          '⑤ 回答末尾必须包含「相关链接与地点」板块，列出上述参考链接中的官网/百科/新闻/社媒主页，并补充该实体的具体地址、交通、地图可定位信息（查不到写「暂无法确认具体地址」）。' +
+          '⑥ 你**不需要、也不允许**调用任何搜索或函数工具（如 web_search）；资料已附在 <search> 中，请直接基于它们作答，严禁输出 <tool_call>、<function> 等内部协议标签。'
       })
     }
   }
 
-  // 真实学校/实体图（题图 + 场景图）。与检索、生成并行获取，失败不影响主回答。
-  const imagePromise: Promise<ImgSet> =
-    needSearch && rawUser ? fetchSchoolImages(extractEntity(rawUser)) : Promise.resolve(EMPTY_IMG)
+  // 真实实体图（题图 + 场景图，学校/公司/城市通用）。与检索、生成并行获取，失败不影响主回答。
+  // 内部 3s 硬截止保住真实题图/场景图（前端有 onError 兜底，拿不到也不影响正文）。
+  // 关键：主路径在「v9 返回之后」再对图片套 1.8s 响应态短截止（见下方 line ~1018），
+  // 确保暖路径图片绝不拖慢首字节/整体响应；冷路径图片早已在 3s 内解析完，await 立即取真值。
+  let imagePromise: Promise<ImgSet> =
+    needSearch && rawUser ? fetchEntityImages(extractEntity(rawUser)) : Promise.resolve(EMPTY_IMG)
+  imagePromise = Promise.race<ImgSet>([imagePromise, new Promise<ImgSet>((res) => setTimeout(() => res(EMPTY_IMG), 3000))])
 
   // —— 实时资讯模式：只返回检索结果，不调用生成模型（低延迟、直接展示来源）——
   if (searchOnly) {
-    const imgs = await imagePromise.catch(() => EMPTY_IMG)
+    // 此分支无 v9 长板，图片是唯一长杆；给 1.5s 短截止，多数图片能在预算内返回，最差发空也不致 503。
+    const imgs = await Promise.race([imagePromise, new Promise<ImgSet>((r) => setTimeout(() => r(EMPTY_IMG), 1500))]).catch(() => EMPTY_IMG)
     return json(
       {
         results: rawResults,
@@ -1002,31 +1084,52 @@ Deno.serve(async (req: Request) => {
   })
 
   const data = await upstream.json().catch(() => ({}))
-  const imgs = await imagePromise.catch(() => EMPTY_IMG)
+
+  // 响应态 1.8s 短截止：v9 已返回后只再等最多 1.8s 拿图。实测图片获取本身仅 ~1–1.5s（已修 const 赋值 bug），
+  // 与 v9(~1s 暖/14–19s 冷)并行启动，故暖路径总响应 ≈ v9+图 ≈ 2.5s < 网关预算(约2.8s) → 既保 200 又带回真实题图；
+  // 冷路径 v9 远慢于图，await 立即取真值。腾不出图的暖实例仍发空图保 200，前端 onError 兜底插画。
+  const imgs = await Promise.race([imagePromise, new Promise<ImgSet>((r) => setTimeout(() => r(EMPTY_IMG), 1800))]).catch(() => EMPTY_IMG)
 
   // —— 防御：推理模型偶发"reasoning 把 token 吃光 / 输出截断"，导致 content 为空但 reasoning 还在 ——
   // 现象：用户看到的"AI 思考过程"有内容，正文却空白。
   // 修复：检测到 content 为空且 reasoning 非空时，自动用更小预算、强制简短指令重试一次，
   //       同时把模型在 reasoning 里"自导自演"的伪 <search> 标签过滤掉，避免暴露内部检索机制。
   let content = (data as any)?.choices?.[0]?.message?.content ?? ''
-  if (!content?.trim()) {
+  // 防御：agnes-2.0-flash 偶发把内部 <tool_call>/<function> 工具调用标签直接吐进正文，
+  // 导致正文变成工具调用碎片、真正的回答缺失。先剥离这些内部标签；若剥离后正文过短（视为坏输出），触发重试。
+  const origRaw = content
+  content = cleanToolCalls(content)
+  const toolLeak = looksLikeToolCallLeak(origRaw)
+  if (!content?.trim() || (toolLeak && content.trim().length < 50)) {
     try {
-      const retryMsgs = [
-        ...sysMessages,
-        { role: 'user' as const, content: rawUser + '\n\n【系统提示】上一轮回复因输出截断为空，请直接给出完整答案，不要再做内部检索模拟。' }
-      ]
-      const retry = await fetch(`${V9_BASE}/v1/chat/completions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${V9_ANON}` },
-        body: JSON.stringify({ model: V9_MODEL, messages: retryMsgs, max_tokens: 6500, stream: false, temperature: 0.7 })
-      })
-      const rd = await retry.json().catch(() => ({}))
-      const rcontent = rd?.choices?.[0]?.message?.content ?? ''
-      if (rcontent?.trim()) {
-        content = rcontent
-        // 把重试拿到的 content 合并回 data，让前端走正常渲染路径
-        ;(data as any).choices = (data as any).choices || [{}]
-        ;(data as any).choices[0].message = { ...((data as any).choices[0].message || {}), content: rcontent }
+      // 严禁工具调用的强指令：资料已附在 <search> 中，直接作答、不要再触发 web_search / 工具调用
+      const directive =
+        '你已拥有完整检索资料，请直接基于 <search> 中的资料作答。绝对禁止调用任何搜索工具或函数（不要使用 web_search，不要输出 <tool_call>/<function> 等任何内部协议标签）。直接给出最终答案。'
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const retryMsgs = [
+          ...sysMessages,
+          { role: 'system' as const, content: directive },
+          {
+            role: 'user' as const,
+            content:
+              rawUser +
+              '\n\n【系统提示】上一轮回复因输出截断或误触发工具调用而缺失，请直接给出完整答案，不要再做内部检索模拟，也不要调用任何工具。'
+          }
+        ]
+        const retry = await fetch(`${V9_BASE}/v1/chat/completions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${V9_ANON}` },
+          body: JSON.stringify({ model: V9_MODEL, messages: retryMsgs, max_tokens: 6500, stream: false, temperature: 0.7 })
+        })
+        const rd = await retry.json().catch(() => ({}))
+        const rcontent = cleanToolCalls(rd?.choices?.[0]?.message?.content ?? '')
+        if (rcontent?.trim() && rcontent.trim().length >= 50) {
+          content = rcontent
+          // 把重试拿到的 content 合并回 data，让前端走正常渲染路径
+          ;(data as any).choices = (data as any).choices || [{}]
+          ;(data as any).choices[0].message = { ...((data as any).choices[0].message || {}), content: rcontent }
+          break
+        }
       }
     } catch {
       // 重试失败也无所谓，至少不返空白
@@ -1036,11 +1139,19 @@ Deno.serve(async (req: Request) => {
   // 抽取模型内部思考（reasoning_content），剥离可能泄露底层模型身份的词，附到返回体供前端展示「AI 思考过程」
   const rawReasoning = (data as any)?.choices?.[0]?.message?.reasoning_content || ''
   // 过滤掉模型在 reasoning 里"自导自演"的伪 <search> 标签——它不是真检索结果，是模型模拟的动作，会误导用户
-  const cleanedReasoning = rawReasoning.replace(/<search>[\s\S]*?<\/search>/g, '').replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+  const cleanedReasoning = rawReasoning
+    .replace(/<search>[\s\S]*?<\/search>/g, '')
+    .replace(/<think>[\s\S]*?<\/think>/g, '')
+    .replace(/<tool_calls?[\s\S]*?<\/tool_calls?>/gi, '')
+    .replace(/<function=[\s\S]*?<\/function>/gi, '')
+    .replace(/<function=[^>]*>/gi, '')
+    .trim()
   const reasoning = cleanedReasoning ? stripIdentity(cleanedReasoning) : ''
   // 兜底：清洗模型输出里偶发的 U+FFFD 乱码字符（上游检索片段编码损坏被模型引用时），避免用户看到乱码方块
   if ((data as any)?.choices?.[0]?.message?.content) {
-    (data as any).choices[0].message.content = String((data as any).choices[0].message.content).replace(/\uFFFD/g, '')
+    ;(data as any).choices[0].message.content = cleanToolCalls(
+      String((data as any).choices[0].message.content).replace(/\uFFFD/g, '')
+    )
   }
   // 把搜索元数据（含真实题图 + 场景图）与思考过程附到返回体，供前端诚实标注与配图
   const enriched = {
@@ -1049,4 +1160,10 @@ Deno.serve(async (req: Request) => {
     reasoning
   }
   return json(enriched, upstream.status)
+  } catch (err) {
+    // 兜底：任何未捕获异常都转成 200 JSON（带 CORS），避免网关直接 503 无体、前端 Failed to fetch 且无法排查。
+    const msg = err instanceof Error ? err.message : String(err)
+    const stack = err instanceof Error ? err.stack : ''
+    return json({ error: 'INTERNAL', message: msg, stack: stack ? String(stack).slice(0, 800) : '' }, 200)
+  }
 })

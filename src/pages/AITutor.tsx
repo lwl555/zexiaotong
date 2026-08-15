@@ -51,7 +51,7 @@ export default function AITutor() {
         id: newId(),
         pageKey: 'ai-tutor',
         channel: 'tutor',
-        pageLabel: '择校导师',
+        pageLabel: '实时资讯台',
         question: `高考评估：${form.province} ${form.kl} ${form.score}分（位次${form.rank || '未知'}）意向${form.cities || '不限'}/${form.majors || '不限'}`,
         answer: reply,
         search: search ?? null,
@@ -68,7 +68,7 @@ export default function AITutor() {
   return (
     <>
       <div className="page-head">
-        <h2>AI择校导师</h2>
+        <h2>实时资讯台</h2>
         <p>告诉我你的分数、位次和意向，AI 帮你分析全省排名、匹配院校、推荐专业——只做推荐，选择权在你。</p>
       </div>
 
@@ -165,7 +165,7 @@ export default function AITutor() {
                   <button className="btn btn-ghost btn-sm" onClick={() => navigator.clipboard.writeText(result).catch(() => {})}>
                     复制
                   </button>
-                  <button className="btn btn-primary btn-sm" onClick={() => exportDocx('择校方案', '择校导师推荐', result)}>
+                  <button className="btn btn-primary btn-sm" onClick={() => exportDocx('择校方案', '实时资讯台 · 择校推荐', result)}>
                     导出 Word
                   </button>
                   <button className="btn btn-ghost btn-sm" onClick={submit} disabled={loading || !form.score.trim()}>
