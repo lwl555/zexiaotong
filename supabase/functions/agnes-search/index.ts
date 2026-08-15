@@ -152,12 +152,16 @@ function isRelevant(snippet: string, info: ReturnType<typeof relevanceInfo>): bo
   return false
 }
 
-// 链接相关性：title+url 必须命中至少 1 个 query 主体 token（剔除「肺癌论文」这种跟学校完全不沾边的噪声）；
-// 维基百科 / 官方政府 / 教育域名天然权威，绕过过滤（即便主题相关度低，对用户仍有定位价值）。
-const OFFICIAL_HOST = /(\.gov(\.cn)?|\.edu(\.cn)?$|\.edu\.cn|wikipedia\.org|linkedin\.com|github\.com)/i
+// 链接相关性：title+url 必须命中至少 1 个 query 主体 token（剔除「肺癌论文 / Unicode 字符表」这种跟学校/公司完全不沾边的噪声）；
+// 仅「机构/权威源」域名天然保留（政府/教育/职业主页通常就是用户要查的实体本身）；
+// 维基百科**不**无条件保留——任何 wiki 条目都匹配 wikipedia.org，所以必须额外校验 title 命中 query token。
+const TRUST_HOST = /(\.gov(\.cn)?|\.edu(\.cn)?$|\.edu\.cn|linkedin\.com|github\.com)/i
 function isLinkRelevant(lk: LinkInfo, info: ReturnType<typeof relevanceInfo>): boolean {
   if (info.tokens.length === 0 && info.years.length === 0 && info.kw.length === 0) return true
-  if (OFFICIAL_HOST.test(lk.url)) return true
+  if (TRUST_HOST.test(lk.url)) return true
+  // 维基百科：title 必须命中 token 才留（避免「List of Unicode characters」这种无关条目混进卡片）
+  if (lk.source === 'wiki-zh' || lk.source === 'wiki-en') return isRelevant(lk.title || '', info)
+  // 其他通用源：title+url 命中 token / 年份 / 领域词
   const text = ((lk.title || '') + ' ' + lk.url).toLowerCase()
   for (const tok of info.tokens) if (tok.length >= 2 && text.includes(tok.toLowerCase())) return true
   for (const y of info.years) if (text.includes(y)) return true
@@ -165,11 +169,11 @@ function isLinkRelevant(lk: LinkInfo, info: ReturnType<typeof relevanceInfo>): b
   return false
 }
 
-// 链接展示优先级：维基百科（最权威的实体信息）> 官方域名 > 社媒（用户明确要抖音/小红书等）> 新闻 / 社区 > 通用搜索
+// 链接展示优先级：机构权威源（.gov/.edu 等就是实体本身）> 维基百科（实体百科词条）> 社媒（用户明确要的抖音/小红书等）> 新闻 / 社区 > 通用搜索
 function linkPriority(lk: LinkInfo): number {
   const s = lk.source
-  if (s === 'wiki-zh' || s === 'wiki-en') return 0
-  if (OFFICIAL_HOST.test(lk.url)) return 1
+  if (TRUST_HOST.test(lk.url)) return 0
+  if (s === 'wiki-zh' || s === 'wiki-en') return 1
   if (s === 'tavily-social' || s === 'bing-social') return 2
   if (s === 'gnews' || s === 'reddit' || s === 'hn') return 3
   return 4
@@ -678,7 +682,7 @@ async function searchMulti(query: string): Promise<SearchResult> {
 
   const tasks: Promise<{ items: string[]; ok: boolean; src: string }>[] = []
 
-  // 有密钥则优先用可靠商业源（Tavily 已配置，覆盖实时检索；中文经模型整理输出，规避上游偶发乱码）
+  // 有密钥则优先用可靠商业源（Tavily 覆盖实时检索；中文经模型整理输出，规避上游偶发乱码）
   let keySrc = 'tavily'
   if (SEARCH_KEY) {
     keySrc = SEARCH_PROVIDER === 'brave' ? 'brave' : SEARCH_PROVIDER === 'serper' ? 'serper' : 'tavily'
@@ -713,11 +717,16 @@ async function searchMulti(query: string): Promise<SearchResult> {
   const social: string[] = [] // 社媒/UGC 专项池：保证抖音/小红书等内容有独立配额，不被通用结果淹没
   const seen = new Set<string>()
   const rt = relevanceInfo(query)
-  // 收集可点击参考链接（去重 + 过滤搜索引擎自身包装/跳转噪音），供前端「相关链接」卡片使用
+  // 收集可点击参考链接（去重 + 过滤搜索引擎自身包装/跳转噪音 + 通用源关联性门控），供前端「相关链接」卡片使用
+  // 通用搜索引擎（Tavily/Brave/Serper/Bing/DDG）若整源 items 全被相关性过滤（典型：Tavily 共享 key 出乱数据返回 Unicode 字符表这种内容），
+  // 其 links 全部丢弃——否则「内江医科学校」会混进 Unicode 表/肺癌论文这种不沾边的卡片噪声；
+  // 权威/特定源（wiki/reddit/hn/gnews）天然保留 links（这些源的链接即便主题不显式相关也对用户有用）。
+  const TRUSTED_LINK_SRC = new Set(['wiki-zh', 'wiki-en', 'reddit', 'hn', 'gnews'])
   const links: LinkInfo[] = []
   const seenLinks = new Set<string>()
   const isNoiseLink = (u: string) => /(duckduckgo\.com\/l\/|bing\.com\/ck\/|google\.com\/url|news\.google\.com\/rss|bing\.com\/search|baidu\.com)/.test(u)
   for (const s of settled) {
+    let sourceRelevantCount = 0
     if (s.ok && s.items.length) {
       const base = s.src.split(':')[0] // gnews / hn / bing / reddit / wiki-zh / wiki-en / ddg / tavily / brave / serper / tavily-social / bing-social
       if (!sources.includes(base)) sources.push(base)
@@ -727,22 +736,30 @@ async function searchMulti(query: string): Promise<SearchResult> {
         ? social
         : dyn
       for (const raw of s.items) {
-        if (raw.includes('�')) continue // 丢弃乱码片段，避免污染生成模型
-        const it = raw.length > 320 ? raw.slice(0, 320) + '…' : raw
+        if (raw.includes('\uFFFD')) continue // 丢弃乱码片段，避免污染生成模型
+        // 单条截断上限 320→480：给生成模型更完整的原始事实（分数线/薪资/地址等常超 320 字被腰斩），
+        // 正文才能写得有细节、有数据，而非泛泛而谈。
+        const it = raw.length > 480 ? raw.slice(0, 480) + '…' : raw
         if (!s.relaxed && !isRelevant(it, rt)) continue // 社媒域作用域结果已按 query 过滤，跳过通用相关性门禁
-        if (!seen.has(it)) { seen.add(it); bucket.push(it) }
+        if (!seen.has(it)) { seen.add(it); bucket.push(it); sourceRelevantCount++ }
       }
     }
-    // 链接独立收集：即便片段被相关性门禁过滤，真实来源链接仍对用户有用
+    // 链接收集：权威/特定源直接保留；通用源需至少 1 条相关 items 才保留链接（防 Tavily 共享 key 出乱数据污染）
+    const base = s.src.split(':')[0]
+    const skipLinks = !TRUSTED_LINK_SRC.has(base) && sourceRelevantCount === 0
     for (const lk of s.links || []) {
       if (!lk?.url || seenLinks.has(lk.url) || isNoiseLink(lk.url)) continue
       try { new URL(lk.url) } catch { continue }
+      if (skipLinks) continue
       seenLinks.add(lk.url)
       links.push(lk)
     }
   }
-  // 通用动态源（最多 14）+ 社媒/UGC 专项（固定 6 条配额）+ 维基兜底（最多 8），合计 28 条上限
-  let merged: string[] = [...dyn.slice(0, 14), ...social.slice(0, 6), ...wiki.slice(0, 8)]
+  // 通用动态源（最多 16）+ 社媒/UGC 专项（固定 8 条配额）+ 维基兜底（最多 10），合计 34 条上限。
+  // 适度放宽：给生成模型更多事实底座，正文才能写得更详实（之前 28 条上限偏低，常导致「暂无法确认」偏多）。
+  let merged: string[] = [...dyn.slice(0, 16), ...social.slice(0, 8), ...wiki.slice(0, 10)]
+  // 最终兜底：再滤一次含 U+FFFD 的片段（上游网页偶发编码损坏，单点过滤可能漏网，防止污染模型上下文导致回答出乱码方块）
+  merged = merged.filter((r) => !r.includes('\uFFFD'))
   // 安全网：若相关性过滤后结果过少（易致「查不到」），放宽门禁，避免空答
   if (merged.length < 5) {
     const seenR = new Set(merged)
@@ -750,17 +767,16 @@ async function searchMulti(query: string): Promise<SearchResult> {
     for (const s of settled) {
       if (!s.ok) continue
       for (const raw of s.items) {
-        if (raw.includes('�')) continue
-        const it = raw.length > 320 ? raw.slice(0, 320) + '…' : raw
+        if (raw.includes('\uFFFD')) continue
+        const it = raw.length > 480 ? raw.slice(0, 480) + '…' : raw
         if (!seenR.has(it)) { seenR.add(it); relaxed.push(it) }
       }
     }
     if (relaxed.length) merged = [...merged, ...relaxed].slice(0, 32)
   }
-  // 参考链接：相关性去噪（query 主体 token 必须命中，否则丢；维基 / 官方域名天然保留）→ 安全网（<2 条放宽避免完全空卡）→ 按权威度排序 → 上限 6 条
-  let linksFiltered = links.filter((lk) => isLinkRelevant(lk, rt))
-  if (linksFiltered.length < 2 && links.length >= 2) linksFiltered = links.slice() // 安全网：去噪后过少就放宽
-  const linksFinal = sortLinks(linksFiltered).slice(0, 6)
+  // 参考链接：相关性去噪（query 主体 token 必须命中；维基条目也走相关性；机构权威域名天然保留）→ 按权威度排序 → 上限 6 条
+// 不设安全网：宁可链接为 0 让前端不渲染卡片，也绝不展示不沾边的乱数据（Tavily 共享 key 偶发返回无关 cache 内容时尤其重要，安全网会把它们原样复活，污染用户体验）
+const linksFinal = sortLinks(links.filter((lk) => isLinkRelevant(lk, rt))).slice(0, 6)
   return { results: merged, sources, links: linksFinal, ok: merged.length > 0 }
 }
 
@@ -881,8 +897,9 @@ Deno.serve(async (req: Request) => {
 
   const messages: any[] = body.messages || []
   // 推理模型需要足够预算：max_tokens=2000 时 reasoning_content 经常把预算吃光，content 变空。
-  // 默认抬到 6000（上限 8192），让 reasoning 和 content 都有空间。
-  const maxTokens = Math.min(Math.max(body.max_tokens ?? 6000, 6000), 8192)
+  // 默认直接拉到上限 8192，并把下限抬到 8000，确保「隐藏推理」与「可见正文」都有充足空间，
+  // 避免正文被 reasoning 挤占而显得单薄（用户反馈「AI 说得不详细」的主因）。
+  const maxTokens = Math.min(Math.max(body.max_tokens ?? 8192, 8000), 8192)
   const webSearch = !!body.web_search
   const autoSearch = !!body.auto_search
   const searchOnly = !!body.search_only
@@ -922,7 +939,9 @@ Deno.serve(async (req: Request) => {
   if (needSearch && query) {
     const ctx = await searchMulti(query)
     searchMeta = { ok: ctx.ok, count: ctx.results.length, sources: ctx.sources, links: ctx.links, image: null, images: [] }
-    rawResults = ctx.results
+    // 清洗无效 Unicode（lone surrogates 等）：TextEncoder round-trip 模拟 UTF-8 传输，
+    // 让无法编码的字符现形为 U+FFFD 再删除——否则 Deno 编码响应体时它们会变成 U+FFFD 乱码方块到达客户端
+    rawResults = ctx.results.map(r => { try { return new TextDecoder().decode(new TextEncoder().encode(r)).replace(/\uFFFD/g, '') } catch { return r } }).filter(r => r.trim().length > 10)
     if (ctx.ok && !searchOnly) {
       const linkBlock = ctx.links.length
         ? '\n【检索到的参考链接（请在回答末尾「相关链接与地点」板块中如实引用，标注来源；不要编造未列出的链接）：】\n' +
@@ -999,7 +1018,7 @@ Deno.serve(async (req: Request) => {
       const retry = await fetch(`${V9_BASE}/v1/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${V9_ANON}` },
-        body: JSON.stringify({ model: V9_MODEL, messages: retryMsgs, max_tokens: 4000, stream: false, temperature: 0.7 })
+        body: JSON.stringify({ model: V9_MODEL, messages: retryMsgs, max_tokens: 6500, stream: false, temperature: 0.7 })
       })
       const rd = await retry.json().catch(() => ({}))
       const rcontent = rd?.choices?.[0]?.message?.content ?? ''
@@ -1019,6 +1038,10 @@ Deno.serve(async (req: Request) => {
   // 过滤掉模型在 reasoning 里"自导自演"的伪 <search> 标签——它不是真检索结果，是模型模拟的动作，会误导用户
   const cleanedReasoning = rawReasoning.replace(/<search>[\s\S]*?<\/search>/g, '').replace(/<think>[\s\S]*?<\/think>/g, '').trim()
   const reasoning = cleanedReasoning ? stripIdentity(cleanedReasoning) : ''
+  // 兜底：清洗模型输出里偶发的 U+FFFD 乱码字符（上游检索片段编码损坏被模型引用时），避免用户看到乱码方块
+  if ((data as any)?.choices?.[0]?.message?.content) {
+    (data as any).choices[0].message.content = String((data as any).choices[0].message.content).replace(/\uFFFD/g, '')
+  }
   // 把搜索元数据（含真实题图 + 场景图）与思考过程附到返回体，供前端诚实标注与配图
   const enriched = {
     ...data,
