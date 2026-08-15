@@ -67,7 +67,7 @@ function onImgError(e: SyntheticEvent<HTMLImageElement>, rawUrl: string) {
 
 import { renderReport, ThemeKey } from './Report'
 import { exportDocx } from '../lib/docx'
-import { PROMPT_EMPHASIS, SYSTEM_IDENTITY, BLUNT_RULE, FRESHNESS_RULE, LINKS_LOCATION_RULE } from '../lib/prompts'
+import { PROMPT_EMPHASIS, SYSTEM_IDENTITY, BLUNT_RULE, FRESHNESS_RULE, LINKS_LOCATION_RULE, DETAIL_RULE } from '../lib/prompts'
 
 // 联网 / 思考阶段的提示文案（按已等待时长切换，纯前端 heuristics，仅用于安抚"没卡住"）
 function phaseOf(ms: number): string {
@@ -209,7 +209,7 @@ export default function AIChat({
       const now = new Date()
       const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`
       const freshness = FRESHNESS_RULE.replace('{DATE}', dateStr)
-      const systemContent = `${SYSTEM_IDENTITY}\n\n${systemPrompt}\n\n${BLUNT_RULE}\n\n${freshness}\n\n${LINKS_LOCATION_RULE}\n\n${PROMPT_EMPHASIS}`
+      const systemContent = `${SYSTEM_IDENTITY}\n\n${systemPrompt}\n\n${BLUNT_RULE}\n\n${DETAIL_RULE}\n\n${freshness}\n\n${LINKS_LOCATION_RULE}\n\n${PROMPT_EMPHASIS}`
       const { content, search, reasoning } = await agnesChat(
         [{ role: 'system', content: systemContent }, ...next.map((m): ChatMsg => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }))],
         { webSearch: (webSearch || autoSearch) ?? false, autoSearch, signal: controller.signal }
