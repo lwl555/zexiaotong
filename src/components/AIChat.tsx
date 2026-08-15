@@ -65,6 +65,24 @@ function onImgError(e: SyntheticEvent<HTMLImageElement>, rawUrl: string) {
   }
 }
 
+// 点击「下载」时把图片抓成 blob 直接下载；跨域抓取失败则新标签打开兜底
+function downloadImage(proxiedUrl: string) {
+  const name = `zexiaotong-${Date.now()}.jpg`
+  fetch(proxiedUrl)
+    .then((r) => (r.ok ? r.blob() : Promise.reject()))
+    .then((blob) => {
+      const a = document.createElement('a')
+      const obj = URL.createObjectURL(blob)
+      a.href = obj
+      a.download = name
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(obj), 1000)
+    })
+    .catch(() => window.open(proxiedUrl, '_blank'))
+}
+
 import { renderReport, ThemeKey } from './Report'
 import { exportDocx } from '../lib/docx'
 import { PROMPT_EMPHASIS, SYSTEM_IDENTITY, BLUNT_RULE, FRESHNESS_RULE, LINKS_LOCATION_RULE, DETAIL_RULE } from '../lib/prompts'
@@ -143,6 +161,8 @@ export default function AIChat({
   const endRef = useRef<HTMLDivElement>(null)
   // 联网 / 思考阶段的实时计时与阶段提示
   const [elapsedMs, setElapsedMs] = useState(0)
+  // 图片灯箱（点击放大查看 + 下载）
+  const [lightbox, setLightbox] = useState<{ url: string; title: string } | null>(null)
   const startRef = useRef<number>(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -355,6 +375,8 @@ export default function AIChat({
                   {m.image?.url && (
                     <figure className="lead-photo">
                       <img src={imgProxy(m.image.url)} alt={m.image.title || '配图'} loading="lazy" referrerPolicy="no-referrer"
+                        onClick={() => setLightbox({ url: imgProxy(m.image!.url), title: m.image?.title || '配图' })}
+                        style={{ cursor: 'zoom-in' }}
                         onError={(e) => onImgError(e, m.image!.url)} />
                       <figcaption>配图 · {m.image.title || '真实资料图'}</figcaption>
                     </figure>
@@ -397,6 +419,8 @@ export default function AIChat({
                       {m.images.map((img, i) => (
                         <figure key={i} className="scene-thumb">
                           <img src={imgProxy(img.url)} alt={sceneLabel(img.title)} loading="lazy" referrerPolicy="no-referrer"
+                            onClick={() => setLightbox({ url: imgProxy(img.url), title: sceneLabel(img.title) })}
+                            style={{ cursor: 'zoom-in' }}
                             onError={(e) => onImgError(e, img.url)} />
                           <figcaption>{sceneLabel(img.title)}</figcaption>
                         </figure>
@@ -478,6 +502,20 @@ export default function AIChat({
           </button>
         )}
       </div>
+      {lightbox && (
+        <div className="img-lightbox" onClick={() => setLightbox(null)}>
+          <div className="lb-inner" onClick={(e) => e.stopPropagation()}>
+            <div className="lb-bar">
+              <span className="lb-title">{lightbox.title}</span>
+              <div className="lb-actions">
+                <button onClick={() => downloadImage(lightbox.url)}>⬇ 下载</button>
+                <button onClick={() => setLightbox(null)}>✕ 关闭</button>
+              </div>
+            </div>
+            <img src={lightbox.url} alt={lightbox.title} referrerPolicy="no-referrer" />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
