@@ -147,7 +147,7 @@ export async function agnesChat(
     body: {
       model: opts.model || DEFAULT_MODEL,
       messages,
-      max_tokens: Math.min(opts.maxTokens ?? 8000, 9000),
+      max_tokens: Math.min(opts.maxTokens ?? 8192, 8192),
       stream: false,
       web_search: opts.webSearch ?? false,
       auto_search: opts.autoSearch ?? false,
