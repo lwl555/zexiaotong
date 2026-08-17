@@ -157,6 +157,8 @@ export default function AIChat({
   const [error, setError] = useState('')
   const [searchMeta, setSearchMeta] = useState<SearchMeta | null>(null)
   const [degraded, setDegraded] = useState(false)
+  // 资料不足标记：后端经「严格 ok 判据」后认为检索失败（not degraded），前端区别展示
+  const [noResult, setNoResult] = useState(false)
   const lastReply = useRef('')
   const abortRef = useRef<AbortController | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
@@ -234,9 +236,13 @@ export default function AIChat({
       // 生成超时降级：保留已检索资料展示，提示用户点「重新生成」即可，不显示空白气泡
       if (isDegraded) {
         setDegraded(true)
+        setNoResult(false)
         return
       }
       setDegraded(false)
+      // 资料不足：后端判定「严格 ok=false」（无实质片段 + 无链接），与超时降级区分开。
+      // 配合后端资料不足分支推的强指令，回答会告诉用户换关键词/查官网，不会有幻觉。
+      setNoResult(!!search && search.ok === false)
       lastReply.current = content
       // 兜底：服务端返回的 content 为空时，给用户明确说明 + 建议下一步，而不是显示空白气泡
       const safeContent = content?.trim()
@@ -483,6 +489,13 @@ export default function AIChat({
           <div className="err degraded">
             ⏳ AI 生成超时（网络偶发卡顿），但已为你检索到公开资料（见上方链接），可点「重新生成」再试一次。
             <button className="retry-btn" onClick={() => resend()}>重新生成回答</button>
+          </div>
+        )}
+
+        {noResult && !degraded && (
+          <div className="err no-result">
+            🔍 本次未检索到相关公开资料。建议换用更口语或常用名（如学校全称、所在地+「大学/学院/学校」、招生年份+校名），
+            或直接访问该校官网 / 官方公众号 / 招生办电话获取准确信息。
           </div>
         )}
 
