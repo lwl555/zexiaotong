@@ -64,14 +64,23 @@ function lastUserText(messages: any[]): string {
   return ''
 }
 
-function stripHtml(s: string): string {
+function decodeEntities(s: string): string {
   return s
-    .replace(/<[^>]+>/g, '')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;|&apos;/g, "'")
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
+    .replace(/&ensp;|&emsp;|&thinsp;|&nbsp;/g, ' ')
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h: string) => { try { return String.fromCodePoint(parseInt(h, 16)) } catch { return '' } })
+    .replace(/&#(\d+);/g, (_, d: string) => { try { return String.fromCodePoint(parseInt(d, 10)) } catch { return '' } })
+    .replace(/&hellip;|&#8230;/g, '…')
+}
+function stripHtml(s: string): string {
+  return decodeEntities(
+    s
+      .replace(/<[^>]+>/g, '')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;|&apos;/g, "'")
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+  )
     .replace(/\s+/g, ' ')
     .trim()
 }
@@ -239,6 +248,12 @@ async function searchTavily(q: string, domains?: string[]): Promise<{ items: str
       },
       25000
     )
+    if (!r.ok) {
+      // 让失效/过期 key 在日志里可见（实测曾返回 401 Unauthorized），而非静默空结果。
+      const errTxt = await r.text().catch(() => '')
+      console.error(`[tavily] HTTP ${r.status} for "${q}": ${errTxt.slice(0, 200)}`)
+      return { items: [], ok: false, links: [] }
+    }
     const j = await r.json()
     const results = (j.results || []).slice(0, 8)
     const items = results.map((x: any) => `- ${x.title}：${stripHtml(x.content || x.snippet || '')}`)
@@ -291,18 +306,41 @@ async function searchSerper(q: string): Promise<{ items: string[]; ok: boolean }
   }
 }
 
+// 从原始 query 提取"实体词"用于百科检索：去掉尾部提问意图词（怎么样/避坑/就业…），再取首词块。
+// 整句直搜（如"攀枝花学院 宿舍 食堂 避坑"）常因多词 AND 而 0 结果 → 用实体词回退命中词条，
+// 避免"其实查得到却搜不到"的伪缺失（实测 攀枝花学院 全句 0 结果、实体词 5 条）。
+function wikiEntityVariants(q: string): string[] {
+  const INTENT = /(怎么样|怎样|如何|咋样|好吗|好不好|行不行|值得去吗|值得吗|靠谱吗|避坑|避雷|宿舍|食堂|待遇|加班|就业|前景|分数线|录取|最近|新闻|发布|加盟|房价|工作|平均|一分一段表|这家公司|这家|计算机|专业|公办|民办|2025|2024|2023|2022)\s*/g
+  const cleaned = q.replace(INTENT, ' ').trim()
+  const toks = cleaned.split(/\s+/).filter(Boolean)
+  const variants = new Set<string>([q])
+  if (cleaned && cleaned !== q) variants.add(cleaned)
+  if (toks[0]) variants.add(toks[0])
+  if (toks[0] && toks[1]) variants.add(toks[0] + ' ' + toks[1])
+  return [...variants]
+}
+
 async function searchWikipedia(q: string, lang: 'zh' | 'en'): Promise<{ items: string[]; ok: boolean }> {
   try {
-    const url =
-      `https://${lang}.wikipedia.org/w/api.php?action=query&list=search` +
-      `&srsearch=${encodeURIComponent(q)}&srlimit=5&srprop=snippet&format=json`
-    const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'zexiaotong/1.0 (search)' } })
-    const j = await r.json()
-    const results = (j.query?.search || []).slice(0, 5)
-    const items = results.map((x: any) => `- ${x.title}：${stripHtml(x.snippet || '')}`)
-    const links: LinkInfo[] = results
-      .filter((x: any) => x.title)
-      .map((x: any) => ({ title: x.title, url: `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(x.title)}`, source: `wiki-${lang}` }))
+    // 先整句，0 结果再回退到实体词（首词块 / 首两词块），避免长尾实体被多词 AND 误杀。
+    const variants = wikiEntityVariants(q)
+    let items: string[] = []
+    let links: LinkInfo[] = []
+    for (const v of variants) {
+      const url =
+        `https://${lang}.wikipedia.org/w/api.php?action=query&list=search` +
+        `&srsearch=${encodeURIComponent(v)}&srlimit=5&srprop=snippet&format=json`
+      const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'zexiaotong/1.0 (search)' } })
+      const j = await r.json()
+      const results = (j.query?.search || []).slice(0, 5)
+      if (results.length) {
+        items = results.map((x: any) => `- ${x.title}：${stripHtml(x.snippet || '')}`)
+        links = results
+          .filter((x: any) => x.title)
+          .map((x: any) => ({ title: x.title, url: `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(x.title)}`, source: `wiki-${lang}` }))
+        break
+      }
+    }
     return { items, ok: items.length > 0, links }
   } catch {
     return { items: [], ok: false, links: [] }
@@ -575,16 +613,61 @@ function stripIdentity(s: string): string {
 // eslint-disable-next-line no-control-regex
 function cleanToolCalls(s: string): string {
   return s
-    .replace(/<tool_calls?[\s\S]*?<\/tool_calls?>/gi, '')
-    .replace(/<function=[\s\S]*?<\/function>/gi, '')
-    .replace(/<function=[^>]*>/gi, '')
-    .replace(/<\/?minimax_agent[^>]*>/gi, '')
-    .replace(/<\/?think>/gi, '')
+    // 单标签无差别剥离：覆盖模型实际吐出的 broken / 不配对工具标签（注意不能要求成对闭合，
+    // 否则 <tool_call>...</function> 这种不配对碎片会原样残留）。
+    .replace(/<\/?tool_calls?[^>]*>/gi, '')        // <tool_call> / <tool_calls> / </tool_call>
+    .replace(/<\/?function_call[^>]*>/gi, '')       // <function_call> / </function_call>
+    .replace(/<\/?function[^>]*>/gi, '')            // <function=...> / <function> / </function>
+    .replace(/<\/?parameter[^>]*>/gi, '')           // <parameter=query> / </parameter>
+    .replace(/<\/?minimax_agent[^>]*>/gi, '')       // <minimax_agent> / </minimax_agent>
+    .replace(/<\/?invoke[^>]*>/gi, '')              // <invoke> / </invoke>
+    .replace(/<\/?think[^>]*>/gi, '')               // <think> / </think>
     .trim()
 }
 // 判断原始输出是否主要是工具调用泄漏（用于决定是否需要重试）
 function looksLikeToolCallLeak(raw: string): boolean {
-  return /<tool_calls?|<function=|<function\s|function_call|<\/?minimax_agent>/i.test(raw)
+  return /<tool_calls?|<function|<\/function|<parameter|function_call|<minimax_agent|<invoke/i.test(raw)
+}
+// 内部指令名泄漏清洗：模型偶发把 system 里的内部常量名（SOURCE_RULE / BLUNT_RULE / DETAIL_RULE 等）
+// 回显到正文（如「===数据明细（按 SOURCE_RULE / BLUNT_RULE 执行；…）」），影响观感。这些词只存在于
+// prompt 内部，正常用户内容不会用到，可安全剥离。
+function cleanInternalLeak(s: string): string {
+  return s
+    .replace(/（[^）]*\b(?:SOURCE|BLUNT|DETAIL|FRESHNESS|LINKS_LOCATION|PROMPT_EMPHASIS|OPINION|AVOID)_RULE[^）]*）/g, '') // 括号里的规则名说明
+    .replace(/【[^】]*\b(?:SOURCE|BLUNT|DETAIL|FRESHNESS|LINKS_LOCATION|PROMPT_EMPHASIS|OPINION|AVOID)_RULE[^】]*】/g, '') // 方括号里的规则名说明
+    .replace(/\b(?:SOURCE|BLUNT|DETAIL|FRESHNESS|LINKS_LOCATION|PROMPT_EMPHASIS|OPINION|AVOID)_RULE\b/g, '') // 裸规则名
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+// 标签墙清洗：剥离模型正文里过度喷涌的「行内/句末来源标签」。
+// 背景：尽管 prompt 已要求"来源标签只在确实引用了具体外部资料时才贴"，
+//       但实测模型在"未检索到 / 推测判断"语境下仍会每条都喷【AI 整理·模型知识】、
+//       （AI 整理）、（AI 推测·未经验证）—— 用户称这是"标注墙"。
+// 修法（硬约束）：剥离以下行内括号/方括号标签，只保留【资料·来源：xxx】等正规引用。
+// 「===信息来源备注==="整段保留（用户约定那是来源集中说明位置）。
+function cleanLabelWall(s: string): string {
+  if (!s) return s
+  let out = s
+  // 1) 整段去除方括号行内标签（【AI 整理】/【AI 整理·模型知识】/【AI 对比】/【AI 推测】 等）
+  out = out.replace(/【\s*AI\s*(整理|对比|推测|推测·未经验证|整理·模型知识|整理对比|判断|参考|推测未经验证)[^】]*】/g, '')
+  // 2) 整段去除句末/行内的括号小标签（（AI 整理） / （AI 整理·模型知识） / （AI 推测·未经验证） 等）
+  out = out.replace(/[（(]\s*AI\s*(整理|对比|推测|推测·未经验证|整理·模型知识|整理对比|判断|参考)[^）)]*[）)]/g, '')
+  // 3) 清理可能被空格/全角空格分隔的两段式拼写
+  out = out.replace(/【\s*检索\s*·\s*来源[^】]*】/g, '')
+  // 4) 修复"清洗后 broken 尾巴"——只在【】标签紧邻的"标【AI 整理】..."这种结构里连带清掉。
+  //    不再无脑匹配"均为..."等无标签句，避免误伤「(检索结果均为...与...无关)」这类正常括号补充说明。
+  out = out.replace(/(均(明确|直接|已)?(标(注)?)?|部分(为)?(推测|为推测))(【[^】\n]*】)/g, '$6')
+  out = out.replace(/([^【】\n]{0,30})(【[^】\n]*】)/g, (m, pre, tag) => {
+    // 当 pre 里只是"标/标注/明确标"这类残留介词时，一并剥掉
+    if (/^[\s，,。]*((均(明确|直接|已)?(标(注)?)?)|((为|是)(推测|AI 整理)))$/.test(pre)) return ''
+    return m
+  })
+  // 5) 「AI 整理部分约占一半篇幅（组织 / 对比 / 判断）」 / 「(AI 整理)」 之类被剥成 broken 的残余
+  out = out.replace(/，\s*(AI 整理(部分)?[^，。\n]{0,30}(组织|对比|判断)|均(已|明确)?[^，。\n]{0,8})/g, '')
+  // 6) 清理空白行/多余换行
+  out = out.replace(/\n{3,}/g, '\n\n')
+  return out
 }
 
 // 检索返回的可点击参考链接（标题 + 真实 URL + 来源标记），供前端渲染「相关链接」卡片。
@@ -599,6 +682,7 @@ interface SearchResult {
   sources: string[]
   links: LinkInfo[]
   ok: boolean
+  diag?: { settled: { src: string; ok: boolean; n: number; timeout: boolean; relaxed: boolean }[] }
 }
 
 // —— 动态 / 新闻类（免 key）——
@@ -657,6 +741,40 @@ async function searchHackerNews(q: string): Promise<{ items: string[]; ok: boole
   }
 }
 
+// —— Bing 片段质量门禁（仅用于 searchBing，避免把 SERP 噪声注入模型）——
+// Bing 免费 SERP 的 b_algo 首段常是百科/词典/歌词/广告/歧义词条（「某」→字典、「字节」→存储单位、「最近」→歌词），
+// 这些噪声会污染模型上下文、浪费 token。注入前做轻量相关性过滤，但保留 relaxed 不丢真相关结果（分层回退）。
+function isBingNoise(t: string): boolean {
+  return /(拼音|部首是|部首为|读音|笔画|由.+演唱|作词|作曲|古称|别称.*市|是指|指说话前|新华字典|说文|总笔画|部首：|指不定的|指示代词|书证|某字|释义|康熙字典)/.test(t)
+}
+function bingAnchors(q: string): string[] {
+  const clean = q.replace(/[\s,，。、？?！!]/g, '')
+  const n = clean.length
+  if (n < 3) return []
+  const set = new Set<string>()
+  for (let i = 0; i + 3 <= n; i++) set.add(clean.slice(i, i + 3))
+  for (let i = 0; i + 4 <= n; i++) set.add(clean.slice(i, i + 4))
+  return [...set]
+}
+// 命中锚点数（用于保底层：要求 ≥2 个锚点，过滤掉「最近」古文、「某」字典这类仅共享 1 个歧义词的噪声）
+function bingGramHits(q: string, t: string): number {
+  const anchors = bingAnchors(q)
+  if (anchors.length === 0) return 1
+  let h = 0
+  for (const g of anchors) if (t.includes(g)) h++
+  return h
+}
+function bingRelevant(q: string, t: string): boolean {
+  const anchors = bingAnchors(q)
+  if (anchors.length === 0) return true
+  let hit = 0
+  let hit4 = false
+  for (const g of anchors) {
+    if (t.includes(g)) { hit++; if (g.length >= 4) hit4 = true }
+  }
+  return hit >= 2 || hit4
+}
+
 // Bing 网页搜索：通用网页摘要，覆盖面广，但偶有反爬挑战页（检测到就跳过）。
 // 注意：Bing 中文结果可能以 GBK 返回，Deno 默认按 UTF-8 解出乱码，故用 arrayBuffer 双解码兜底。
 async function searchBing(q: string, siteScope?: string): Promise<{ items: string[]; ok: boolean }> {
@@ -679,9 +797,10 @@ async function searchBing(q: string, siteScope?: string): Promise<{ items: strin
     const re = /<li class="b_algo"[\s\S]*?<p[^>]*>([\s\S]*?)<\/p>/g
     let m: RegExpExecArray | null
     let i = 0
-    while ((m = re.exec(html)) !== null && i < 6) {
+    while ((m = re.exec(html)) !== null && i < 10) {
       const txt = stripHtml(m[1])
-      if (txt && txt.length > 15) snippets.push('- ' + txt.slice(0, 200))
+      // 先丢字典/歌词/百科卡片类噪声片段（「某」→拼音、由…演唱 等）
+      if (txt && txt.length > 15 && !isBingNoise(txt)) snippets.push('- ' + txt.slice(0, 200))
       i++
     }
     // 结果链接：b_algo 块内第一个 h2>a 的 href 即真实地址
@@ -691,7 +810,15 @@ async function searchBing(q: string, siteScope?: string): Promise<{ items: strin
       const href = ma[1]
       if (/^https?:\/\//.test(href)) links.push({ title: stripHtml(ma[2]) || href, url: href, source: 'bing' })
     }
-    return { items: snippets, ok: snippets.length > 0, links }
+    // 相关性门禁（分层回退，避免把 SERP 噪声注入模型）：
+    // ① 严格层：片段需命中 ≥2 个不同锚点或 1 个 ≥4 字锚点；
+    // ② 宽松层：至少命中 1 个 3~4 字锚点；
+    // ③ 保底层：原样返回（极端情况也不让 Bing 退化成空，模型自有兜底）。
+    const strict = snippets.filter((s) => bingRelevant(q, s))
+    const soft = snippets.filter((s) => bingGramHits(q, s) >= 2)
+    // 两层都空则不硬塞原始噪声，让 Bing 退化成空（模型 + gnews/wiki 自有兜底）
+    const finalItems = strict.length ? strict : soft
+    return { items: finalItems.slice(0, 6), ok: finalItems.length > 0, links }
   } catch {
     return { items: [], ok: false, links: [] }
   }
@@ -755,31 +882,32 @@ async function searchMulti(query: string): Promise<SearchResult> {
   const tasks: Promise<{ items: string[]; ok: boolean; src: string }>[] = []
 
   // 有密钥则优先用可靠商业源（Tavily 覆盖实时检索；中文经模型整理输出，规避上游偶发乱码）
+  // 通用网页源（Tavily/Brave/Serper）本身已按 query 定向检索，结果天然相关，**跳过严格 token 过滤**（relaxed），
+  // 否则「内江医科学校」这类长尾实体的网页结果会因片段未逐字命中实体名而被全数丢弃。
   let keySrc = 'tavily'
   if (SEARCH_KEY) {
     keySrc = SEARCH_PROVIDER === 'brave' ? 'brave' : SEARCH_PROVIDER === 'serper' ? 'serper' : 'tavily'
     const p = keySrc === 'brave' ? searchBrave : keySrc === 'serper' ? searchSerper : searchTavily
-    tasks.push(s2(p(query), keySrc))
+    tasks.push(withTimeout(s2(p(query), keySrc, true), 3500))
   }
 
-  // 动态 / 新闻源（最新信息，优先注入模型上下文）
-  tasks.push(s2(searchGoogleNews(query), 'gnews'))
-  tasks.push(s2(searchHackerNews(query), 'hn'))
-  // 百科兜底源：维基（中/英，仅用整句作为唯一候选，砍掉分词多候选以减少并发与等待）
-  // 注：Bing/百度/DDG/Reddit 在悉尼节点实测被 GFW/限流挂死（>0.7s 必超时且零结果），
-  // 社媒专项（bing-social/tavily-social）同样依赖这些被封源，故全部移除以压缩并发与首字节耗时，
-  // 只保留确实可达的 Wiki 中英文 + 新闻 + HN（+ 商业密钥源），显著提稳定性。
-  tasks.push(s2(searchWikipedia(query, 'zh'), 'wiki-zh'))
-  tasks.push(s2(searchWikipedia(query, 'en'), 'wiki-en'))
+  // 免密钥通用网页源（常驻兜底，不依赖任何 API key）：Bing 从悉尼出口实测可达、中文干净、~240ms。
+  // 即便配了付费 key，Bing 也并行提供第二路通用网页结果，提升「县城/小生意/长尾实体」类查询的覆盖率。
+  tasks.push(withTimeout(s2(searchBing(query), 'bing', true), 3500))
 
-  // 冷启动守护：单个搜索任务超过 0.7s 就丢掉（其余已完成的结果照常进 merged）。
-  // 非流式下整段响应须在网关首字节预算（实测硬上限约 2.8s）内完成，
-  // 关键路径 = 检索(~0.7s) + v9(函数内部实测 ~1s) + 图片响应态短截止(0.4s) ≈ 2.1s，留足余量；
-  // 慢源（Bing/百度/DDG/Reddit 常 >0.7s）被丢弃，保留 Wiki 中英文 + 新闻 + HN 等快源。
-  const settledAll = await Promise.all(
-    tasks.map((t) => Promise.race<any>([t, new Promise((res) => setTimeout(() => res({ _timeout: true }), 700))]))
-  )
-  const settled = settledAll.filter((s: any) => s && !s._timeout)
+  // 动态 / 新闻源（最新信息，优先注入模型上下文）。同样 relaxed：新闻/HN 已是 query 定向，
+  // 区域相关新闻（如查某县高校命中该县新闻）对回答有价值，不必逐字命中实体名。
+  tasks.push(withTimeout(s2(searchGoogleNews(query), 'gnews', true), 1800))
+  tasks.push(withTimeout(s2(searchHackerNews(query), 'hn', true), 1800))
+  // 百科兜底源：维基（中/英）。维基片段偶发严重跑题（如查「内江医科学校」返回「中国高校合并」通页），
+  // 故**保留**严格 token 相关性过滤，避免把无关词条污染生成模型。
+  tasks.push(withTimeout(s2(searchWikipedia(query, 'zh'), 'wiki-zh'), 1800))
+  tasks.push(withTimeout(s2(searchWikipedia(query, 'en'), 'wiki-en'), 1800))
+
+  // 冷启动守护（关键修复）：原先 0.7s 一刀切导致悉尼冷实例下所有外部源（gnews/wiki/tavily 普遍 0.7~1.5s）
+  // 全部被丢弃 → 检索结果恒为 0 → 模型拿不到资料只能说「未检索到」。改为**按源给独立超时预算**
+  // （通用网页 3.5s、新闻/HN/维基 1.8s），既保住真实可达的结果，又防止单源挂死拖垮整体。
+  const settled: any[] = (await Promise.all(tasks)).filter((s: any) => s && !s._timeout)
   const sources: string[] = []
   const dyn: string[] = []
   const wiki: string[] = []
@@ -846,11 +974,45 @@ async function searchMulti(query: string): Promise<SearchResult> {
   // 参考链接：相关性去噪（query 主体 token 必须命中；维基条目也走相关性；机构权威域名天然保留）→ 按权威度排序 → 上限 6 条
 // 不设安全网：宁可链接为 0 让前端不渲染卡片，也绝不展示不沾边的乱数据（Tavily 共享 key 偶发返回无关 cache 内容时尤其重要，安全网会把它们原样复活，污染用户体验）
 const linksFinal = sortLinks(links.filter((lk) => isLinkRelevant(lk, rt))).slice(0, 6)
-  return { results: merged, sources, links: linksFinal, ok: merged.length > 0 }
+  return {
+    results: merged,
+    sources,
+    links: linksFinal,
+    ok: merged.length > 0,
+    diag: {
+      settled: settled.map((s: any) => ({ src: s.src, ok: !!s.ok, n: (s.items || []).length, timeout: !!s._timeout, relaxed: !!s.relaxed }))
+    }
+  }
 }
 
 function s2(p: Promise<{ items: string[]; ok: boolean; links?: LinkInfo[] }>, src: string, relaxed = false) {
   return p.then((r) => ({ ...r, src, relaxed, links: r.links || [] }))
+}
+
+// 给单个检索任务独立超时预算：超时则返回 {_timeout:true}，不拖垮整段检索。
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | { _timeout: true }> {
+  return Promise.race<T | { _timeout: true }>([p, new Promise((res) => setTimeout(() => res({ _timeout: true }), ms))])
+}
+
+// 带超时与自动重试的 v9(Agnes) 调用封装。
+// 背景：agnes-2.0-flash 是推理模型，冷启动偶发 60s+ 才返回；而 Supabase Edge Function 网关预算约 50s，
+// 一旦超过会被强杀 → 前端干等 60s 后只看到报错。改为：单次 22s 超时，失败（含超时）自动重试一次，
+// 两次都失败则交由上层「降级」分支返回 200 + 已检索资料，绝不让用户干挂。
+async function callV9(payload: any, timeoutMs = 22000): Promise<{ data: any; status: number }> {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs)
+  try {
+    const r = await fetch(`${V9_BASE}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${V9_ANON}` },
+      body: JSON.stringify(payload),
+      signal: ctrl.signal
+    })
+    const data = await r.json().catch(() => ({}))
+    return { data, status: r.status }
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 // —— 检索决策器：让模型判断「这个问题是否需要检索最新公开资料才能准确回答」——
@@ -964,9 +1126,31 @@ Deno.serve(async (req: Request) => {
   if (body.__probe) {
     return json({ probe: await probe() })
   }
+  // 搜索诊断：逐源暴露「原始条数 / 相关性过滤后条数 / 截断前样本」，定位检索被清空在哪一层
+  if (body.__debug_search) {
+    const q = String(body.query || body.__debug_search || '')
+    const rt = relevanceInfo(q)
+    const sources: [string, Promise<{ items: string[]; ok: boolean; links?: any[] }>][] = [
+      ['gnews', searchGoogleNews(q)],
+      ['hn', searchHackerNews(q)],
+      ['wiki-zh', searchWikipedia(q, 'zh')],
+      ['wiki-en', searchWikipedia(q, 'en')]
+    ]
+    if (SEARCH_KEY) sources.push([SEARCH_PROVIDER || 'tavily', searchTavily(q)])
+    const settled = await Promise.all(
+      sources.map(([name, p]) => Promise.race<any>([p.then((r) => ({ ...r, name })), new Promise((res) => setTimeout(() => res({ _timeout: true, name }), 1800))]))
+    )
+    const diag = settled.map((s: any) => {
+      const raw = (s.items || []).length
+      const relevant = (s.items || []).filter((it: string) => isRelevant(it, rt)).length
+      const sample = (s.items || []).slice(0, 2).map((it: string) => it.slice(0, 80))
+      return { src: s.name, timeout: !!s._timeout, ok: !!s.ok, raw, relevant, sample }
+    })
+    return json({ query: q, tokens: rt.tokens, years: rt.years, kw: rt.kw, perSource: diag })
+  }
   // 关键修复：原「Failed to fetch」根因是 Bing/DDG/Reddit 等检索源在悉尼节点经常被 GFW/限流挂死，
   // 导致 searchMulti 迟迟不返回、整段响应超网关首字节预算（约 3s）→ 503 无 CORS。修复分两层：
-  // (1) 检索 searchMulti 加 0.7s 硬截止，挂死慢源直接丢弃，保留 Wiki 中英文 + 新闻 + HN 等快源；
+  // (1) searchMulti 改按源给独立超时预算（通用网页 3500ms、新闻/HN/维基 1800ms），挂死慢源超时丢弃，保留已返回的快源；
   // (2) 配图 fetchEntityImages 内部 3s cap，主路径（v9 返回后）再套 1.8s「响应态短截止」——
   //     图片获取实测仅 ~1–1.5s（曾因 `const scenes` 重赋值 bug 抛异常被吞，已修复），与 v9 并行启动，
   //     暖路径总响应 ≈ v9+图 ≈ 2.5s < 网关预算(约2.8s) → 既保 200 又带回真实题图/场景图；
@@ -1009,12 +1193,18 @@ Deno.serve(async (req: Request) => {
     links: LinkInfo[]
     image: { url: string; title: string } | null
     images: { url: string; title: string }[]
+    query?: string
+    needSearch?: boolean
+    diag?: any
   } = { ok: false, count: 0, sources: [], links: [], image: null, images: [] }
+  // 透出诊断：无论是否真正发起检索，都把 query / needSearch 带回，便于排查「检索被跳过」类问题
+  searchMeta.query = query
+  searchMeta.needSearch = needSearch
   let rawResults: string[] = []
 
   if (needSearch && query) {
     const ctx = await searchMulti(query)
-    searchMeta = { ok: ctx.ok, count: ctx.results.length, sources: ctx.sources, links: ctx.links, image: null, images: [] }
+    searchMeta = { ok: ctx.ok, count: ctx.results.length, sources: ctx.sources, links: ctx.links, image: null, images: [], query, needSearch, diag: ctx.diag }
     // 清洗无效 Unicode（lone surrogates 等）：TextEncoder round-trip 模拟 UTF-8 传输，
     // 让无法编码的字符现形为 U+FFFD 再删除——否则 Deno 编码响应体时它们会变成 U+FFFD 乱码方块到达客户端
     rawResults = ctx.results.map(r => { try { return new TextDecoder().decode(new TextEncoder().encode(r)).replace(/\uFFFD/g, '') } catch { return r } }).filter(r => r.trim().length > 10)
@@ -1033,12 +1223,16 @@ Deno.serve(async (req: Request) => {
           ctx.results.join('\n') +
           '\n</search>\n' +
           linkBlock +
-          '要求：① 优先依据上述资料作答，并在关键事实后用「（来源：xxx）」标注；' +
-          '② 若资料不足以回答，明确说明「未检索到确切信息」，不要编造；' +
-          '③ 涉及排名/分数/政策等易变数据，提醒用户以官方最新公布为准；' +
-          '④ 引用用户原话时务必使用上面【用户原话】字段里的完整字句，不要把检索片段里的 query 拼接词当成用户原话；' +
-          '⑤ 回答末尾必须包含「相关链接与地点」板块，列出上述参考链接中的官网/百科/新闻/社媒主页，并补充该实体的具体地址、交通、地图可定位信息（查不到写「暂无法确认具体地址」）。' +
-          '⑥ 你**不需要、也不允许**调用任何搜索或函数工具（如 web_search）；资料已附在 <search> 中，请直接基于它们作答，严禁输出 <tool_call>、<function> 等内部协议标签。'
+          '要求：① 优先依据上述资料作答；' +
+          '② 严禁"来源标注成灾"——只在确实引用了上方 <search> 里某段具体外部资料（如官网具体数字 / 某新闻报道 / 维基词条里的明文事实）时，才在该句末用【资料·来源：xxx】简短标注（如「【资料·来源：维基百科】」）。' +
+          '严禁给"自身知识 / 通用常识 / 行业经验 / 跨年对比 / 推断判断"贴来源标签——这类原本就不属于检索资料，强行贴来源会污染正文，' +
+          '也不要在每句话、每条优缺点后都贴来源（那叫"标注墙"，用户根本看不下去）。' +
+          '若通篇没有具体引用外部资料的数字/事实，就不要在正文中堆任何来源标签；' +
+          '③ 综合作答、不要轻易放弃：请基于上方 <search> 资料与你自身的知识一起作答。资料齐全处直接给结论与数据；资料偏旧 / 偏题 / 不充分处，用你的知识补充并标注「（以下为 AI 基于公开知识补充，非本次检索原文）」，切忌笼统甩出「未检索到确切信息」就草草收尾；只有连你也无法确认的具体数字 / 内部信息才单独标注「暂无法确认」。' +
+          '④ 涉及排名/分数/政策等易变数据，提醒用户以官方最新公布为准；' +
+          '⑤ 引用用户原话时务必使用上面【用户原话】字段里的完整字句，不要把检索片段里的 query 拼接词当成用户原话；' +
+          '⑥ 回答末尾必须包含「相关链接与地点」板块，列出上述参考链接中的官网/百科/新闻/社媒主页，并补充该实体的具体地址、交通、地图可定位信息（查不到写「暂无法确认具体地址」）。' +
+          '⑦ 你**不需要、也不允许**调用任何搜索或函数工具（如 web_search）；资料已附在 <search> 中，请直接基于它们作答，严禁输出 <tool_call>、<function> 等内部协议标签。'
       })
     }
   }
@@ -1068,22 +1262,44 @@ Deno.serve(async (req: Request) => {
 
   // 转发给现有 v9（Agnes）—— 强制在最前注入平台身份，盖掉模型固有身份
   sysMessages.unshift({ role: 'system', content: PLATFORM_IDENTITY })
-  const upstream = await fetch(`${V9_BASE}/v1/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${V9_ANON}`
-    },
-    body: JSON.stringify({
-      model: V9_MODEL,
-      messages: [...sysMessages, ...otherMessages],
-      max_tokens: maxTokens,
-      stream: false,
-      temperature: body.temperature ?? 0.7
-    })
-  })
 
-  const data = await upstream.json().catch(() => ({}))
+  // v9 调用统一走 callV9：单次 22s 超时 + 失败（含超时）自动重试一次，共 ~44s，
+  // 远在 Edge Function 网关预算（免费档约 50s）内；两次都失败 → 降级而非干挂。
+  let v9Resp: { data: any; status: number } | null = null
+  for (let i = 0; i < 2 && !v9Resp; i++) {
+    try {
+      v9Resp = await callV9(
+        {
+          model: V9_MODEL,
+          messages: [...sysMessages, ...otherMessages],
+          max_tokens: maxTokens,
+          stream: false,
+          temperature: body.temperature ?? 0.7
+        },
+        22000
+      )
+    } catch {
+      // 重试前短暂等待，给 agnes-proxy 冷实例一点启动时间（仅首次重试前等，避免叠加超时）
+      if (i === 0) await new Promise((r) => setTimeout(r, 800))
+    }
+  }
+
+  // 降级：v9 两次都超时/失败（偶发冷启动卡死）。返回 200 + degraded 标记 + 已检索资料，
+  // 避免用户干等 60s+ 后只看到报错。前端会提示「生成超时，已为你整理资料 + 重新生成」按钮。
+  if (!v9Resp) {
+    return json(
+      {
+        degraded: true,
+        choices: [{ message: { content: '' } }],
+        search: { ...searchMeta, image: EMPTY_IMG.lead, images: EMPTY_IMG.scenes },
+        reasoning: ''
+      },
+      200
+    )
+  }
+
+  const upstream = v9Resp
+  const data = v9Resp.data ?? {}
 
   // 响应态 1.8s 短截止：v9 已返回后只再等最多 1.8s 拿图。实测图片获取本身仅 ~1–1.5s（已修 const 赋值 bug），
   // 与 v9(~1s 暖/14–19s 冷)并行启动，故暖路径总响应 ≈ v9+图 ≈ 2.5s < 网关预算(约2.8s) → 既保 200 又带回真实题图；
@@ -1099,8 +1315,13 @@ Deno.serve(async (req: Request) => {
   // 导致正文变成工具调用碎片、真正的回答缺失。先剥离这些内部标签；若剥离后正文过短（视为坏输出），触发重试。
   const origRaw = content
   content = cleanToolCalls(content)
+  // 标签墙硬约束：剥离模型正文里过度喷涌的【AI 整理·模型知识】等行内/句末来源标签（用户投诉"标注墙"）。
+  // 注意：只清洗这种内联小标签；用户约定的 ===信息来源备注=== 整段集中说明保留。
+  content = cleanLabelWall(content)
+  content = cleanInternalLeak(content)
   const toolLeak = looksLikeToolCallLeak(origRaw)
-  if (!content?.trim() || (toolLeak && content.trim().length < 50)) {
+  // 修复：只要原始输出或清洗后残留含工具调用标签，就进重试——不被「一句前言 + 海量 broken 标签」的长度骗过。
+  if (!content?.trim() || toolLeak || looksLikeToolCallLeak(content)) {
     try {
       // 严禁工具调用的强指令：资料已附在 <search> 中，直接作答、不要再触发 web_search / 工具调用
       const directive =
@@ -1116,14 +1337,14 @@ Deno.serve(async (req: Request) => {
               '\n\n【系统提示】上一轮回复因输出截断或误触发工具调用而缺失，请直接给出完整答案，不要再做内部检索模拟，也不要调用任何工具。'
           }
         ]
-        const retry = await fetch(`${V9_BASE}/v1/chat/completions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${V9_ANON}` },
-          body: JSON.stringify({ model: V9_MODEL, messages: retryMsgs, max_tokens: 6500, stream: false, temperature: 0.7 })
-        })
-        const rd = await retry.json().catch(() => ({}))
+        const retry = await callV9(
+          { model: V9_MODEL, messages: retryMsgs, max_tokens: 6500, stream: false, temperature: 0.7 },
+          22000
+        )
+        const rd = retry.data ?? {}
         const rcontent = cleanToolCalls(rd?.choices?.[0]?.message?.content ?? '')
-        if (rcontent?.trim() && rcontent.trim().length >= 50) {
+        // 接受条件：非空、长度足够、且清洗后**无任何工具标签残留**（避免被 broken 标签骗过）
+        if (rcontent?.trim() && rcontent.trim().length >= 50 && !looksLikeToolCallLeak(rcontent)) {
           content = rcontent
           // 把重试拿到的 content 合并回 data，让前端走正常渲染路径
           ;(data as any).choices = (data as any).choices || [{}]
@@ -1149,9 +1370,9 @@ Deno.serve(async (req: Request) => {
   const reasoning = cleanedReasoning ? stripIdentity(cleanedReasoning) : ''
   // 兜底：清洗模型输出里偶发的 U+FFFD 乱码字符（上游检索片段编码损坏被模型引用时），避免用户看到乱码方块
   if ((data as any)?.choices?.[0]?.message?.content) {
-    ;(data as any).choices[0].message.content = cleanToolCalls(
+    ;(data as any).choices[0].message.content = cleanInternalLeak(cleanLabelWall(cleanToolCalls(
       String((data as any).choices[0].message.content).replace(/\uFFFD/g, '')
-    )
+    )))
   }
   // 把搜索元数据（含真实题图 + 场景图）与思考过程附到返回体，供前端诚实标注与配图
   const enriched = {

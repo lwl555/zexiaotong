@@ -35,7 +35,10 @@ async function call<T = any>(
     ...resolveAuthHeaders()
   }
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 180_000)
+  // 前端被动超时：75s（双重保险）。后端 v9 调用已自带 22s×2 超时 + 降级返回，
+  // 正常情况下 44s 内就会拿到结果（含 degraded 降级），不会走到这里；
+  // 仅当整条链路异常时才触发，避免用户无限转圈。
+  const timer = setTimeout(() => controller.abort(), 75_000)
   // 外部中断（如「停止生成」）：与超时共用一个 controller，任一触发即取消请求
   if (opts.signal) {
     if (opts.signal.aborted) controller.abort()
@@ -140,6 +143,8 @@ export interface ChatResult {
   results?: string[]
   /** 模型内部推理过程（reasoning_content），已剥离可能的身份泄露词；可能为空 */
   reasoning?: string
+  /** 生成超时降级标记：v9 两次调用均超时/失败，后端已返回已检索资料，前端应提示用户「重新生成」 */
+  degraded?: boolean
 }
 
 /** OpenAI 兼容 chat/completions，返回正文与检索元数据。 */
@@ -163,7 +168,8 @@ export async function agnesChat(
   const search = (data as any)?.search as SearchMeta | undefined
   const results = (data as any)?.results as string[] | undefined
   const reasoning = (data as any)?.reasoning as string | undefined
-  return { content, search, results, reasoning }
+  const degraded = !!(data as any)?.degraded
+  return { content, search, results, reasoning, degraded }
 }
 
 // —— 预热：页面加载 / 窗口聚焦时后台暖热 agnes-search 与 v9(agnes-proxy) 两个 Edge Function ——

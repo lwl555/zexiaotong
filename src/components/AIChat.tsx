@@ -156,6 +156,7 @@ export default function AIChat({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [searchMeta, setSearchMeta] = useState<SearchMeta | null>(null)
+  const [degraded, setDegraded] = useState(false)
   const lastReply = useRef('')
   const abortRef = useRef<AbortController | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
@@ -205,17 +206,12 @@ export default function AIChat({
     upsertConversation(conv)
   }
 
-  async function send(override?: string) {
-    const text = (override ?? input).trim()
-    if (!text || loading) return
-    setError('')
-    setSearchMeta(null)
-    const next = [...messages, { role: 'user' as const, content: text }]
-    setMessages(next)
-    const title = convTitle || text.slice(0, 24)
+  // 核心请求逻辑：用 next（已含最新 user 消息）调 agnesChat 并渲染结果。
+  // send 负责追加 user 消息后调用；resend 在「生成超时降级」后复用当前对话再试，不再重复追加 user。
+  async function run(next: Msg[]) {
+    const title = convTitle || next[next.length - 1]?.content.slice(0, 24) || '对话'
     setConvTitle(title)
     persist(next, title)
-    setInput('')
     setLoading(true)
     // 启动"已等待时长"计时器（每 250ms 刷新一次）
     startRef.current = Date.now()
@@ -230,11 +226,17 @@ export default function AIChat({
       const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`
       const freshness = FRESHNESS_RULE.replace('{DATE}', dateStr)
       const systemContent = `${SYSTEM_IDENTITY}\n\n${systemPrompt}\n\n${BLUNT_RULE}\n\n${DETAIL_RULE}\n\n${freshness}\n\n${LINKS_LOCATION_RULE}\n\n${PROMPT_EMPHASIS}`
-      const { content, search, reasoning } = await agnesChat(
+      const { content, search, reasoning, degraded: isDegraded } = await agnesChat(
         [{ role: 'system', content: systemContent }, ...next.map((m): ChatMsg => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }))],
         { webSearch: (webSearch || autoSearch) ?? false, autoSearch, signal: controller.signal }
       )
       setSearchMeta(search ?? null)
+      // 生成超时降级：保留已检索资料展示，提示用户点「重新生成」即可，不显示空白气泡
+      if (isDegraded) {
+        setDegraded(true)
+        return
+      }
+      setDegraded(false)
       lastReply.current = content
       // 兜底：服务端返回的 content 为空时，给用户明确说明 + 建议下一步，而不是显示空白气泡
       const safeContent = content?.trim()
@@ -260,7 +262,7 @@ export default function AIChat({
         pageKey,
         channel,
         pageLabel: title,
-        question: text,
+        question: next[next.length - 1]?.content || '',
         answer: safeContent,
         search: search ?? null,
         image: search?.image ?? null,
@@ -285,6 +287,28 @@ export default function AIChat({
       setLoading(false)
       abortRef.current = null
     }
+  }
+
+  async function send(override?: string) {
+    const text = (override ?? input).trim()
+    if (!text || loading) return
+    setError('')
+    setDegraded(false)
+    setSearchMeta(null)
+    const next = [...messages, { role: 'user' as const, content: text }]
+    setMessages(next)
+    setInput('')
+    await run(next)
+  }
+
+  // 「生成超时」降级后，复用当前对话（末尾已含 user 消息）重新请求，不再重复追加 user
+  function resend() {
+    if (loading) return
+    const lastUser = [...messages].reverse().find((m) => m.role === 'user')
+    if (!lastUser) return
+    setError('')
+    setDegraded(false)
+    run(messages)
   }
 
   function stop() {
@@ -455,6 +479,12 @@ export default function AIChat({
           </div>
         )}
         {error && <div className="err">出错了：{error}</div>}
+        {degraded && (
+          <div className="err degraded">
+            ⏳ AI 生成超时（网络偶发卡顿），但已为你检索到公开资料（见上方链接），可点「重新生成」再试一次。
+            <button className="retry-btn" onClick={() => resend()}>重新生成回答</button>
+          </div>
+        )}
 
         {messages.some((m) => m.role === 'ai') && !loading && followups && followups.length > 0 && (
           <div className="followups">
