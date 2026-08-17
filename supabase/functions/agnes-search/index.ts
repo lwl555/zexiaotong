@@ -974,13 +974,21 @@ async function searchMulti(query: string): Promise<SearchResult> {
   // 参考链接：相关性去噪（query 主体 token 必须命中；维基条目也走相关性；机构权威域名天然保留）→ 按权威度排序 → 上限 6 条
 // 不设安全网：宁可链接为 0 让前端不渲染卡片，也绝不展示不沾边的乱数据（Tavily 共享 key 偶发返回无关 cache 内容时尤其重要，安全网会把它们原样复活，污染用户体验）
 const linksFinal = sortLinks(links.filter((lk) => isLinkRelevant(lk, rt))).slice(0, 6)
+  // 严格判定 ok：至少 3 条长度 ≥ 50 字符的实质片段 才算检索成功。
+  // 原 `merged.length > 0` 太松，5 条 < 10 字符的 gnews 短标题噪声也会被算成功，引发 model 误判"资料齐全"→ 信心满满地"自查 + 编"。
+  // 注意：链接不再作为硬门槛——`isLinkRelevant` 对热门实体偶尔会过严（如电子科大维基条目被滤），
+  // 但只要内容充足（≥ 3 条实质片段）就足够支撑"资料齐全"作答。
+  const usefulResults = merged.filter((r) => r.length >= 50)
+  const strictOk = usefulResults.length >= 3
   return {
     results: merged,
     sources,
     links: linksFinal,
-    ok: merged.length > 0,
+    ok: strictOk,
     diag: {
-      settled: settled.map((s: any) => ({ src: s.src, ok: !!s.ok, n: (s.items || []).length, timeout: !!s._timeout, relaxed: !!s.relaxed }))
+      settled: settled.map((s: any) => ({ src: s.src, ok: !!s.ok, n: (s.items || []).length, timeout: !!s._timeout, relaxed: !!s.relaxed })),
+      useful: usefulResults.length,
+      raw: merged.length
     }
   }
 }
@@ -998,7 +1006,7 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | { _timeout: true
 // 背景：agnes-2.0-flash 是推理模型，冷启动偶发 60s+ 才返回；而 Supabase Edge Function 网关预算约 50s，
 // 一旦超过会被强杀 → 前端干等 60s 后只看到报错。改为：单次 22s 超时，失败（含超时）自动重试一次，
 // 两次都失败则交由上层「降级」分支返回 200 + 已检索资料，绝不让用户干挂。
-async function callV9(payload: any, timeoutMs = 22000): Promise<{ data: any; status: number }> {
+async function callV9(payload: any, timeoutMs = 30000): Promise<{ data: any; status: number }> {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), timeoutMs)
   try {
@@ -1208,7 +1216,31 @@ Deno.serve(async (req: Request) => {
     // 清洗无效 Unicode（lone surrogates 等）：TextEncoder round-trip 模拟 UTF-8 传输，
     // 让无法编码的字符现形为 U+FFFD 再删除——否则 Deno 编码响应体时它们会变成 U+FFFD 乱码方块到达客户端
     rawResults = ctx.results.map(r => { try { return new TextDecoder().decode(new TextEncoder().encode(r)).replace(/\uFFFD/g, '') } catch { return r } }).filter(r => r.trim().length > 10)
-    if (ctx.ok && !searchOnly) {
+    // 资料不足分支：检索跑过但没拿到有效资料（连 2 条 ≥50 字的实质片段都凑不齐）。
+    // 原代码不分这种情况，都走"资料齐全"分支并允许 AI 用知识补 → 大量幻觉（用户截图：
+    // "内江医科学校"根本不存在，模型自信满满编"中等职业学校，培养护理药剂检验"）。
+    // 现在专门推一条强指令，禁止 AI 用自身知识补，直接告知未检索到、列出已尝试的源、建议换关键词。
+    if (!ctx.ok && !searchOnly) {
+      const sourcesTxt = ctx.sources.length ? ctx.sources.join('、') : '全部内置源'
+      const rawLen = rawResults.length
+      const linksTxt = ctx.links.length
+        ? `\n下面列出已抓到的链接（供用户点击备查）：\n${ctx.links.slice(0, 5).map((l, i) => `${i + 1}. ${l.title} — ${l.url}`).join('\n')}`
+        : ''
+      sysMessages.push({
+        role: 'system',
+        content:
+          `【重要】针对用户原话「${rawUser}」的检索结果如下：\n` +
+          `<search>\n${ctx.results.join('\n') || '（空）'}\n</search>\n` +
+          `\n⚠️ 资料不足以让你给出真实答案：仅 ${rawLen} 条短片段（最长 ${Math.max(...ctx.results.map((r) => r.length), 0)} 字），且 ${ctx.links.length ? '' : '无'}可靠的官网/百科链接。已尝试源：${sourcesTxt}。${linksTxt}\n` +
+          `\n请严格遵守（本次回复不可偏离）：\n` +
+          `① 不要基于自身知识编造任何具体事实——尤其是学校类型 / 办学层次 / 专业设置 / 分数线 / 就业率 / 升学通道 / 学费 这类不在本次 <search> 里原文出现的内容。编出来就是幻觉，会严重误导正在做择校决定的学生与家长；\n` +
+          `② 不要给出「该校是 X 类型学校 / 位于 X 省 Y 市 / 设有 X 专业」这类确定性描述，除非 <search> 里原文出现；\n` +
+          `③ 明确告知用户："关于「${rawUser}」，本次未检索到相关公开资料"，并列出本次已尝试的检索源（${sourcesTxt}），让用户知道系统确实跑过检索；\n` +
+          `④ 给出可操作的建议，例如："可尝试换用更口语或常用名（学校全称 / 所在地 + '大学/学院/学校' / 招生年份 + 校名）"或"直接查询该校官网 / 官方公众号 / 招生办电话"；` +
+          `⑤ 回答风格：简短、客观、不绕弯。**不要写**「## 学校概况」「## 办学定位」「## 优劣势分析」这种假装资料的标题——这是以前模型胡编时的"伪资料"包装；直接一句话点明情况 + 建议即可。` +
+          `⑥ 严禁调用任何搜索工具或函数，直接基于本提示与 <search> 作答。`
+      })
+    } else if (ctx.ok && !searchOnly) {
       const linkBlock = ctx.links.length
         ? '\n【检索到的参考链接（请在回答末尾「相关链接与地点」板块中如实引用，标注来源；不要编造未列出的链接）：】\n' +
           ctx.links.slice(0, 10).map((l, i) => `${i + 1}. （${l.source}）${l.title} ${l.url}`).join('\n') + '\n'
@@ -1228,7 +1260,9 @@ Deno.serve(async (req: Request) => {
           '严禁给"自身知识 / 通用常识 / 行业经验 / 跨年对比 / 推断判断"贴来源标签——这类原本就不属于检索资料，强行贴来源会污染正文，' +
           '也不要在每句话、每条优缺点后都贴来源（那叫"标注墙"，用户根本看不下去）。' +
           '若通篇没有具体引用外部资料的数字/事实，就不要在正文中堆任何来源标签；' +
-          '③ 综合作答、不要轻易放弃：请基于上方 <search> 资料与你自身的知识一起作答。资料齐全处直接给结论与数据；资料偏旧 / 偏题 / 不充分处，用你的知识补充并标注「（以下为 AI 基于公开知识补充，非本次检索原文）」，切忌笼统甩出「未检索到确切信息」就草草收尾；只有连你也无法确认的具体数字 / 内部信息才单独标注「暂无法确认」。' +
+          '③ **仅当 <search> 里确有可用资料时**才允许"综合作答"：基于上方 <search> 资料与你自身的知识一起作答；资料齐全处直接给结论与数据，资料偏旧处用知识补充并标注「（以下为 AI 基于公开知识补充，非本次检索原文）」；' +
+          '若 <search> 几乎为空 / 片段极短 / 全部不沾边（本情况会单独推一条「资料不足」指令，不再走本条），**严禁**用自身知识编造具体事实（学校类型、办学层次、专业设置、分数线、就业率、内部数据 等），那些不在检索资料里、用户查不到、编出来就是幻觉——这是上一版模型集中翻车的根因；' +
+          '只有连你也无法确认的具体数字 / 内部信息才单独标注「暂无法确认」，且要小范围、克制；' +
           '④ 涉及排名/分数/政策等易变数据，提醒用户以官方最新公布为准；' +
           '⑤ 引用用户原话时务必使用上面【用户原话】字段里的完整字句，不要把检索片段里的 query 拼接词当成用户原话；' +
           '⑥ 回答末尾必须包含「相关链接与地点」板块，列出上述参考链接中的官网/百科/新闻/社媒主页，并补充该实体的具体地址、交通、地图可定位信息（查不到写「暂无法确认具体地址」）。' +
@@ -1284,13 +1318,34 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  // 降级：v9 两次都超时/失败（偶发冷启动卡死）。返回 200 + degraded 标记 + 已检索资料，
-  // 避免用户干等 60s+ 后只看到报错。前端会提示「生成超时，已为你整理资料 + 重新生成」按钮。
+  // 降级：v9 两次都超时/失败（偶发冷启动卡死）。返回 200 + degraded 标记 + 已检索资料摘要，
+  // 避免用户干等 60s+ 后只看到空白答案。前端会提示「生成超时，已为你整理资料 + 重新生成」按钮。
   if (!v9Resp) {
+    const q = (rawUser || '').slice(0, 100) // 用原始用户问题，不被 extractQuery 截断
+    const links = searchMeta.links || []
+    const sources = searchMeta.sources || []
+    // 摘要列表：优先 links（带标题+URL） → fallback sources（仅标题） → fallback rawResults 片段（保证有内容）
+    let list: string
+    if (links.length) {
+      list = links.slice(0, 5).map((l, i) => `${i + 1}. ${l.title} — ${l.url}`).join('\n')
+    } else if (sources.length) {
+      list = sources.slice(0, 5).map((t, i) => `${i + 1}. ${t}`).join('\n')
+      if (rawResults.length) {
+        list += '\n\n**📖 资料摘要片段：**\n' + rawResults.slice(0, 2).map((t) => `> ${t.slice(0, 220).replace(/\n+/g, ' ')}`).join('\n\n')
+      }
+    } else if (rawResults.length) {
+      list = rawResults.slice(0, 3).map((t, i) => `${i + 1}. ${t.slice(0, 220).replace(/\n+/g, ' ')}`).join('\n\n')
+    } else {
+      list = '（暂无资料）'
+    }
+    const fallbackContent =
+      `⏱️ **AI 生成超时（网络偶发卡顿）**，但已为你检索到 ${searchMeta.count || 0} 条公开资料，请你先参考下方链接；点「重新生成」可再试一次。\n\n` +
+      `> 关于「${q}」的参考资料：\n${list}\n\n` +
+      `💡 建议：点击下方「重新生成」可再试一次，或直接打开上方链接获取完整信息。`
     return json(
       {
         degraded: true,
-        choices: [{ message: { content: '' } }],
+        choices: [{ message: { content: fallbackContent } }],
         search: { ...searchMeta, image: EMPTY_IMG.lead, images: EMPTY_IMG.scenes },
         reasoning: ''
       },
@@ -1339,7 +1394,7 @@ Deno.serve(async (req: Request) => {
         ]
         const retry = await callV9(
           { model: V9_MODEL, messages: retryMsgs, max_tokens: 6500, stream: false, temperature: 0.7 },
-          22000
+          30000
         )
         const rd = retry.data ?? {}
         const rcontent = cleanToolCalls(rd?.choices?.[0]?.message?.content ?? '')
