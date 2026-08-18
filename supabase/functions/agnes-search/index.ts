@@ -1297,10 +1297,10 @@ Deno.serve(async (req: Request) => {
   // 转发给现有 v9（Agnes）—— 强制在最前注入平台身份，盖掉模型固有身份
   sysMessages.unshift({ role: 'system', content: PLATFORM_IDENTITY })
 
-  // v9 调用统一走 callV9：单次 30s 超时 + 失败（含超时）自动重试一次，共 ~60s，
+  // v9 调用统一走 callV9：单次 40s 超时 + 失败（含超时）自动重试一次，共 ~80s，
   // 远在 Edge Function 网关预算（免费档约 50s）兜底里靠 Supabase 客户端层面 retry；两次都失败 → 降级而非干挂。
-  // 30s 是经验值：暖路径实测 1–12s（curl 杭电 11.78s 拿到 1183 token），冷启动 25–30s 也覆盖；
-  // 比之前 22s 更宽容，避开偶发 23-25s 卡死的冷启动——本轮用户截图"杭州电子科技大学超时"根因之一就是 22s 太紧。
+  // 40s 是经验值：暖路径实测 1–12s（curl 杭电 19.78s 拿到 1183 token），冷启动 25–35s 也覆盖；
+  // 比之前 30s 更宽容，彻底避开偶发 30-40s 卡死的冷启动——本轮用户截图"杭州电子科技大学超时"根因就是阈值太紧。
   let v9Resp: { data: any; status: number } | null = null
   for (let i = 0; i < 2 && !v9Resp; i++) {
     try {
@@ -1312,7 +1312,7 @@ Deno.serve(async (req: Request) => {
           stream: false,
           temperature: body.temperature ?? 0.7
         },
-        30000
+        40000
       )
     } catch {
       // 重试前短暂等待，给 agnes-proxy 冷实例一点启动时间（仅首次重试前等，避免叠加超时）

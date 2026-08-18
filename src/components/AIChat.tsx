@@ -91,7 +91,10 @@ import { PROMPT_EMPHASIS, SYSTEM_IDENTITY, BLUNT_RULE, FRESHNESS_RULE, LINKS_LOC
 function phaseOf(ms: number): string {
   if (ms < 4000) return '🌐 正在联网检索真实资料…'
   if (ms < 16000) return '🤔 AI 正在分析、对比、提炼优缺点…'
-  return '✍️ 正在生成直白结论…'
+  if (ms < 40000) return '✍️ 正在生成直白结论…'
+  // 等待超过 40s：v9 是外部推理模型，冷启动 + 复杂问题会有 30–40s 的生成延迟，
+  // 提前给预期，避免用户以为卡死。后端 v9 单次超时已是 40s，会再自动重试一次。
+  return '⏳ AI 生成较慢（外部推理模型，深度检索+思考需 30–40 秒，属正常现象），请稍候…'
 }
 
 interface Props {
@@ -508,7 +511,7 @@ export default function AIChat({
                   <span className="ts-time">⏱ 已等待 {(elapsedMs / 1000).toFixed(1)}s</span>
                 </div>
                 <div className="ts-eta">
-                  预计约 15–45 秒（联网检索 + AI 思考，首次或复杂问题会更久）· 没卡住，正在为你查证
+                  首次或复杂问题，AI 生成可能需 30–40 秒（外部推理模型深度检索+思考），属正常现象 · 没卡住，正在为你查证
                 </div>
                 <div className="ts-bar">
                   <span className="ts-bar-fill" />
