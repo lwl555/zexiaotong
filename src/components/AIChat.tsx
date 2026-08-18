@@ -233,10 +233,43 @@ export default function AIChat({
         { webSearch: (webSearch || autoSearch) ?? false, autoSearch, signal: controller.signal }
       )
       setSearchMeta(search ?? null)
-      // 生成超时降级：保留已检索资料展示，提示用户点「重新生成」即可，不显示空白气泡
+      // 生成超时降级：保留已检索资料展示，提示用户点「重新生成」即可，不显示空白气泡。
+      // 修复：之前直接 return 把后端拼好的 fallbackContent（含具体资料列表）丢了，前端只
+      //       显示一句笼统的"AI 生成超时"，用户看不到任何资料。现在把 content 渲染成
+      //       正常 AI 消息，让用户至少能看到"已检索到 N 条资料" + 资料摘要列表，再叠加
+      //       底部的"⏳ 超时 + 重新生成"按钮引导二次重试。
       if (isDegraded) {
         setDegraded(true)
         setNoResult(false)
+        if (content?.trim()) {
+          const aiMsg: Msg = {
+            role: 'ai' as const,
+            content,
+            image: search?.image ?? null,
+            images: search?.images ?? null,
+            links: search?.links ?? null,
+            reasoning: reasoning ?? null
+          }
+          const merged = [...next, aiMsg]
+          setMessages(merged)
+          persist(merged, title)
+          // 写入查询记录，方便用户在历史里回看这次降级时实际拿到的资料
+          const q: QueryRecord = {
+            id: newId(),
+            pageKey,
+            channel,
+            pageLabel: title,
+            question: next[next.length - 1]?.content || '',
+            answer: content,
+            search: search ?? null,
+            image: search?.image ?? null,
+            images: search?.images ?? null,
+            links: search?.links ?? null,
+            reasoning: reasoning ?? null,
+            createdAt: Date.now()
+          }
+          addQuery(q)
+        }
         return
       }
       setDegraded(false)
