@@ -917,6 +917,9 @@ async function searchMulti(query: string): Promise<SearchResult> {
   // 中文覆盖面最广的通用源（百度）：中文实体/长尾查询覆盖率高于 Bing，悉尼出口可达。
   tasks.push(withTimeout(s2(searchBaidu(query), 'baidu', true), 3500))
 
+  // DuckDuckGo HTML 版：免 key 通用网页源，反爬宽松，实测悉尼可达
+  tasks.push(withTimeout(s2(searchDuckDuckGo(query), 'ddg', true), 3500))
+
   // 动态 / 新闻源（最新信息，优先注入模型上下文）。同样 relaxed：新闻/HN 已是 query 定向，
   // 区域相关新闻（如查某县高校命中该县新闻）对回答有价值，不必逐字命中实体名。
   tasks.push(withTimeout(s2(searchGoogleNews(query), 'gnews', true), 1800))
