@@ -1,4 +1,4 @@
-// agnes-search — Supabase Edge Function (Deno)
+﻿// agnes-search — Supabase Edge Function (Deno)
 // 「搜索增强层」：服务端联网检索真实资料，再把「检索结果 + 用户问题」转发给
 // 现有的 v9 agnes-proxy（Agnes 平台，agnes-2.0-flash，已验证可用）生成回答。
 //
@@ -903,6 +903,9 @@ async function searchMulti(query: string): Promise<SearchResult> {
   // 即便配了付费 key，Bing 也并行提供第二路通用网页结果，提升「县城/小生意/长尾实体」类查询的覆盖率。
   tasks.push(withTimeout(s2(searchBing(query), 'bing', true), 3500))
 
+  // 中文覆盖面最广的通用源（百度）：中文实体/长尾查询覆盖率高于 Bing，悉尼出口可达。
+  tasks.push(withTimeout(s2(searchBaidu(query), 'baidu', true), 3500))
+
   // 动态 / 新闻源（最新信息，优先注入模型上下文）。同样 relaxed：新闻/HN 已是 query 定向，
   // 区域相关新闻（如查某县高校命中该县新闻）对回答有价值，不必逐字命中实体名。
   tasks.push(withTimeout(s2(searchGoogleNews(query), 'gnews', true), 1800))
@@ -1147,6 +1150,10 @@ Deno.serve(async (req: Request) => {
     const q = String(body.query || body.__debug_search || '')
     const rt = relevanceInfo(q)
     const sources: [string, Promise<{ items: string[]; ok: boolean; links?: any[] }>][] = [
+      ['bing', searchBing(q)],
+      ['ddg', searchDuckDuckGo(q)],
+      ['reddit', searchReddit(q)],
+      ['baidu', searchBaidu(q)],
       ['gnews', searchGoogleNews(q)],
       ['hn', searchHackerNews(q)],
       ['wiki-zh', searchWikipedia(q, 'zh')],
