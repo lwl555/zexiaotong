@@ -43,6 +43,19 @@ const CORS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS'
 }
 
+// 完整浏览器请求头：模拟真实浏览器访问，降低被反爬拦截概率
+const BROWSER_HEADERS: Record<string, string> = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+  'Accept-Encoding': 'gzip, deflate, br',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'none',
+  'Sec-Fetch-User': '?1',
+  'Upgrade-Insecure-Requests': '1'
+}
+
 function json(data: unknown, status = 200, extra?: Record<string, string>) {
   return new Response(JSON.stringify(data), {
     status,
@@ -359,7 +372,7 @@ async function searchDuckDuckGo(q: string): Promise<{ items: string[]; ok: boole
   try {
     const r = await fetchWithTimeout(
       'https://html.duckduckgo.com/html/?q=' + encodeURIComponent(q),
-      { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; zexiaotong/1.0)' } }
+      { headers: { ...BROWSER_HEADERS } }
     )
     const buf = await r.arrayBuffer()
     let html = new TextDecoder('utf-8').decode(buf)
@@ -788,10 +801,8 @@ function bingRelevant(q: string, t: string): boolean {
 async function searchBing(q: string, siteScope?: string): Promise<{ items: string[]; ok: boolean }> {
   try {
     const qFull = siteScope ? `${q} ${siteScope}` : q
-    const url = 'https://www.bing.com/search?q=' + encodeURIComponent(qFull) + '&setlang=zh-CN&cc=CN'
-    const r = await fetchWithTimeout(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
-    })
+    const url = 'https://www.bing.com/search?q=' + encodeURIComponent(qFull) + '&cc=us&setlang=en-US'
+    const r = await fetchWithTimeout(url, { headers: { ...BROWSER_HEADERS } })
     const buf = await r.arrayBuffer()
     let html = new TextDecoder('utf-8').decode(buf)
     if (html.includes('�')) {
@@ -836,10 +847,9 @@ async function searchBing(q: string, siteScope?: string): Promise<{ items: strin
 // 同样存在 GBK 返回问题，用 arrayBuffer 双解码兜底；解析失败时优雅返回空。
 async function searchBaidu(q: string): Promise<{ items: string[]; ok: boolean }> {
   try {
-    const url = 'https://www.baidu.com/s?wd=' + encodeURIComponent(q) + '&rn=10'
-    const r = await fetchWithTimeout(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
-    })
+    // 移动端入口：百度对移动 UA 反爬更宽松
+    const url = 'https://m.baidu.com/s?wd=' + encodeURIComponent(q) + '&rn=10'
+    const r = await fetchWithTimeout(url, { headers: { ...BROWSER_HEADERS } })
     const buf = await r.arrayBuffer()
     let html = new TextDecoder('utf-8').decode(buf)
     if (html.includes('�')) { try { html = new TextDecoder('gbk').decode(buf) } catch {} }
@@ -847,10 +857,11 @@ async function searchBaidu(q: string): Promise<{ items: string[]; ok: boolean }>
       return { items: [], ok: false }
     }
     const snippets: string[] = []
-    const re = /<div class="c-abstract[^"]*"[^>]*>([\s\S]*?)<\/div>|<span class="content-right[^"]*"[^>]*>([\s\S]*?)<\/span>/g
+    // 兼容桌面端 + 移动端百度 HTML 结构
+    const re = /<div class="(?:c-abstract|cos-space-mb-sm)[^"]*"[^>]*>([\s\S]*?)<\/div>|<span class="(?:content-right|cos-text-hide)[^"]*"[^>]*>([\s\S]*?)<\/span>|<div class="c-span-last"[^>]*>([\s\S]*?)<\/div>/g
     let m: RegExpExecArray | null
     while ((m = re.exec(html)) !== null && snippets.length < 6) {
-      const txt = stripHtml(m[1] || m[2] || '')
+      const txt = stripHtml(m[1] || m[2] || m[3] || '')
       if (txt && txt.length > 15) snippets.push('- ' + txt.slice(0, 200))
     }
     return { items: snippets, ok: snippets.length > 0 }
@@ -863,7 +874,7 @@ async function searchBaidu(q: string): Promise<{ items: string[]; ok: boolean }>
 async function searchReddit(q: string): Promise<{ items: string[]; ok: boolean }> {
   try {
     const url = 'https://www.reddit.com/search.json?q=' + encodeURIComponent(q) + '&limit=5&sort=relevance'
-    const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'zexiaotong/1.0 by researcher' } })
+    const r = await fetchWithTimeout(url, { headers: { ...BROWSER_HEADERS } })
     const j = await r.json()
     const children = (j.data?.children || []).slice(0, 5)
     const items = children.map((c: any) => {
