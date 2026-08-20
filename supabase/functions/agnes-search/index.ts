@@ -87,13 +87,15 @@ function stripHtml(s: string): string {
 
 // 从用户长提示词里抠出「核心检索实体」：去掉指令词/修饰词/标点/引号，保留主体。
 // 例：「用三句话介绍浙江大学，并说明它的一个明显优点和一个明显缺点」→「浙江大学」
+// 关键：「学校/学院/公司/企业/集团」等后缀是实体名的一部分，不能单独剥离——
+// 否则「内江医科学校」→「内江医科」，检索跑偏到其他医科大学。
 const QUERY_STOP = [
   '请用', '请', '帮我', '分析一下', '分析', '评估', '推荐', '查一下', '查询', '查', '看一下', '看看',
   '介绍',   '说明', '对比', '比较', '总结', '生成', '写', '用三句话', '用一句话', '简述', '概述',
   '说一下', '讲讲', '谈谈', '说大实话', '直说', '拆解', '深度', '维度', '多维度', '核心', '主要',
   '包括', '包含', '关于', '针对', '对于', '明显', '真实信息', '情况', '怎么样', '如何',
   '是否', '吗', '呢', '的', '了', '我', '我们', '想', '要', '需要', '一份', '报告', '简历',
-  '该', '院校', '学校', '公司', '城市', '找工作', '就业', '优缺点', '优点', '缺点', '亮点', '重点', '避雷', '坑'
+  '该', '找工作', '就业', '优缺点', '优点', '缺点', '亮点', '重点', '避雷', '坑'
 ]
 // 注意：「并 / 和 / 与 / 及」是连接词，不是停用词，删了会破坏实体识别（如「宿舍和食堂」变「宿舍 食堂」，
 // 让 AI 把检索关键词误当作用户原话引用，参见 2026-08-13 截图 bug）。从 QUERY_STOP 中移除。
@@ -104,6 +106,11 @@ function extractQuery(text: string): string {
   for (const s of QUERY_STOP) q = q.split(s).join(' ')
   q = q.replace(/\s+/g, ' ').trim()
   return q || text.trim()
+}
+// 抽取含后缀的完整实体名（用于多 query 变体），「内江医科学校」→「内江医科学校」而非「内江医科」
+function extractEntityQuery(text: string): string {
+  const m = (text || '').match(/[一-龥A-Za-z0-9]{2,}(大学|学院|学校|公司|企业|集团|医院|银行|市|省|县|新区)/)
+  return m ? m[0] : text.trim()
 }
 
 // —— 检索片段相关性过滤 ——
@@ -143,7 +150,7 @@ function relevanceInfo(query: string) {
   const kw = DOMAIN_KW.filter((k) => query.includes(k))
   return { tokens, years, kw }
 }
-function isRelevant(snippet: string, info: ReturnType<typeof relevanceInfo>): boolean {
+function isRelevant(snippet: string, info: ReturnType<typeof relevanceInfo>, relaxed = false): boolean {
   // query 没提取出任何有意义 token（纯数字/英文/太碎）：不过滤，避免误杀
   if (info.tokens.length === 0 && info.years.length === 0 && info.kw.length === 0) return true
   // 0) 强相关：snippet 直接包含 query 完整主体（去空格拼接），直接过
@@ -151,9 +158,10 @@ function isRelevant(snippet: string, info: ReturnType<typeof relevanceInfo>): bo
   if (flat && flat.length >= 2 && snippet.includes(flat)) return true
   // 1) 短语匹配：snippet 必须包含 query 中某个 token 的**完整连续子串**（非单字命中），
   //    且该 token 至少 2 汉字（避免「美/大/学」这种单字高频字混入误判）
-  for (const tok of info.tokens) {
-    if (tok.length >= 2 && snippet.includes(tok)) return true
-  }
+  //    多实体查询（≥3 个不同实体 token）要求命中 ≥2 个不同 token，避免「杭州方言」因含「杭州」就过审
+  const hitTokens = info.tokens.filter((tok) => tok.length >= 2 && snippet.includes(tok))
+  const minHit = relaxed ? 1 : (info.tokens.length >= 3 ? 2 : 1)
+  if (hitTokens.length >= minHit) return true
   // 2) 弱相关兜底：query 含明确年份，snippet 也含该年份
   if (info.years.some((y) => snippet.includes(y))) return true
   // 3) 弱相关兜底：query 含具体数据线索词，snippet 也含该词
@@ -937,7 +945,7 @@ async function searchMulti(query: string): Promise<SearchResult> {
         // 单条截断上限 320→480：给生成模型更完整的原始事实（分数线/薪资/地址等常超 320 字被腰斩），
         // 正文才能写得有细节、有数据，而非泛泛而谈。
         const it = raw.length > 480 ? raw.slice(0, 480) + '…' : raw
-        if (!s.relaxed && !isRelevant(it, rt)) continue // 社媒域作用域结果已按 query 过滤，跳过通用相关性门禁
+        if (!isRelevant(it, rt, !!s.relaxed)) continue // 社媒域作用域结果已按 query 过滤，跳过通用相关性门禁
         if (!seen.has(it)) { seen.add(it); bucket.push(it); sourceRelevantCount++ }
       }
     }
@@ -1211,7 +1219,12 @@ Deno.serve(async (req: Request) => {
   let rawResults: string[] = []
 
   if (needSearch && query) {
-    const ctx = await searchMulti(query)
+    let ctx = await searchMulti(query)
+    // 第一次检索资料不足时，用完整实体名再查一次（避免"内江医科学校"被拆成"内江医科"导致跑偏）
+    if (!ctx.ok) {
+      const entityQuery = extractEntityQuery(rawUser)
+      if (entityQuery !== query) ctx = await searchMulti(entityQuery)
+    }
     searchMeta = { ok: ctx.ok, count: ctx.results.length, sources: ctx.sources, links: ctx.links, image: null, images: [], query, needSearch, diag: ctx.diag }
     // 清洗无效 Unicode（lone surrogates 等）：TextEncoder round-trip 模拟 UTF-8 传输，
     // 让无法编码的字符现形为 U+FFFD 再删除——否则 Deno 编码响应体时它们会变成 U+FFFD 乱码方块到达客户端
@@ -1266,7 +1279,14 @@ Deno.serve(async (req: Request) => {
           '④ 涉及排名/分数/政策等易变数据，提醒用户以官方最新公布为准；' +
           '⑤ 引用用户原话时务必使用上面【用户原话】字段里的完整字句，不要把检索片段里的 query 拼接词当成用户原话；' +
           '⑥ 回答末尾必须包含「相关链接与地点」板块，列出上述参考链接中的官网/百科/新闻/社媒主页，并补充该实体的具体地址、交通、地图可定位信息（查不到写「暂无法确认具体地址」）。' +
-          '⑦ 你**不需要、也不允许**调用任何搜索或函数工具（如 web_search）；资料已附在 <search> 中，请直接基于它们作答，严禁输出 <tool_call>、<function> 等内部协议标签。'
+          '⑦ 你**不需要、也不允许**调用任何搜索或函数工具（如 web_search）；资料已附在 <search> 中，请直接基于它们作答，严禁输出 <tool_call>、<function> 等内部协议标签。\n' +
+          '⑧ **你必须深度思考，给出自己的分析和判断，而非单纯复述检索资料**：\n' +
+          '  a) 回答前先梳理检索资料的关键信息，辨别哪些是最相关、最可靠的；\n' +
+          '  b) 结合你的知识进行交叉验证、对比分析——比如查学校时横向对比同档次院校，查城市时结合产业结构分析就业机会；\n' +
+          '  c) 给出你明确的观点和结论（用「综合来看」「我的分析是」「值得注意」等措辞），而非罗列一堆资料让用户自己判断；\n' +
+          '  d) 对不确定的信息诚实标注（「这一点暂无确切数据，仅供参考」），但不确定的东西不要编；\n' +
+          '  e) 结尾给出可操作的建议（择校：关注哪些指标、避开哪些坑；求职：城市/行业怎么选；搞钱：风险点在哪）。\n' +
+          '  f) **说直白，有问题就直接说**：学校烂就直说「这学校牌子不够硬，就业市场认可度有限」；公司加班狠就直说「拼多多以996著称，身体不好的慎去」；查不到就直说「查不到，建议换个关键词」。不要和稀泥、不要两面讨好、不要「仁者见仁智者见智」。用户要的是你真实的判断，不是外交辞令。'
       })
     }
   }
