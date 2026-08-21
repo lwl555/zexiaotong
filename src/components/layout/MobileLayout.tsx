@@ -12,7 +12,8 @@ const tabs = [
 
 export default function MobileLayout() {
   const nav = useNavigate()
-  const unread = useStore(s => s.notifications.filter(n => n.user_id === s.session.userId && !n.read).length)
+  const me = useStore(s => s.me)
+  const unread = useStore(s => me ? s.notifications.filter(n => n.user_id === me.id && !n.read).length : 0)
   return (
     <div className="app-shell flex flex-col" style={{ minHeight: '100vh' }}>
       <div className="flex-1 overflow-y-auto no-scrollbar pb-20">

@@ -18,7 +18,8 @@ export default function Home() {
   const tasks = useStore(s => s.tasks)
   const goods = useStore(s => s.goods)
   const posts = useStore(s => s.posts)
-  const unread = useStore(s => s.notifications.filter(n => n.user_id === s.session.userId && !n.read).length)
+  const me = useStore(s => s.me)
+  const unread = useStore(s => me ? s.notifications.filter(n => n.user_id === me.id && !n.read).length : 0)
   const [tab, setTab] = useState('全部')
   const [kw, setKw] = useState('')
 

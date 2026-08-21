@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ImagePlus, X } from 'lucide-react'
 import { useStore } from '../../store/store'
-import { img } from '../../lib/mockData'
+import { img } from '../../lib/img'
 
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise(res => {

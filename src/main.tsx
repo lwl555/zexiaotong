@@ -4,9 +4,10 @@ import { HashRouter } from 'react-router-dom'
 import App from './App'
 import './styles.css'
 import './tailwind.css'
+import { useStore } from './store/store'
 
-// 使用 HashRouter：URL 形如 /zexiaotong/#/ai-tutor，深层路由不发 HTTP 请求，
-// GitHub Pages 永远只返回 /zexiaotong/（200），彻底消除深链 404 状态码问题。
+// 应用启动时从 Supabase 拉取数据
+useStore.getState().init()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

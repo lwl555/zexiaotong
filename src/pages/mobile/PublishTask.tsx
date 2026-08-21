@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ImagePlus, X } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { useMe } from '../../store/useMe'
-import { img } from '../../lib/mockData'
+import { img } from '../../lib/img'
 
 const CATS = ['悬赏', '跑腿', '文档设计', '问卷']
 
