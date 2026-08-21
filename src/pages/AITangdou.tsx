@@ -289,23 +289,6 @@ export default function AITangdou() {
       display: 'flex', flexDirection: 'column', height: 'calc(100vh - 60px)',
       background: '#ffffff', maxWidth: 880, margin: '0 auto', width: '100%'
     }}>
-      {/* 顶部栏 */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '12px 20px', borderBottom: '1px solid #f0f0f0', flexShrink: 0
-      }}>
-        <div>
-          <div style={{ fontWeight: 600, fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 20 }}>🍬</span> AI糖豆
-          </div>
-          <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>你的全能 AI 助手，问啥答啥</div>
-        </div>
-        <button onClick={newChat} style={{
-          padding: '6px 14px', border: '1px solid #e5e5e5', borderRadius: 8,
-          background: '#fff', cursor: 'pointer', fontSize: 13, color: '#555'
-        }}>＋ 新对话</button>
-      </div>
-
       {/* 消息区 */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
         {messages.length === 0 && !loading && (
@@ -432,7 +415,11 @@ export default function AITangdou() {
                 fontFamily: 'inherit', padding: '6px 0'
               }}
             />
-            {/* 功能面板切换按钮 */}
+            <button onClick={newChat} title="新对话" style={{
+              width: 36, height: 36, borderRadius: 8, border: 'none', cursor: 'pointer',
+              background: '#f5f5f5', fontSize: 16, display: 'flex', alignItems: 'center',
+              justifyContent: 'center', flexShrink: 0, transition: 'all .15s'
+            }}>＋</button>
             <button onClick={() => setShowActions((v) => !v)} title="快捷功能" style={{
               width: 36, height: 36, borderRadius: 8, border: 'none', cursor: 'pointer',
               background: showActions ? '#c2410c' : '#eee', color: showActions ? '#fff' : '#666',
