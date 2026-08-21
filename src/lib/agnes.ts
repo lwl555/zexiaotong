@@ -172,31 +172,6 @@ export async function agnesChat(
   return { content, search, results, reasoning, degraded }
 }
 
-/**
- * 提交用户反馈（👍/👎）到后端知识库，用于自我进化
- */
-export interface FeedbackPayload {
-  conversationId: string
-  feedbackType: 'up' | 'down'
-  userQuery: string
-  aiResponse?: string
-  correctionText?: string
-}
-
-export async function submitFeedback(payload: FeedbackPayload): Promise<void> {
-  const base = resolveBase()
-  // 生产态：发到 Edge Function → 写入 Supabase
-  if (!base.startsWith('/')) {
-    await call('/feedback', {
-      body: {
-        conversation_id: payload.conversationId,
-        feedback_type: payload.feedbackType,
-        correction_text: payload.correctionText || null
-      }
-    })
-  }
-}
-
 // —— 预热：页面加载 / 窗口聚焦时后台暖热 agnes-search 与 v9(agnes-proxy) 两个 Edge Function ——
 // 两者各自冷启动约 1.5s+，叠加后「用户首个真实提问」会撞双冷启动（耗时 10s+，偶发被网关掐断 → "Failed to fetch"）。
 // 这里在页面加载即无声发起一次极轻的请求（trivial query 仍会调 v9 以暖热它），结果被忽略，失败也无所谓；

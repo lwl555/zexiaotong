@@ -1,0 +1,58 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=Noto+Serif+SC:wght@600;700;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 关闭 preflight 后补的 border 基线：让 Tailwind 的 border 工具类（border / border-gray-100 等）
+   在非 preflight 模式下也能显示（否则 border-style 默认 none 不可见）。仅设置边框默认行为，不动其它样式。 */
+*, ::before, ::after { border-width: 0; border-style: solid; border-color: #e5e7eb; }
+
+/* ===== 新模块（悬赏/二手/论坛/钱包/后台）的组件类，全部限定在 .app-shell 与 .admin 作用域内，
+   绝不污染原择校通桌面 AI 页面的 .card/.btn/.input 等暖陶土编辑风样式 ===== */
+@layer components {
+  .app-shell .btn, .admin .btn,
+  .app-shell .btn-primary, .admin .btn-primary,
+  .app-shell .btn-ghost, .admin .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium transition active:scale-[.98] disabled:opacity-50 disabled:active:scale-100;
+  }
+  .app-shell .btn-primary, .admin .btn-primary {
+    @apply bg-brand-500 text-white hover:bg-brand-600;
+  }
+  .app-shell .btn-ghost, .admin .btn-ghost {
+    @apply bg-gray-100 text-ink hover:bg-gray-200;
+  }
+  .app-shell .input, .admin .input {
+    @apply w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-[15px] outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100;
+  }
+  .app-shell .card, .admin .card {
+    @apply rounded-2xl bg-white shadow-card;
+  }
+  .app-shell .tag, .admin .tag {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+}
+
+/* 手机 H5 容器：最大宽度居中，模拟真机（原桌面页面使用 .shell，互不影响） */
+.app-shell {
+  max-width: 480px;
+  margin: 0 auto;
+  background: #fff;
+  min-height: 100vh;
+  position: relative;
+  box-shadow: 0 0 40px rgba(0, 0, 0, .06);
+}
+/* 桌面端：不再模拟手机，作为常规内容容器铺满（避免出现居中的窄卡片） */
+@media (min-width: 768px) {
+  .app-shell {
+    max-width: 100%;
+    margin: 0;
+    background: transparent;
+    box-shadow: none;
+    min-height: auto;
+  }
+}
+
+/* 隐藏滚动条但保留滚动 */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

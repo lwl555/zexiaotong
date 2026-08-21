@@ -1,22 +1,9 @@
 import { ReactNode, useState, useEffect, useRef } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useNavigate, Outlet } from 'react-router-dom'
 import HistoryDrawer from './HistoryDrawer'
+import { primaryNav, moreNav, type NavDef } from '../lib/nav'
 
-interface NavDef {
-  to: string
-  label: string
-  icon: string
-  live?: boolean
-  end?: boolean
-}
-
-interface Props {
-  primaryNav: NavDef[]
-  moreNav: NavDef[]
-  children: ReactNode
-}
-
-export default function Layout({ primaryNav, moreNav, children }: Props) {
+export default function Layout() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -143,7 +130,7 @@ export default function Layout({ primaryNav, moreNav, children }: Props) {
         )}
       </header>
 
-      <main className="container">{children}</main>
+      <main className="container"><Outlet /></main>
 
       <footer className="footer">
         <b>择校通</b> · 真实 · 直接 · 不客气 — AI 只说大实话，不粉饰、不回避、不绕弯子。

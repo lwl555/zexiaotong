@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, type SyntheticEvent } from 'react'
-import { agnesChat, submitFeedback, ChatMsg, SearchMeta, LinkInfo } from '../lib/agnes'
+import { agnesChat, ChatMsg, SearchMeta, LinkInfo } from '../lib/agnes'
 import {
   Conversation,
   StoredMsg,
@@ -162,8 +162,6 @@ export default function AIChat({
   const [degraded, setDegraded] = useState(false)
   // 资料不足标记：后端经「严格 ok 判据」后认为检索失败（not degraded），前端区别展示
   const [noResult, setNoResult] = useState(false)
-  /** 每条 AI 消息的反馈状态：key=消息index, value='up'|'down'|null */
-  const [feedback, setFeedback] = useState<Record<number, 'up' | 'down' | null>>({})
   const lastReply = useRef('')
   const abortRef = useRef<AbortController | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
@@ -174,40 +172,8 @@ export default function AIChat({
   const startRef = useRef<number>(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-
-
-  // 自我进化：反馈处理
-  const handleFeedback = async (msgIndex: number, type: 'up' | 'down') => {
-    const current = feedback[msgIndex]
-    const newVal = current === type ? null : type
-    setFeedback((prev) => ({ ...prev, [msgIndex]: newVal }))
-    const aiMessages = messages.filter((m) => m.role === 'ai')
-    const targetMsg = aiMessages[msgIndex]
-    if (!targetMsg) return
-    let userQuery = ''
-    for (let i = 0; i < messages.length; i++) {
-      if (messages[i] === targetMsg) {
-        for (let j = i - 1; j >= 0; j--) {
-          if (messages[j].role === 'user') { userQuery = messages[j].content; break }
-        }
-        break
-      }
-    }
-    try {
-      await submitFeedback({
-        conversationId: convId + ':' + msgIndex,
-        feedbackType: newVal || type,
-        userQuery: userQuery.slice(0, 200),
-        aiResponse: targetMsg.content.slice(0, 500)
-      })
-    } catch {
-      // 静默失败
-    }
-  }
-
   // 组件卸载时清掉计时器，避免泄漏
   useEffect(() => {
-
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
     }
@@ -528,20 +494,6 @@ export default function AIChat({
                     </div>
                   )}
                   <div className="report">{renderReport(m.content, theme)}</div>
-                  {m.role === 'ai' && !loading && (
-                    <div className="feedback-bar">
-                      <button
-                        className={'fb-btn ' + (feedback[i] === 'up' ? 'active' : '')}
-                        onClick={() => handleFeedback(i, 'up')}
-                        title="有帮助"
-                      >👍</button>
-                      <button
-                        className={'fb-btn ' + (feedback[i] === 'down' ? 'active' : '')}
-                        onClick={() => handleFeedback(i, 'down')}
-                        title="没帮助"
-                      >👎</button>
-                    </div>
-                  )}
                 </>
               )}
             </div>

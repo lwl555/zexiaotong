@@ -1,0 +1,55 @@
+import { useState } from 'react'
+import { Save, Megaphone, Percent, Pin } from 'lucide-react'
+import { useStore } from '../../store/store'
+import { PageHeader } from './ui'
+import type { PlatformConfig } from '../../lib/types'
+
+export default function Config() {
+  const config = useStore(s => s.config)
+  const setConfig = useStore(s => s.setConfig)
+  const [draft, setDraft] = useState<PlatformConfig>(config)
+
+  const save = () => {
+    const rate = Math.min(0.3, Math.max(0.01, Number(draft.commission_rate)))
+    setConfig({ ...draft, commission_rate: rate })
+    alert('配置已保存（本地演示，刷新后还原）')
+  }
+
+  return (
+    <div>
+      <PageHeader title="运营配置" desc="设置平台抽佣、置顶价格与全局公告">
+        <button className="btn-primary" onClick={save}><Save size={16} /> 保存配置</button>
+      </PageHeader>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="card p-5">
+          <div className="flex items-center gap-2 font-bold text-ink mb-4"><Percent size={18} className="text-brand-600" /> 平台抽佣比例</div>
+          <label className="text-sm text-gray-600">任务完成时平台抽佣（%）</label>
+          <input type="number" step="0.5" min="1" max="30" className="input mt-2" value={(draft.commission_rate * 100).toFixed(1)}
+            onChange={e => setDraft({ ...draft, commission_rate: Number(e.target.value) / 100 })} />
+          <div className="text-xs text-gray-400 mt-1">范围 1% – 30%，当前 {(draft.commission_rate * 100).toFixed(0)}%</div>
+        </div>
+
+        <div className="card p-5">
+          <div className="flex items-center gap-2 font-bold text-ink mb-4"><Pin size={18} className="text-clay" /> 付费置顶价格</div>
+          <div className="space-y-3">
+            {(['d1', 'd3', 'd7'] as const).map((k, i) => (
+              <div key={k} className="flex items-center gap-3">
+                <span className="text-sm text-gray-600 w-20">{['1 天', '3 天', '7 天'][i]}</span>
+                <input type="number" min="0" className="input" value={draft.top_price[k]}
+                  onChange={e => setDraft({ ...draft, top_price: { ...draft.top_price, [k]: Number(e.target.value) } })} />
+                <span className="text-gray-400 text-sm">元</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="card p-5 lg:col-span-2">
+          <div className="flex items-center gap-2 font-bold text-ink mb-4"><Megaphone size={18} className="text-brand-600" /> 全局公告</div>
+          <textarea className="input h-28 resize-none" value={draft.announce}
+            onChange={e => setDraft({ ...draft, announce: e.target.value })} placeholder="发布全站公告…" />
+        </div>
+      </div>
+    </div>
+  )
+}
