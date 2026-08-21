@@ -1,44 +1,26 @@
-import { useState, useRef, useEffect, type SyntheticEvent } from 'react'
-import { agnesChat, ChatMsg, SearchMeta, LinkInfo } from '../lib/agnes'
-import {
-  Conversation,
-  StoredMsg,
-  QueryRecord,
-  getConversation,
-  upsertConversation,
-  deleteConversation,
-  addQuery,
-  newId
-} from '../lib/history'
-import { exportDocx } from '../lib/docx'
-import { SYSTEM_IDENTITY, PROMPT_EMPHASIS } from '../lib/prompts'
+import { useState, useRef, useEffect } from 'react'
+import { agnesChat, ChatMsg, LinkInfo } from '../lib/agnes'
 
-// AI 糖豆的专属系统提示词：简洁、亲切、全能助手风格
-const PROMPT_AI_TANGDOU = `你是「择校通」平台上的 AI 助手，名字叫「AI糖豆」。
+// ─── 提示词 ─────────────────────────────────────────────────────
+
+const PROMPT = `你是「择校通」平台上的 AI 助手，名字叫「糖豆」。
 你是一个简洁、高效、全能的 AI 助手，语气亲切自然，回答直击要点。
 
 【身份纪律】
-- 始终以「AI糖豆」身份回答，不要自称或暗示任何第三方大模型。
+- 始终以「糖豆」身份回答，不要自称或暗示任何第三方大模型。
 - 若用户问「你是谁」，回答：「我是择校通的 AI 糖豆，一个帮你解决各种问题的小助手。」
 
 【回答风格】
 - 简洁明了，不要废话，先给结论再展开。
-- 该详细时详细，该简短时简短，根据问题灵活调整。
-- 重要数据和关键词用 **双星号** 包裹，方便用户一眼看到重点。
-- 用列表和分段让内容结构清晰，避免一大段文字糊脸上。
+- 重要数据和关键词用 **双星号** 包裹。
+- 用列表和分段让内容结构清晰。
+- 回答中如需整理成表格，使用 markdown 表格语法（| 列1 | 列2 | ... |），前端会自动渲染为真实表格。
 
 【联网检索】
 - 可以联网检索获取最新信息，检索到的资料要标注【资料·来源：xxx】。
-- 自身知识整理的部分不要说成检索结果，如实标注"根据公开信息整理"。`
+- 自身知识整理的部分如实标注"根据公开信息整理"。`
 
-// 底部功能面板按钮
-interface QuickAction {
-  icon: string
-  label: string
-  prompt: string
-}
-
-const QUICK_ACTIONS: QuickAction[] = [
+const QUICK_ACTIONS = [
   { icon: '📝', label: '帮我写作', prompt: '帮我写一篇关于以下主题的文案：' },
   { icon: '🌐', label: '翻译', prompt: '请将以下内容翻译成英文：' },
   { icon: '💻', label: '写代码', prompt: '请用代码帮我实现：' },
@@ -49,32 +31,135 @@ const QUICK_ACTIONS: QuickAction[] = [
   { icon: '🔍', label: '联网搜索', prompt: '帮我搜索以下最新信息：' }
 ]
 
-// 检索来源英文 key → 中文标签
-const SRC_LABEL: Record<string, string> = {
-  gnews: '新闻', hn: '技术讨论', bing: '网页', 'bing-social': '社媒',
-  reddit: '社区', 'wiki-zh': '维基(中)', 'wiki-en': '维基(英)', ddg: 'DuckDuckGo',
-  tavily: '综合检索', 'tavily-social': '社媒', brave: 'Brave', serper: 'Serper', baidu: '百度'
-}
-const srcLabel = (s: string) => SRC_LABEL[s] || s
+// ─── 图片压缩 ───────────────────────────────────────────────────
 
-// 联网阶段提示
-function phaseOf(ms: number): string {
-  if (ms < 3000) return '🌐 正在联网搜索…'
-  if (ms < 12000) return '🤔 正在思考…'
-  if (ms < 30000) return '✍️ 正在整理回答…'
-  return '⏳ 生成中，请稍候…'
+function compressImage(file: File, maxW = 1024, quality = 0.7): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const img = new window.Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        let w = img.width, h = img.height
+        if (w > maxW) { h = h * maxW / w; w = maxW }
+        canvas.width = w; canvas.height = h
+        const ctx = canvas.getContext('2d')!
+        ctx.drawImage(img, 0, 0, w, h)
+        resolve(canvas.toDataURL('image/jpeg', quality))
+      }
+      img.onerror = reject
+      img.src = reader.result as string
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
 }
 
-interface Msg {
-  role: 'user' | 'ai'
-  content: string
-  reasoning?: string | null
-  links?: LinkInfo[] | null
+// ─── Markdown 渲染（支持表格、列表、代码块、标题、加粗） ──────
+
+function renderMarkdown(text: string) {
+  if (!text) return null
+  const lines = text.split('\n')
+  const elements: JSX.Element[] = []
+  let i = 0
+
+  while (i < lines.length) {
+    const line = lines[i].replace(/\r$/, '')
+
+    // 空行
+    if (!line.trim()) { i++; continue }
+
+    // 代码块
+    if (line.startsWith('```')) {
+      const lang = line.slice(3).trim()
+      const buf: string[] = []
+      i++
+      while (i < lines.length && !lines[i].startsWith('```')) {
+        buf.push(lines[i]); i++
+      }
+      i++ // skip closing ```
+      elements.push(
+        <div key={i} style={{
+          margin: '10px 0', borderRadius: 10, overflow: 'hidden',
+          border: '1px solid #e5e7eb', background: '#f9fafb'
+        }}>
+          {lang && <div style={{ padding: '6px 12px', fontSize: 12, color: '#6b7280', borderBottom: '1px solid #e5e7eb', background: '#f3f4f6' }}>{lang}</div>}
+          <pre style={{ padding: '12px 14px', overflow: 'auto', fontSize: 13, lineHeight: 1.6, margin: 0, fontFamily: 'ui-monospace, SF Mono, Menlo, monospace' }}>
+            <code>{buf.join('\n')}</code>
+          </pre>
+        </div>
+      )
+      continue
+    }
+
+    // 表格：连续以 | 开头的行
+    if (line.trim().startsWith('|')) {
+      const tableRows: string[] = []
+      while (i < lines.length && lines[i].trim().startsWith('|')) {
+        tableRows.push(lines[i].trim()); i++
+      }
+      if (tableRows.length >= 2) {
+        const headerRow = tableRows[0]
+        const bodyRows = tableRows.slice(2) // skip separator
+        const parseRow = (r: string) => r.split('|').filter(c => c.trim() !== '').map(c => c.trim())
+        const headers = parseRow(headerRow)
+        elements.push(
+          <div key={i} style={{ margin: '12px 0', overflowX: 'auto', borderRadius: 10, border: '1px solid #e5e7eb' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+              <thead>
+                <tr style={{ background: '#fef3c7' }}>
+                  {headers.map((h, j) => <th key={j} style={{ padding: '10px 14px', textAlign: 'left', borderBottom: '2px solid #f59e0b', fontWeight: 600, color: '#92400e' }}>{inlineRender(h)}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {bodyRows.map((row, ri) => {
+                  const cells = parseRow(row)
+                  return (
+                    <tr key={ri} style={{ background: ri % 2 === 0 ? '#fff' : '#f9fafb' }}>
+                      {cells.map((c, ci) => <td key={ci} style={{ padding: '9px 14px', borderBottom: '1px solid #e5e7eb' }}>{inlineRender(c)}</td>)}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )
+        continue
+      }
+    }
+
+    // 标题
+    const hMatch = line.match(/^(#{1,3})\s+(.+)$/)
+    if (hMatch) {
+      const Tag = `h${hMatch[1].length}` as keyof JSX.IntrinsicElements
+      const size = hMatch[1].length === 1 ? 18 : hMatch[1].length === 2 ? 16 : 15
+      elements.push(<Tag key={i} style={{ margin: '14px 0 6px', fontSize: size, fontWeight: 600, color: '#1c1814' }}>{inlineRender(hMatch[2])}</Tag>)
+      i++; continue
+    }
+
+    // 列表
+    if (/^[-*]\s+/.test(line)) {
+      const items: string[] = []
+      while (i < lines.length && /^[-*]\s+/.test(lines[i])) {
+        items.push(lines[i].replace(/^[-*]\s+/, '')); i++
+      }
+      elements.push(
+        <ul key={i} style={{ margin: '6px 0', paddingLeft: 20, lineHeight: 1.8 }}>
+          {items.map((item, j) => <li key={j}>{inlineRender(item)}</li>)}
+        </ul>
+      )
+      continue
+    }
+
+    // 普通段落
+    elements.push(<p key={i} style={{ margin: '4px 0', lineHeight: 1.75, whiteSpace: 'pre-wrap' }}>{inlineRender(line)}</p>)
+    i++
+  }
+  return elements
 }
 
-// 渲染 **重点** 标红加粗
-function renderInline(text: string) {
-  if (!text) return []
+// **加粗** 标红
+function inlineRender(text: string) {
   const parts = text.split(/(\*\*[^*]+\*\*)/g)
   return parts.map((p, i) => {
     const m = p.match(/^\*\*([^*]+)\*\*$/)
@@ -84,159 +169,89 @@ function renderInline(text: string) {
   })
 }
 
-// 简单 markdown 渲染（段落 + 列表 + 代码块）
-function renderContent(text: string) {
-  if (!text) return null
-  const lines = text.split('\n')
-  const elements: JSX.Element[] = []
-  let listItems: string[] = []
-  let inCode = false
-  let codeBuf: string[] = []
+// ─── 联网阶段提示 ───────────────────────────────────────────────
 
-  const flushList = () => {
-    if (listItems.length) {
-      elements.push(
-        <ul key={`ul-${elements.length}`} style={{ margin: '6px 0', paddingLeft: 20, lineHeight: 1.8 }}>
-          {listItems.map((item, i) => <li key={i}>{renderInline(item)}</li>)}
-        </ul>
-      )
-      listItems = []
-    }
-  }
-
-  for (const raw of lines) {
-    const line = raw.replace(/\r$/, '')
-
-    // 代码块
-    if (line.startsWith('```')) {
-      if (inCode) {
-        elements.push(
-          <pre key={`code-${elements.length}`} style={{
-            background: '#f5f5f5', padding: '10px 14px', borderRadius: 8,
-            overflow: 'auto', fontSize: 13, lineHeight: 1.6, margin: '8px 0',
-            fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace'
-          }}>
-            <code>{codeBuf.join('\n')}</code>
-          </pre>
-        )
-        codeBuf = []
-        inCode = false
-      } else {
-        flushList()
-        inCode = true
-      }
-      continue
-    }
-    if (inCode) {
-      codeBuf.push(line)
-      continue
-    }
-
-    // 空行
-    if (!line.trim()) {
-      flushList()
-      continue
-    }
-
-    // 列表
-    const listMatch = line.match(/^[-*]\s+(.*)$/)
-    if (listMatch) {
-      listItems.push(listMatch[1])
-      continue
-    }
-    flushList()
-
-    // 标题
-    const hMatch = line.match(/^(#{1,3})\s+(.+)$/)
-    if (hMatch) {
-      const Tag = `h${hMatch[1].length}` as keyof JSX.IntrinsicElements
-      elements.push(<Tag key={`h-${elements.length}`} style={{ margin: '12px 0 6px', fontSize: 15, fontWeight: 600 }}>{renderInline(hMatch[2])}</Tag>)
-      continue
-    }
-
-    // 普通段落
-    elements.push(<p key={`p-${elements.length}`} style={{ margin: '4px 0', lineHeight: 1.75, whiteSpace: 'pre-wrap' }}>{renderInline(line)}</p>)
-  }
-  flushList()
-  return elements
+function phaseOf(ms: number): string {
+  if (ms < 3000) return '🌐 正在联网搜索…'
+  if (ms < 12000) return '🤔 正在思考…'
+  if (ms < 30000) return '✍️ 正在整理回答…'
+  return '⏳ 生成中，请稍候…'
 }
 
+// ─── 消息类型 ───────────────────────────────────────────────────
+
+interface Msg {
+  role: 'user' | 'ai'
+  content: string
+  reasoning?: string | null
+  links?: LinkInfo[] | null
+  image?: string | null  // base64 for sent image
+}
+
+// ─── 组件 ───────────────────────────────────────────────────────
+
 export default function AITangdou() {
-  const convId = 'ai-tangdou:main'
-  const [messages, setMessages] = useState<Msg[]>(() => {
-    const c = getConversation(convId)
-    return c ? c.messages.map((m: StoredMsg) => ({ role: m.role, content: m.content, reasoning: m.reasoning ?? null, links: m.links ?? null })) : []
-  })
-  const [convTitle, setConvTitle] = useState<string>(() => getConversation(convId)?.title ?? '')
-  const [convCreated, setConvCreated] = useState<number>(() => getConversation(convId)?.createdAt ?? Date.now())
+  const [messages, setMessages] = useState<Msg[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [elapsedMs, setElapsedMs] = useState(0)
   const [showActions, setShowActions] = useState(false)
-  const lastReply = useRef('')
+  const [pendingImage, setPendingImage] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
   const startRef = useRef<number>(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  useEffect(() => { return () => { if (timerRef.current) clearInterval(timerRef.current) } }, [])
   useEffect(() => {
-    return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [])
-
-  useEffect(() => {
-    const nearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 200
-    if (nearBottom) endRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (endRef.current && (messages.length > 0 || loading)) {
+      endRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
   }, [messages, loading])
 
-  function persist(nextMsgs: Msg[], title: string) {
-    const conv: Conversation = {
-      id: convId, pageKey: 'ai-tangdou', channel: 'main',
-      title: title || '新对话',
-      messages: nextMsgs.map((m) => ({ role: m.role, content: m.content, reasoning: m.reasoning ?? null, links: m.links ?? null })),
-      createdAt: convCreated, updatedAt: Date.now()
-    }
-    upsertConversation(conv)
-  }
-
   async function run(next: Msg[]) {
-    const title = convTitle || next[next.length - 1]?.content.slice(0, 20) || '对话'
-    setConvTitle(title)
-    persist(next, title)
     setLoading(true)
     startRef.current = Date.now()
     setElapsedMs(0)
     if (timerRef.current) clearInterval(timerRef.current)
     timerRef.current = setInterval(() => setElapsedMs(Date.now() - startRef.current), 200)
+
     const controller = new AbortController()
     abortRef.current = controller
 
     try {
-      const now = new Date()
-      const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`
-      const systemContent = `${SYSTEM_IDENTITY.replace(/名字叫「择校通助手」/g, '名字叫「AI糖豆」')}\n\n${PROMPT_AI_TANGDOU}\n\n${PROMPT_EMPHASIS}`
-      const { content, search, reasoning, degraded: isDegraded } = await agnesChat(
-        [{ role: 'system', content: systemContent }, ...next.map((m): ChatMsg => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }))],
-        { autoSearch: true, signal: controller.signal }
-      )
+      // 构造 messages：如果有图片，放在最后一条 user message 里
+      const chatMessages: ChatMsg[] = [
+        { role: 'system', content: PROMPT },
+        ...next.slice(0, -1).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }))
+      ]
+      const lastMsg = next[next.length - 1]
+      if (lastMsg.image) {
+        // multimodal: content = text + image_url
+        chatMessages.push({
+          role: 'user',
+          content: [
+            { type: 'text', text: lastMsg.content || '请描述这张图片' },
+            { type: 'image_url', image_url: { url: lastMsg.image } }
+          ] as any
+        })
+      } else {
+        chatMessages.push({ role: 'user', content: lastMsg.content })
+      }
+
+      const { content, search, reasoning } = await agnesChat(chatMessages, {
+        autoSearch: true,
+        signal: controller.signal
+      })
 
       const safeContent = content?.trim() || '⚠️ 这一轮没拿到回复，请换个说法再试试。'
-      const aiMsg: Msg = { role: 'ai' as const, content: safeContent, reasoning: reasoning ?? null, links: search?.links ?? null }
-      const merged = [...next, aiMsg]
-      setMessages(merged)
-      persist(merged, title)
-      lastReply.current = safeContent
-
-      const q: QueryRecord = {
-        id: newId(), pageKey: 'ai-tangdou', channel: 'main', pageLabel: 'AI糖豆',
-        question: next[next.length - 1]?.content || '', answer: safeContent,
-        search: search ?? null, links: search?.links ?? null, reasoning: reasoning ?? null,
-        createdAt: Date.now()
-      }
-      addQuery(q)
+      const aiMsg: Msg = { role: 'ai', content: safeContent, reasoning: reasoning ?? null, links: search?.links ?? null }
+      setMessages([...next, aiMsg])
     } catch (e: any) {
-      if (e?.name !== 'AbortError') setError(String(e?.message || e))
+      if (e?.name !== 'AbortError') setError(e?.message || '请求失败')
     } finally {
       if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
       setLoading(false)
@@ -246,39 +261,44 @@ export default function AITangdou() {
 
   async function send(override?: string) {
     const text = (override ?? input).trim()
-    if (!text || loading) return
+    if (!text && !pendingImage) return
     setError('')
-    const next = [...messages, { role: 'user' as const, content: text }]
+    const next = [...messages, { role: 'user' as const, content: text, image: pendingImage }]
     setMessages(next)
     setInput('')
+    setPendingImage(null)
     setShowActions(false)
     await run(next)
   }
 
-  function stop() {
-    abortRef.current?.abort()
-    abortRef.current = null
-  }
+  function stop() { abortRef.current?.abort(); abortRef.current = null }
 
   function newChat() {
     abortRef.current?.abort()
-    deleteConversation(convId)
     setMessages([])
-    setConvTitle('')
-    setConvCreated(Date.now())
     setInput('')
+    setPendingImage(null)
     setError('')
-    lastReply.current = ''
   }
 
-  // 快捷功能：填入输入框
-  function useAction(action: QuickAction) {
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const compressed = await compressImage(file, 1024, 0.7)
+      setPendingImage(compressed)
+    } catch { /* ignore */ }
+    e.target.value = ''
+  }
+
+  function removePendingImage() { setPendingImage(null) }
+
+  function useAction(action: typeof QUICK_ACTIONS[0]) {
     setInput(action.prompt)
     setShowActions(false)
     inputRef.current?.focus()
   }
 
-  // 自适应 textarea 高度
   function autoResize(el: HTMLTextAreaElement) {
     el.style.height = 'auto'
     el.style.height = Math.min(el.scrollHeight, 160) + 'px'
@@ -294,8 +314,8 @@ export default function AITangdou() {
         {messages.length === 0 && !loading && (
           <div style={{ textAlign: 'center', marginTop: 80 }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>🍬</div>
-            <div style={{ fontSize: 20, fontWeight: 600, color: '#333', marginBottom: 8 }}>你好，我是 AI糖豆</div>
-            <div style={{ fontSize: 14, color: '#888', marginBottom: 32 }}>可以帮你写作、翻译、算题、写代码，或者随便聊聊天</div>
+            <div style={{ fontSize: 20, fontWeight: 600, color: '#333', marginBottom: 8 }}>你好，我是糖豆</div>
+            <div style={{ fontSize: 14, color: '#888', marginBottom: 32 }}>可以帮你写作、翻译、算题、写代码、识图分析，或者随便聊聊天</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 10, maxWidth: 560, margin: '0 auto' }}>
               {['写一封求职信', 'Python 快速排序', '翻译成英文', '头脑风暴创业点子'].map((ex) => (
                 <button key={ex} onClick={() => send(ex)} style={{
@@ -321,15 +341,22 @@ export default function AITangdou() {
               }}>🍬</div>
             )}
             <div style={{
-              maxWidth: '78%', padding: '12px 16px', borderRadius: 16,
+              maxWidth: '78%', padding: m.image ? 0 : '12px 16px', borderRadius: 16,
               background: m.role === 'user' ? '#c2410c' : '#f7f7f7',
               color: m.role === 'user' ? '#fff' : '#333',
               fontSize: 15, lineHeight: 1.7,
               borderTopRightRadius: m.role === 'user' ? 4 : 16,
               borderTopLeftRadius: m.role === 'user' ? 16 : 4,
-              wordBreak: 'break-word'
+              wordBreak: 'break-word', overflow: 'hidden'
             }}>
-              {m.role === 'ai' ? renderContent(m.content) : <span style={{ whiteSpace: 'pre-wrap' }}>{m.content}</span>}
+              {m.image && (
+                <div style={{ padding: '10px 10px 0' }}>
+                  <img src={m.image} alt="用户发送的图片" style={{ maxWidth: 200, maxHeight: 180, borderRadius: 10, display: 'block' }} />
+                </div>
+              )}
+              {m.image && m.content && <div style={{ padding: '8px 12px' }}>{m.content}</div>}
+              {!m.image && m.role === 'ai' && renderMarkdown(m.content)}
+              {!m.image && m.role === 'user' && <span style={{ whiteSpace: 'pre-wrap' }}>{m.content}</span>}
               {m.links && m.links.length > 0 && (
                 <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid #e5e5e5', fontSize: 13 }}>
                   <div style={{ color: '#888', marginBottom: 4 }}>🔗 参考资料：</div>
@@ -342,7 +369,7 @@ export default function AITangdou() {
                 </div>
               )}
             </div>
-            {m.role === 'user' && (
+            {m.role === 'user' && !m.image && (
               <div style={{
                 width: 32, height: 32, borderRadius: '50%', background: '#e8e0d8',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -373,9 +400,9 @@ export default function AITangdou() {
         <div ref={endRef} />
       </div>
 
-      {/* 底部功能面板 + 输入区 */}
+      {/* 底部 */}
       <div style={{ flexShrink: 0, borderTop: '1px solid #f0f0f0', background: '#fff' }}>
-        {/* 功能面板（可折叠） */}
+        {/* 功能面板 */}
         {showActions && (
           <div style={{
             display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8,
@@ -392,6 +419,18 @@ export default function AITangdou() {
                 <span style={{ fontSize: 12, color: '#666' }}>{a.label}</span>
               </button>
             ))}
+          </div>
+        )}
+
+        {/* 待发送图片预览 */}
+        {pendingImage && (
+          <div style={{ padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 10, background: '#fef3c7' }}>
+            <img src={pendingImage} alt="待发送" style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'cover' }} />
+            <span style={{ fontSize: 13, color: '#92400e' }}>图片已压缩，将与消息一起发送</span>
+            <button onClick={removePendingImage} style={{
+              marginLeft: 'auto', border: 'none', background: '#f59e0b', color: '#fff',
+              borderRadius: 6, padding: '4px 12px', fontSize: 12, cursor: 'pointer'
+            }}>移除</button>
           </div>
         )}
 
@@ -415,6 +454,12 @@ export default function AITangdou() {
                 fontFamily: 'inherit', padding: '6px 0'
               }}
             />
+            <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
+            <button onClick={() => fileRef.current?.click()} title="上传图片" style={{
+              width: 36, height: 36, borderRadius: 8, border: 'none', cursor: 'pointer',
+              background: pendingImage ? '#c2410c' : '#f5f5f5', fontSize: 16, display: 'flex', alignItems: 'center',
+              justifyContent: 'center', flexShrink: 0, transition: 'all .15s'
+            }}>📷</button>
             <button onClick={newChat} title="新对话" style={{
               width: 36, height: 36, borderRadius: 8, border: 'none', cursor: 'pointer',
               background: '#f5f5f5', fontSize: 16, display: 'flex', alignItems: 'center',
@@ -432,16 +477,16 @@ export default function AITangdou() {
                 background: '#eee', fontSize: 14, flexShrink: 0
               }}>⏹</button>
             ) : (
-              <button onClick={() => send()} disabled={!input.trim()} style={{
-                width: 36, height: 36, borderRadius: 8, border: 'none', cursor: input.trim() ? 'pointer' : 'default',
-                background: input.trim() ? '#c2410c' : '#eee', color: input.trim() ? '#fff' : '#aaa',
+              <button onClick={() => send()} disabled={!input.trim() && !pendingImage} style={{
+                width: 36, height: 36, borderRadius: 8, border: 'none', cursor: (input.trim() || pendingImage) ? 'pointer' : 'default',
+                background: (input.trim() || pendingImage) ? '#c2410c' : '#eee', color: (input.trim() || pendingImage) ? '#fff' : '#aaa',
                 fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 flexShrink: 0, transition: 'all .15s'
               }}>↑</button>
             )}
           </div>
           <div style={{ textAlign: 'center', fontSize: 11, color: '#bbb', marginTop: 6 }}>
-            AI糖豆 由择校通平台提供 · 内容仅供参考
+            糖豆 由择校通平台提供 · 内容仅供参考
           </div>
         </div>
       </div>

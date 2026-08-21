@@ -14,7 +14,7 @@ export interface NavDef {
 export const primaryNav: NavDef[] = [
   { to: '/', label: '首页', icon: '', end: true },
   { to: '/ai-search', label: 'AI百事通', icon: '🧭', live: true },
-  { to: '/ai-tangdou', label: 'AI糖豆', icon: '🍬', live: true },
+  { to: '/ai-tangdou', label: '糖豆', icon: '🍬', live: true },
   { to: '/ai-tutor', label: '实时资讯台', icon: '', live: true },
   { to: '/document-workshop', label: '文档工坊', icon: '', live: true }
 ]
@@ -34,7 +34,7 @@ export const moreNav: NavDef[] = [
 export const ROUTE_TITLES: Record<string, string> = {
   '/': '择校通',
   '/ai-search': '择校通 · AI百事通',
-  '/ai-tangdou': '择校通 · AI糖豆',
+  '/ai-tangdou': '择校通 · 糖豆',
   '/ai-tutor': '择校通 · 实时资讯台',
   '/document-workshop': '择校通 · 文档工坊',
   '/warnings': '择校通 · 避雷清单',
