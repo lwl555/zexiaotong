@@ -69,10 +69,10 @@ function ResponsiveShell() {
   return isMobile ? <MobileLayout /> : <Layout />
 }
 
-// 首页按设备选不同落地页（编辑式桌面首页 vs H5 首页），功能一致。
+// PC 首页默认显示糖豆（AI 助手），H5 首页保持原样
 function DeviceHome() {
   const isMobile = useIsMobile()
-  return isMobile ? <MobileHome /> : <Home />
+  return isMobile ? <MobileHome /> : <AITangdou />
 }
 
 export default function App() {
