@@ -47,6 +47,18 @@ const QUICK_TAGS = [
   { icon: Search, label: '联网搜索' }
 ]
 
+// 模式 = 注入系统提示词的「行为增量」（参考 Omnifact Response Modes / Gemini Gems / 豆包快捷指令）
+// 选中后在整个对话中持续生效，而非只发一句废话。
+const MODE_SYSTEM: Record<string, string> = {
+  '帮我写作': '【当前模式：写作】用户希望得到结构清晰、有观点的文章或文案。必要时用一两个问题快速澄清主题与风格，然后直接动笔；成稿用标题、分段、列表组织。',
+  '翻译': '【当前模式：翻译】把用户的内容翻译成目标语言，保持原意与语气；未指定目标语言时默认译为英文。优先只输出译文，必要时附极简说明。',
+  '写代码': '【当前模式：编程】帮用户写或改代码。先一句话说明思路，再给可运行代码并附关键注释；优先使用用户所用的语言与框架。',
+  '算题': '【当前模式：计算】逐步推导用户的计算/数学题，给出过程与最终答案；不确定处先说明假设。',
+  '头脑风暴': '【当前模式：头脑风暴】围绕用户的话题给出多条有创意、可落地的想法或方案，分点列出，可附简短优劣说明。',
+  '做表格': '【当前模式：表格】帮用户整理结构化 Markdown 表格，列清字段与示例数据；复杂信息优先表格化。',
+  '联网搜索': '【当前模式：联网检索】优先联网获取最新资料再回答，并在末尾附【资料·来源：xxx】链接；自身整理部分标注"根据公开信息整理"。'
+}
+
 // ─── 图片压缩 ───────────────────────────────────────────────────
 
 function compressImage(file: File, maxW = 1024, quality = 0.7): Promise<string> {
@@ -363,6 +375,7 @@ export default function AITangdou() {
   const [currentTitle, setCurrentTitle] = useState<string>('')
   const [mode, setMode] = useState<'chat' | 'work'>('chat')  // 对话 / 工作模式（PC端 tab）
   const [sidebarConvs, setSidebarConvs] = useState<Conversation[]>([])
+  const [activeMode, setActiveMode] = useState<string | null>(null)  // 快捷模式：选中后持续注入系统提示词
   const abortRef = useRef<AbortController | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -408,6 +421,7 @@ export default function AITangdou() {
     setMessages([])
     setInput('')
     setPendingImage(null)
+    setActiveMode(null)
     setError('')
   }
 
@@ -428,7 +442,7 @@ export default function AITangdou() {
     refreshSidebar()
   }
 
-  async function run(next: Msg[]) {
+  async function run(next: Msg[], modeOverride?: string | null) {
     setLoading(true)
     startRef.current = Date.now()
     setElapsedMs(0)
@@ -439,8 +453,11 @@ export default function AITangdou() {
     abortRef.current = controller
 
     try {
+      // 模式系统提示增量：选中模式后持续注入，让整段对话都带模式行为
+      const mode = modeOverride ?? activeMode
+      const sysContent = mode ? `${PROMPT}\n\n${MODE_SYSTEM[mode] ?? ''}`.trim() : PROMPT
       const chatMessages: ChatMsg[] = [
-        { role: 'system', content: PROMPT },
+        { role: 'system', content: sysContent },
         ...next.slice(0, -1).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }))
       ]
       const lastMsg = next[next.length - 1]
@@ -475,7 +492,7 @@ export default function AITangdou() {
     }
   }
 
-  async function send(override?: string) {
+  async function send(override?: string, opts?: { mode?: string | null }) {
     const text = (override ?? input).trim()
     if (!text && !pendingImage) return
     setError('')
@@ -487,12 +504,14 @@ export default function AITangdou() {
       setCurrentConvId(convId)
     }
 
+    if (opts?.mode !== undefined) setActiveMode(opts.mode)
+
     const next = [...messages, { role: 'user' as const, content: text, image: pendingImage }]
     setMessages(next)
     setInput('')
     setPendingImage(null)
     setShowTags(false)
-    await run(next)
+    await run(next, opts?.mode)
   }
 
   function stop() { abortRef.current?.abort(); abortRef.current = null }
@@ -510,20 +529,17 @@ export default function AITangdou() {
   function removePendingImage() { setPendingImage(null) }
 
   function useTag(tag: { icon?: any; label: string }) {
-    // 直接触发对应模式的 AI 对话，而非只在输入框填字
-    const prompts: Record<string, string> = {
-      '帮我写作': '【写作模式】请帮我围绕一个主题写一篇结构清晰、有观点的文章。你可以先问我主题和风格，或给一个示例主题直接开始。',
-      '翻译': '【翻译模式】请把我接下来发的内容翻译成目标语言，保持原意和语气；若未说明目标语言，请默认翻译成英文。',
-      '写代码': '【代码模式】请帮我写代码解决一个问题。先说明思路，再给出可运行代码，并附必要注释。',
-      '算题': '【计算模式】请一步步计算我发的题目，给出推导过程和最终答案。',
-      '头脑风暴': '【头脑风暴】请围绕一个话题给我多条有创意的想法或可行方案，分点列出。',
-      '做表格': '【表格模式】请帮我整理一份结构化的 Markdown 表格，列清字段与示例数据。',
-      '联网搜索': '【联网搜索】请联网检索最新资料后回答我的问题，并在末尾附上来源链接。'
-    }
-    const p = prompts[tag.label] || (tag.label + '：')
+    const label = tag.label
     setShowTags(false)
+    const text = input.trim()
+    if (text) {
+      // 用户已输入内容：直接按该模式发送，绝不丢弃原文字
+      send(text, { mode: label })
+      return
+    }
+    // 空输入：进入该模式（持续生效、可见、可退出），不浪费一轮对话
+    setActiveMode(label)
     setInput('')
-    send(p)
   }
 
   function renameConv(id: string, title: string) {
@@ -567,7 +583,7 @@ export default function AITangdou() {
       <div style={{ padding: '4px 8px', display: 'flex', flexDirection: 'column', gap: 2 }}>
         {[
           { icon: MessageSquare, label: '新对话', onClick: startNewChat },
-          { icon: Search, label: '联网搜索', onClick: () => send('【联网搜索】请联网检索最新资料后回答我的问题，并在末尾附上来源链接。') },
+          { icon: Search, label: '联网搜索', onClick: () => useTag({ icon: Search, label: '联网搜索' }) },
           { icon: PenLine, label: '帮我写作', onClick: () => useTag({ icon: SquarePen, label: '帮我写作' }) },
           { icon: Table2, label: '做表格', onClick: () => useTag({ icon: Table2, label: '做表格' }) },
           { icon: Languages, label: '翻译', onClick: () => useTag({ icon: Languages, label: '翻译' }) },
@@ -807,6 +823,25 @@ export default function AITangdou() {
         </div>
       )}
 
+      {/* 当前快捷模式条（选中模式后可见，可一键退出） */}
+      {activeMode && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: isMobile ? '6px 12px' : '6px 24px',
+          background: '#fafafa', borderTop: '1px solid #f5f5f5'
+        }}>
+          <span style={{
+            fontSize: 12, color: '#92400e', fontWeight: 600,
+            display: 'inline-flex', alignItems: 'center', gap: 4
+          }}><Wand size={13} strokeWidth={2} /> {activeMode}模式</span>
+          <button onClick={() => setActiveMode(null)} style={{
+            marginLeft: 'auto', border: 'none', background: 'transparent',
+            color: '#999', fontSize: 12, cursor: 'pointer', padding: 0,
+            display: 'inline-flex', alignItems: 'center', gap: 2
+          }}><X size={12} strokeWidth={2} /> 退出</button>
+        </div>
+      )}
+
       {/* Mobile 端：一行横排快捷功能（默认折叠，点 + 展开） */}
       {showTags && isMobile && (
         <div style={{
@@ -852,7 +887,7 @@ export default function AITangdou() {
           <textarea
             ref={inputRef}
             value={input}
-            placeholder={isMobile ? '发消息或按住说话…' : '发消息或按住空格说话…'}
+            placeholder={activeMode ? `${activeMode}模式：输入内容后发送` : (isMobile ? '发消息或按住说话…' : '发消息或按住空格说话…')}
             onChange={(e) => { setInput(e.target.value); autoResize(e.target) }}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !loading) { e.preventDefault(); send() } }}
             rows={1}
