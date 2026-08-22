@@ -2,6 +2,12 @@ import { useState, useRef, useEffect } from 'react'
 import { agnesChat, ChatMsg, LinkInfo } from '../lib/agnes'
 import { useIsMobile } from '../lib/useIsMobile'
 import {
+  MessageSquare, Search, PenLine, Table2, Globe, Image as ImageIcon,
+  Clapperboard, Plus, User, Sparkles, Wand, Code2, Calculator,
+  Lightbulb, Languages, Home, Bot, SquarePen, Square, X, Trash2,
+  Link2, Menu
+} from 'lucide-react'
+import {
   Conversation, StoredMsg, getConversations, upsertConversation, deleteConversation, newId
 } from '../lib/history'
 
@@ -32,13 +38,13 @@ const WELCOME_EXAMPLES = [
   '头脑风暴创业点子'
 ]
 const QUICK_TAGS = [
-  { icon: '⚡', label: '帮我写作' },
-  { icon: '🌐', label: '翻译' },
-  { icon: '💻', label: '写代码' },
-  { icon: '🧮', label: '算题' },
-  { icon: '💡', label: '头脑风暴' },
-  { icon: '📊', label: '做表格' },
-  { icon: '🔍', label: '联网搜索' }
+  { icon: SquarePen, label: '帮我写作' },
+  { icon: Languages, label: '翻译' },
+  { icon: Code2, label: '写代码' },
+  { icon: Calculator, label: '算题' },
+  { icon: Lightbulb, label: '头脑风暴' },
+  { icon: Table2, label: '做表格' },
+  { icon: Search, label: '联网搜索' }
 ]
 
 // ─── 图片压缩 ───────────────────────────────────────────────────
@@ -173,10 +179,10 @@ function inlineRender(text: string) {
 }
 
 function phaseOf(ms: number): string {
-  if (ms < 3000) return '🌐 正在联网搜索…'
-  if (ms < 12000) return '🤔 正在思考…'
-  if (ms < 30000) return '✍️ 正在整理回答…'
-  return '⏳ 生成中，请稍候…'
+  if (ms < 3000) return '正在联网搜索…'
+  if (ms < 12000) return '正在思考…'
+  if (ms < 30000) return '正在整理回答…'
+  return '生成中，请稍候…'
 }
 
 interface Msg {
@@ -262,7 +268,7 @@ function HistoryPanel({
             <button onClick={onClose} style={{
               border: 'none', background: '#f5f5f5', color: '#666',
               borderRadius: 8, width: 28, height: 28, fontSize: 14, cursor: 'pointer'
-            }}>✕</button>
+            }}><X size={14} strokeWidth={2} /></button>
           </div>
         </div>
 
@@ -317,8 +323,9 @@ function HistoryPanel({
                         setEditingTitle(c.title)
                       }} style={{
                         border: 'none', background: 'transparent', color: '#666',
-                        fontSize: 12, padding: 0, cursor: 'pointer'
-                      }}>✏️ 重命名</button>
+                        fontSize: 12, padding: 0, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: 3
+                      }}><SquarePen size={12} strokeWidth={1.9} /> 重命名</button>
                       <button onClick={e => {
                         e.stopPropagation()
                         if (confirm(`删除对话「${c.title || '未命名'}」？`)) {
@@ -326,8 +333,9 @@ function HistoryPanel({
                         }
                       }} style={{
                         border: 'none', background: 'transparent', color: '#c2410c',
-                        fontSize: 12, padding: 0, cursor: 'pointer'
-                      }}>🗑 删除</button>
+                        fontSize: 12, padding: 0, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: 3
+                      }}><Trash2 size={12} strokeWidth={1.9} /> 删除</button>
                     </div>
                   </>
                 )}
@@ -453,7 +461,7 @@ export default function AITangdou() {
         signal: controller.signal
       })
 
-      const safeContent = content?.trim() || '⚠️ 这一轮没拿到回复，请换个说法再试试。'
+      const safeContent = content?.trim() || '这一轮没拿到回复，请换个说法再试试。'
       const aiMsg: Msg = { role: 'ai', content: safeContent, reasoning: reasoning ?? null, links: search?.links ?? null }
       const allMsgs = [...next, aiMsg]
       setMessages(allMsgs)
@@ -501,7 +509,7 @@ export default function AITangdou() {
 
   function removePendingImage() { setPendingImage(null) }
 
-  function useTag(tag: { icon: string; label: string }) {
+  function useTag(tag: { icon?: any; label: string }) {
     setInput(tag.label + '：')
     setShowTags(false)
     inputRef.current?.focus()
@@ -546,41 +554,44 @@ export default function AITangdou() {
       <div style={{ padding: '16px 14px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{
-            width: 28, height: 28, borderRadius: '50%', background: '#fef3c7',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16
-          }}>🍬</span>
+            width: 28, height: 28, borderRadius: 7, background: '#1c1814',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}><Sparkles size={16} color="#fff" strokeWidth={2} /></span>
           <span style={{ fontSize: 15, fontWeight: 600, color: '#1c1814' }}>糖豆</span>
         </div>
         <button onClick={startNewChat} title="新对话" style={{
           width: 30, height: 30, borderRadius: 8, border: '1px solid #e5e5e5',
-          background: '#fff', cursor: 'pointer', color: '#666', fontSize: 15,
+          background: '#fff', cursor: 'pointer', color: '#444',
           display: 'flex', alignItems: 'center', justifyContent: 'center'
-        }}>＋</button>
+        }}><Plus size={16} strokeWidth={2} /></button>
       </div>
 
-      {/* 导航项（豆包风：图标 + 文字） */}
+      {/* 导航项（几何线性图标 + 文字，黑色 currentColor） */}
       <div style={{ padding: '4px 8px', display: 'flex', flexDirection: 'column', gap: 2 }}>
         {[
-          { icon: '💬', label: '新对话', onClick: startNewChat },
-          { icon: '🔍', label: '联网搜索', onClick: () => setInput('联网搜索：') },
-          { icon: '✍️', label: '帮我写作', onClick: () => useTag({ icon: '', label: '帮我写作' }) },
-          { icon: '📊', label: '做表格', onClick: () => useTag({ icon: '', label: '做表格' }) },
-          { icon: '🌐', label: '翻译', onClick: () => useTag({ icon: '', label: '翻译' }) },
-          { icon: '🖼️', label: '图像生成', onClick: () => fileRef.current?.click() },
-          { icon: '🎬', label: '视频生成', onClick: () => fileRef.current?.click() }
-        ].map(item => (
-          <button key={item.label} onClick={item.onClick} style={{
-            display: 'flex', alignItems: 'center', gap: 10,
-            padding: '8px 10px', borderRadius: 8, border: 'none',
-            background: 'transparent', cursor: 'pointer', color: '#333',
-            fontSize: 14, textAlign: 'left', transition: 'background .15s'
-          }}
-            onMouseEnter={e => e.currentTarget.style.background = '#f0f0f0'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-            <span style={{ fontSize: 16 }}>{item.icon}</span>
-            <span>{item.label}</span>
-          </button>
-        ))}
+          { icon: MessageSquare, label: '新对话', onClick: startNewChat },
+          { icon: Search, label: '联网搜索', onClick: () => setInput('联网搜索：') },
+          { icon: PenLine, label: '帮我写作', onClick: () => useTag({ icon: SquarePen, label: '帮我写作' }) },
+          { icon: Table2, label: '做表格', onClick: () => useTag({ icon: Table2, label: '做表格' }) },
+          { icon: Languages, label: '翻译', onClick: () => useTag({ icon: Languages, label: '翻译' }) },
+          { icon: ImageIcon, label: '图像生成', onClick: () => fileRef.current?.click() },
+          { icon: Clapperboard, label: '视频生成', onClick: () => fileRef.current?.click() }
+        ].map(item => {
+          const Icon = item.icon
+          return (
+            <button key={item.label} onClick={item.onClick} style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '8px 10px', borderRadius: 8, border: 'none',
+              background: 'transparent', cursor: 'pointer', color: '#333',
+              fontSize: 14, textAlign: 'left', transition: 'background .15s'
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = '#f0f0f0'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <Icon size={18} strokeWidth={1.9} />
+              <span>{item.label}</span>
+            </button>
+          )
+        })}
       </div>
 
       {/* 历史对话 */}
@@ -617,10 +628,10 @@ export default function AITangdou() {
         display: 'flex', alignItems: 'center', gap: 8
       }}>
         <div style={{
-          width: 28, height: 28, borderRadius: '50%', background: '#e8e0d8',
+          width: 28, height: 28, borderRadius: '50%', background: '#1c1814',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 13, color: '#666'
-        }}>我</div>
+          color: '#fff'
+        }}><User size={16} strokeWidth={2} /></div>
         <span style={{ fontSize: 13, color: '#333' }}>我的</span>
       </div>
     </aside>
@@ -684,9 +695,9 @@ export default function AITangdou() {
             <>
               <div style={{
                 width: 64, height: 64, borderRadius: '50%',
-                background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 30, marginBottom: 14
-              }}>🍬</div>
+                background: '#1c1814', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                marginBottom: 14
+              }}><Sparkles size={30} color="#fff" strokeWidth={1.8} /></div>
               <div style={{ fontSize: 20, fontWeight: 600, color: '#1c1814', marginBottom: 6 }}>
                 你好，我是糖豆
               </div>
@@ -715,10 +726,10 @@ export default function AITangdou() {
         <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', marginBottom: 14 }}>
           {m.role === 'ai' && (
             <div style={{
-              width: 30, height: 30, borderRadius: '50%', background: '#fef3c7',
+              width: 30, height: 30, borderRadius: '50%', background: '#1c1814',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 15, flexShrink: 0, marginRight: 8
-            }}>🍬</div>
+              flexShrink: 0, marginRight: 8
+            }}><Sparkles size={16} color="#fff" strokeWidth={2} /></div>
           )}
           <div style={{
             maxWidth: isMobile ? '78%' : '70%', padding: m.image ? 0 : '10px 14px', borderRadius: 14,
@@ -739,7 +750,7 @@ export default function AITangdou() {
             {!m.image && m.role === 'user' && <span style={{ whiteSpace: 'pre-wrap' }}>{m.content}</span>}
             {m.links && m.links.length > 0 && (
               <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #e5e5e5', fontSize: 12 }}>
-                <div style={{ color: '#888', marginBottom: 3 }}>🔗 参考资料：</div>
+                <div style={{ color: '#888', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 4 }}><Link2 size={12} strokeWidth={1.9} /> 参考资料：</div>
                 {m.links.slice(0, 4).map((lk, j) => (
                   <a key={j} href={lk.url} target="_blank" rel="noopener noreferrer"
                      style={{ display: 'block', color: '#1d4ed8', marginBottom: 2, textDecoration: 'none' }}>
@@ -762,10 +773,10 @@ export default function AITangdou() {
       {loading && (
         <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 14 }}>
           <div style={{
-            width: 30, height: 30, borderRadius: '50%', background: '#fef3c7',
+            width: 30, height: 30, borderRadius: '50%', background: '#1c1814',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 15, flexShrink: 0, marginRight: 8
-          }}>🍬</div>
+            flexShrink: 0, marginRight: 8
+          }}><Sparkles size={16} color="#fff" strokeWidth={2} /></div>
           <div style={{
             padding: '10px 14px', borderRadius: 14, background: '#f5f5f5',
             borderTopLeftRadius: 4, fontSize: 13, color: '#666'
@@ -832,7 +843,7 @@ export default function AITangdou() {
           color: pendingImage ? '#fff' : '#666',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           flexShrink: 0, fontSize: 16, transition: 'all .15s'
-        }}>📷</button>
+        }}><ImageIcon size={18} strokeWidth={1.9} /></button>
 
         <div style={{
           flex: 1, display: 'flex', alignItems: 'center',
@@ -874,8 +885,9 @@ export default function AITangdou() {
         {loading ? (
           <button onClick={stop} style={{
             width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius: '50%', border: 'none', cursor: 'pointer',
-            background: '#f5f5f5', color: '#666', fontSize: 13, flexShrink: 0
-          }}>⏹</button>
+            background: '#f5f5f5', color: '#666', flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}><Square size={14} strokeWidth={2.4} fill="#666" /></button>
         ) : (input.trim() || pendingImage) ? (
           <button onClick={() => send()} style={{
             width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius: '50%', border: 'none', cursor: 'pointer',
@@ -892,17 +904,20 @@ export default function AITangdou() {
           display: 'flex', alignItems: 'center', gap: 14, padding: '8px 24px 4px',
           fontSize: 12, color: '#888'
         }}>
-          {QUICK_TAGS.slice(0, 6).map(t => (
-            <button key={t.label} onClick={() => useTag(t)} style={{
-              border: 'none', background: 'transparent', color: '#666',
-              fontSize: 12, cursor: 'pointer', padding: 0,
-              display: 'flex', alignItems: 'center', gap: 4
-            }}
-              onMouseEnter={e => e.currentTarget.style.color = '#c2410c'}
-              onMouseLeave={e => e.currentTarget.style.color = '#666'}>
-              <span>{t.icon}</span><span>{t.label}</span>
-            </button>
-          ))}
+          {QUICK_TAGS.slice(0, 6).map(t => {
+            const Icon = t.icon
+            return (
+              <button key={t.label} onClick={() => useTag(t)} style={{
+                border: 'none', background: 'transparent', color: '#666',
+                fontSize: 12, cursor: 'pointer', padding: 0,
+                display: 'flex', alignItems: 'center', gap: 4
+              }}
+                onMouseEnter={e => e.currentTarget.style.color = '#c2410c'}
+                onMouseLeave={e => e.currentTarget.style.color = '#666'}>
+                <Icon size={13} strokeWidth={1.9} /><span>{t.label}</span>
+              </button>
+            )
+          })}
         </div>
       )}
 
@@ -930,14 +945,14 @@ export default function AITangdou() {
           <>
             <button onClick={() => setHistoryOpen(true)} title="历史对话" style={{
               border: 'none', background: 'transparent', cursor: 'pointer',
-              width: 36, height: 36, borderRadius: 8, fontSize: 20, color: '#333',
+              width: 36, height: 36, borderRadius: 8, color: '#333',
               display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>☰</button>
+            }}><Menu size={20} strokeWidth={2} /></button>
             <div style={{
               display: 'flex', alignItems: 'center', gap: 6,
               fontSize: 16, fontWeight: 600, color: '#1c1814'
             }}>
-              <span style={{ fontSize: 20 }}>🍬</span>
+              <Sparkles size={18} color="#1c1814" strokeWidth={2} />
               <span>{currentTitle || '糖豆'}</span>
             </div>
             <button onClick={startNewChat} title="新对话" style={{
@@ -951,7 +966,7 @@ export default function AITangdou() {
             display: 'flex', alignItems: 'center', gap: 8,
             fontSize: 15, fontWeight: 600, color: '#1c1814'
           }}>
-            <span style={{ fontSize: 18 }}>🍬</span>
+            <Sparkles size={17} color="#1c1814" strokeWidth={2} />
             <span>{currentTitle || '糖豆'}</span>
           </div>
         )}
