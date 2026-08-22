@@ -1,5 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { agnesChat, ChatMsg, LinkInfo } from '../lib/agnes'
+import {
+  Conversation, StoredMsg, getConversations, upsertConversation, deleteConversation, newId
+} from '../lib/history'
 
 // ─── 提示词 ─────────────────────────────────────────────────────
 
@@ -20,15 +23,21 @@ const PROMPT = `你是「择校通」平台上的 AI 助手，名字叫「糖豆
 - 可以联网检索获取最新信息，检索到的资料要标注【资料·来源：xxx】。
 - 自身知识整理的部分如实标注"根据公开信息整理"。`
 
-const QUICK_ACTIONS = [
-  { icon: '📝', label: '帮我写作', prompt: '帮我写一篇关于以下主题的文案：' },
-  { icon: '🌐', label: '翻译', prompt: '请将以下内容翻译成英文：' },
-  { icon: '💻', label: '写代码', prompt: '请用代码帮我实现：' },
-  { icon: '🧮', label: '算题', prompt: '请帮我解答这道题：' },
-  { icon: '💡', label: '头脑风暴', prompt: '帮我想几个关于以下主题的创意：' },
-  { icon: '📊', label: '做表格', prompt: '帮我整理成表格：' },
-  { icon: '✏️', label: '改写润色', prompt: '帮我润色以下内容，让表达更流畅专业：' },
-  { icon: '🔍', label: '联网搜索', prompt: '帮我搜索以下最新信息：' }
+// 顶部快捷气泡（千问风：3 个问题气泡 + 一排小功能标签）
+const WELCOME_EXAMPLES = [
+  '写一封求职信',
+  'Python 快速排序',
+  '翻译成英文',
+  '头脑风暴创业点子'
+]
+const QUICK_TAGS = [
+  { icon: '⚡', label: '帮我写作' },
+  { icon: '🌐', label: '翻译' },
+  { icon: '💻', label: '写代码' },
+  { icon: '🧮', label: '算题' },
+  { icon: '💡', label: '头脑风暴' },
+  { icon: '📊', label: '做表格' },
+  { icon: '🔍', label: '联网搜索' }
 ]
 
 // ─── 图片压缩 ───────────────────────────────────────────────────
@@ -51,11 +60,11 @@ function compressImage(file: File, maxW = 1024, quality = 0.7): Promise<string> 
       img.src = reader.result as string
     }
     reader.onerror = reject
-    reader.readAsDataURL(file)
+    reader.readAsDataURL(reader.result as string)
   })
 }
 
-// ─── Markdown 渲染（支持表格、列表、代码块、标题、加粗） ──────
+// ─── Markdown 渲染 ─────────────────────────────────────────────
 
 function renderMarkdown(text: string) {
   if (!text) return null
@@ -66,10 +75,8 @@ function renderMarkdown(text: string) {
   while (i < lines.length) {
     const line = lines[i].replace(/\r$/, '')
 
-    // 空行
     if (!line.trim()) { i++; continue }
 
-    // 代码块
     if (line.startsWith('```')) {
       const lang = line.slice(3).trim()
       const buf: string[] = []
@@ -77,7 +84,7 @@ function renderMarkdown(text: string) {
       while (i < lines.length && !lines[i].startsWith('```')) {
         buf.push(lines[i]); i++
       }
-      i++ // skip closing ```
+      i++
       elements.push(
         <div key={i} style={{
           margin: '10px 0', borderRadius: 10, overflow: 'hidden',
@@ -92,7 +99,6 @@ function renderMarkdown(text: string) {
       continue
     }
 
-    // 表格：连续以 | 开头的行
     if (line.trim().startsWith('|')) {
       const tableRows: string[] = []
       while (i < lines.length && lines[i].trim().startsWith('|')) {
@@ -100,7 +106,7 @@ function renderMarkdown(text: string) {
       }
       if (tableRows.length >= 2) {
         const headerRow = tableRows[0]
-        const bodyRows = tableRows.slice(2) // skip separator
+        const bodyRows = tableRows.slice(2)
         const parseRow = (r: string) => r.split('|').filter(c => c.trim() !== '').map(c => c.trim())
         const headers = parseRow(headerRow)
         elements.push(
@@ -128,7 +134,6 @@ function renderMarkdown(text: string) {
       }
     }
 
-    // 标题
     const hMatch = line.match(/^(#{1,3})\s+(.+)$/)
     if (hMatch) {
       const Tag = `h${hMatch[1].length}` as keyof JSX.IntrinsicElements
@@ -137,7 +142,6 @@ function renderMarkdown(text: string) {
       i++; continue
     }
 
-    // 列表
     if (/^[-*]\s+/.test(line)) {
       const items: string[] = []
       while (i < lines.length && /^[-*]\s+/.test(lines[i])) {
@@ -151,14 +155,12 @@ function renderMarkdown(text: string) {
       continue
     }
 
-    // 普通段落
     elements.push(<p key={i} style={{ margin: '4px 0', lineHeight: 1.75, whiteSpace: 'pre-wrap' }}>{inlineRender(line)}</p>)
     i++
   }
   return elements
 }
 
-// **加粗** 标红
 function inlineRender(text: string) {
   const parts = text.split(/(\*\*[^*]+\*\*)/g)
   return parts.map((p, i) => {
@@ -169,8 +171,6 @@ function inlineRender(text: string) {
   })
 }
 
-// ─── 联网阶段提示 ───────────────────────────────────────────────
-
 function phaseOf(ms: number): string {
   if (ms < 3000) return '🌐 正在联网搜索…'
   if (ms < 12000) return '🤔 正在思考…'
@@ -178,17 +178,168 @@ function phaseOf(ms: number): string {
   return '⏳ 生成中，请稍候…'
 }
 
-// ─── 消息类型 ───────────────────────────────────────────────────
-
 interface Msg {
   role: 'user' | 'ai'
   content: string
   reasoning?: string | null
   links?: LinkInfo[] | null
-  image?: string | null  // base64 for sent image
+  image?: string | null
 }
 
-// ─── 组件 ───────────────────────────────────────────────────────
+const PAGE_KEY = 'ai-tangdou'
+const CHANNEL = 'tangdou'
+
+function msgToStored(m: Msg): StoredMsg {
+  return {
+    role: m.role,
+    content: m.content,
+    image: m.image ? { url: m.image, title: '用户图片' } : null,
+    reasoning: m.reasoning ?? null,
+    links: m.links ?? null
+  }
+}
+function storedToMsg(s: StoredMsg): Msg {
+  return {
+    role: s.role,
+    content: s.content,
+    reasoning: s.reasoning ?? null,
+    links: s.links ?? null,
+    image: s.image?.url || null
+  }
+}
+
+// ─── 历史抽屉 ──────────────────────────────────────────────────
+
+function HistoryPanel({
+  open, currentId, onClose, onSelect, onRename, onDelete, onNew
+}: {
+  open: boolean
+  currentId: string
+  onClose: () => void
+  onSelect: (c: Conversation) => void
+  onRename: (id: string, title: string) => void
+  onDelete: (id: string) => void
+  onNew: () => void
+}) {
+  const [convs, setConvs] = useState<Conversation[]>([])
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingTitle, setEditingTitle] = useState('')
+
+  useEffect(() => {
+    if (open) setConvs(getConversations().filter(c => c.pageKey === PAGE_KEY))
+  }, [open])
+
+  function refresh() { setConvs(getConversations().filter(c => c.pageKey === PAGE_KEY)) }
+  function commitRename(id: string) {
+    const t = editingTitle.trim()
+    if (t) onRename(id, t)
+    setEditingId(null)
+    setEditingTitle('')
+    refresh()
+  }
+
+  if (!open) return null
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 100 }} />
+      <aside style={{
+        position: 'fixed', top: 0, left: 0, bottom: 0, width: 'min(320px, 86vw)',
+        background: '#fff', zIndex: 101, display: 'flex', flexDirection: 'column',
+        boxShadow: '2px 0 12px rgba(0,0,0,.08)'
+      }}>
+        <div style={{
+          padding: '14px 16px', borderBottom: '1px solid #f0f0f0',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+        }}>
+          <div style={{ fontSize: 16, fontWeight: 600, color: '#1c1814' }}>历史对话</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => { onNew(); onClose() }} style={{
+              border: 'none', background: '#c2410c', color: '#fff',
+              borderRadius: 8, padding: '5px 12px', fontSize: 13, cursor: 'pointer'
+            }}>＋ 新对话</button>
+            <button onClick={onClose} style={{
+              border: 'none', background: '#f5f5f5', color: '#666',
+              borderRadius: 8, width: 28, height: 28, fontSize: 14, cursor: 'pointer'
+            }}>✕</button>
+          </div>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
+          {convs.length === 0 && (
+            <div style={{ padding: '40px 20px', textAlign: 'center', color: '#999', fontSize: 14 }}>
+              还没有对话，发条消息就会自动保存
+            </div>
+          )}
+          {convs.map(c => {
+            const active = c.id === currentId
+            const editing = editingId === c.id
+            return (
+              <div key={c.id} style={{
+                padding: '10px 16px', cursor: editing ? 'default' : 'pointer',
+                background: active ? '#fef3c7' : 'transparent',
+                borderLeft: active ? '3px solid #c2410c' : '3px solid transparent',
+                borderBottom: '1px solid #f8f8f8'
+              }} onClick={() => !editing && onSelect(c)}>
+                {editing ? (
+                  <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: 6 }}>
+                    <input
+                      autoFocus value={editingTitle}
+                      onChange={e => setEditingTitle(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') commitRename(c.id)
+                        if (e.key === 'Escape') { setEditingId(null); setEditingTitle('') }
+                      }}
+                      style={{
+                        flex: 1, border: '1px solid #c2410c', borderRadius: 6,
+                        padding: '4px 8px', fontSize: 14, outline: 'none'
+                      }}
+                    />
+                    <button onClick={() => commitRename(c.id)} style={{
+                      border: 'none', background: '#c2410c', color: '#fff',
+                      borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer'
+                    }}>保存</button>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{
+                      fontSize: 14, color: '#1c1814', fontWeight: active ? 600 : 500,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                    }}>{c.title || '未命名对话'}</div>
+                    <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
+                      {c.messages.length} 条消息 · {new Date(c.updatedAt).toLocaleDateString('zh-CN')}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                      <button onClick={e => {
+                        e.stopPropagation()
+                        setEditingId(c.id)
+                        setEditingTitle(c.title)
+                      }} style={{
+                        border: 'none', background: 'transparent', color: '#666',
+                        fontSize: 12, padding: 0, cursor: 'pointer'
+                      }}>✏️ 重命名</button>
+                      <button onClick={e => {
+                        e.stopPropagation()
+                        if (confirm(`删除对话「${c.title || '未命名'}」？`)) {
+                          onDelete(c.id); refresh()
+                        }
+                      }} style={{
+                        border: 'none', background: 'transparent', color: '#c2410c',
+                        fontSize: 12, padding: 0, cursor: 'pointer'
+                      }}>🗑 删除</button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </aside>
+    </>
+  )
+}
+
+// ─── 主组件 ────────────────────────────────────────────────────
 
 export default function AITangdou() {
   const [messages, setMessages] = useState<Msg[]>([])
@@ -196,8 +347,11 @@ export default function AITangdou() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [elapsedMs, setElapsedMs] = useState(0)
-  const [showActions, setShowActions] = useState(false)
+  const [showTags, setShowTags] = useState(false)
   const [pendingImage, setPendingImage] = useState<string | null>(null)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [currentConvId, setCurrentConvId] = useState<string>('')
+  const [currentTitle, setCurrentTitle] = useState<string>('')
   const abortRef = useRef<AbortController | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -205,12 +359,53 @@ export default function AITangdou() {
   const startRef = useRef<number>(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  useEffect(() => { return () => { if (timerRef.current) clearInterval(timerRef.current) } }, [])
+  // 启动时尝试恢复最近一条对话
+  useEffect(() => {
+    const convs = getConversations().filter(c => c.pageKey === PAGE_KEY)
+    if (convs.length > 0) {
+      loadConv(convs[0])
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current) }
+  }, [])
+
   useEffect(() => {
     if (endRef.current && (messages.length > 0 || loading)) {
       endRef.current.scrollIntoView({ behavior: 'smooth' })
     }
   }, [messages, loading])
+
+  function loadConv(c: Conversation) {
+    setCurrentConvId(c.id)
+    setCurrentTitle(c.title)
+    setMessages(c.messages.map(storedToMsg))
+  }
+
+  function startNewChat() {
+    abortRef.current?.abort()
+    const id = `${PAGE_KEY}:${newId()}`
+    setCurrentConvId(id)
+    setCurrentTitle('')
+    setMessages([])
+    setInput('')
+    setPendingImage(null)
+    setError('')
+  }
+
+  function persist(messages: Msg[]) {
+    if (!currentConvId || messages.length === 0) return
+    const title = currentTitle || messages.find(m => m.role === 'user')?.content?.slice(0, 20) || '新对话'
+    if (!currentTitle) setCurrentTitle(title)
+    const conv: Conversation = {
+      id: currentConvId,
+      pageKey: PAGE_KEY,
+      channel: CHANNEL,
+      title,
+      messages: messages.map(msgToStored),
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    }
+    upsertConversation(conv)
+  }
 
   async function run(next: Msg[]) {
     setLoading(true)
@@ -223,14 +418,12 @@ export default function AITangdou() {
     abortRef.current = controller
 
     try {
-      // 构造 messages：如果有图片，放在最后一条 user message 里
       const chatMessages: ChatMsg[] = [
         { role: 'system', content: PROMPT },
         ...next.slice(0, -1).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }))
       ]
       const lastMsg = next[next.length - 1]
       if (lastMsg.image) {
-        // multimodal: content = text + image_url
         chatMessages.push({
           role: 'user',
           content: [
@@ -249,7 +442,9 @@ export default function AITangdou() {
 
       const safeContent = content?.trim() || '⚠️ 这一轮没拿到回复，请换个说法再试试。'
       const aiMsg: Msg = { role: 'ai', content: safeContent, reasoning: reasoning ?? null, links: search?.links ?? null }
-      setMessages([...next, aiMsg])
+      const allMsgs = [...next, aiMsg]
+      setMessages(allMsgs)
+      persist(allMsgs)
     } catch (e: any) {
       if (e?.name !== 'AbortError') setError(e?.message || '请求失败')
     } finally {
@@ -263,23 +458,23 @@ export default function AITangdou() {
     const text = (override ?? input).trim()
     if (!text && !pendingImage) return
     setError('')
+
+    // 没在对话中：自动开新对话
+    let convId = currentConvId
+    if (!convId) {
+      convId = `${PAGE_KEY}:${newId()}`
+      setCurrentConvId(convId)
+    }
+
     const next = [...messages, { role: 'user' as const, content: text, image: pendingImage }]
     setMessages(next)
     setInput('')
     setPendingImage(null)
-    setShowActions(false)
+    setShowTags(false)
     await run(next)
   }
 
   function stop() { abortRef.current?.abort(); abortRef.current = null }
-
-  function newChat() {
-    abortRef.current?.abort()
-    setMessages([])
-    setInput('')
-    setPendingImage(null)
-    setError('')
-  }
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -293,37 +488,97 @@ export default function AITangdou() {
 
   function removePendingImage() { setPendingImage(null) }
 
-  function useAction(action: typeof QUICK_ACTIONS[0]) {
-    setInput(action.prompt)
-    setShowActions(false)
+  function useTag(tag: { icon: string; label: string }) {
+    setInput(tag.label + '：')
+    setShowTags(false)
     inputRef.current?.focus()
+  }
+
+  function renameConv(id: string, title: string) {
+    const convs = getConversations().filter(c => c.pageKey === PAGE_KEY)
+    const target = convs.find(c => c.id === id)
+    if (!target) return
+    upsertConversation({ ...target, title, updatedAt: Date.now() })
+    if (id === currentConvId) setCurrentTitle(title)
+  }
+
+  function deleteConv(id: string) {
+    deleteConversation(id)
+    if (id === currentConvId) {
+      const convs = getConversations().filter(c => c.pageKey === PAGE_KEY)
+      if (convs.length > 0) loadConv(convs[0])
+      else startNewChat()
+    }
   }
 
   function autoResize(el: HTMLTextAreaElement) {
     el.style.height = 'auto'
-    el.style.height = Math.min(el.scrollHeight, 160) + 'px'
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px'
   }
+
+  const hasMessages = messages.length > 0
 
   return (
     <div style={{
-      display: 'flex', flexDirection: 'column', height: 'calc(100vh - 60px)',
-      background: '#ffffff', maxWidth: 880, margin: '0 auto', width: '100%'
+      display: 'flex', flexDirection: 'column',
+      height: 'calc(100vh - 60px)', background: '#fff',
+      maxWidth: 880, margin: '0 auto', width: '100%'
     }}>
-      {/* 消息区 */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
-        {messages.length === 0 && !loading && (
-          <div style={{ textAlign: 'center', marginTop: 80 }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>🍬</div>
-            <div style={{ fontSize: 20, fontWeight: 600, color: '#333', marginBottom: 8 }}>你好，我是糖豆</div>
-            <div style={{ fontSize: 14, color: '#888', marginBottom: 32 }}>可以帮你写作、翻译、算题、写代码、识图分析，或者随便聊聊天</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 10, maxWidth: 560, margin: '0 auto' }}>
-              {['写一封求职信', 'Python 快速排序', '翻译成英文', '头脑风暴创业点子'].map((ex) => (
+      {/* 顶部栏：☰ + 糖豆 + ＋（豆包/千问风，极简） */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '10px 16px', borderBottom: '1px solid #f0f0f0', background: '#fff',
+        flexShrink: 0
+      }}>
+        <button onClick={() => setHistoryOpen(true)} title="历史对话" style={{
+          border: 'none', background: 'transparent', cursor: 'pointer',
+          width: 36, height: 36, borderRadius: 8, fontSize: 20, color: '#333',
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>☰</button>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          fontSize: 16, fontWeight: 600, color: '#1c1814'
+        }}>
+          <span style={{ fontSize: 20 }}>🍬</span>
+          <span>{currentTitle || '糖豆'}</span>
+        </div>
+        <button onClick={startNewChat} title="新对话" style={{
+          border: 'none', background: 'transparent', cursor: 'pointer',
+          width: 36, height: 36, borderRadius: 8, fontSize: 18, color: '#666',
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>＋</button>
+      </div>
+
+      {/* 主对话区 */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: hasMessages ? '20px 16px' : 0 }}>
+        {!hasMessages && !loading && (
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            minHeight: '100%', padding: '40px 20px'
+          }}>
+            <div style={{
+              width: 64, height: 64, borderRadius: '50%',
+              background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 30, marginBottom: 14
+            }}>🍬</div>
+            <div style={{ fontSize: 20, fontWeight: 600, color: '#1c1814', marginBottom: 6 }}>
+              你好，我是糖豆
+            </div>
+            <div style={{ fontSize: 13, color: '#888', marginBottom: 24, textAlign: 'center' }}>
+              可以帮你写作、翻译、算题、写代码、识图分析，或者随便聊聊天
+            </div>
+            {/* 千问风：3-4 个问题气泡 */}
+            <div style={{
+              display: 'flex', flexDirection: 'column', gap: 10, width: '100%', maxWidth: 380
+            }}>
+              {WELCOME_EXAMPLES.map(ex => (
                 <button key={ex} onClick={() => send(ex)} style={{
-                  padding: '10px 18px', borderRadius: 20, border: '1px solid #e8e8e8',
-                  background: '#fafafa', cursor: 'pointer', fontSize: 14, color: '#555',
-                  transition: 'all .15s'
-                }} onMouseEnter={(e) => { e.currentTarget.style.background = '#f0f0f0' }}
-                   onMouseLeave={(e) => { e.currentTarget.style.background = '#fafafa' }}>
+                  padding: '12px 16px', borderRadius: 12, border: '1px solid #e8e8e8',
+                  background: '#fff', cursor: 'pointer', fontSize: 14, color: '#555',
+                  textAlign: 'left', transition: 'all .15s'
+                }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#fafafa'; e.currentTarget.style.borderColor = '#c2410c' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = '#e8e8e8' }}>
                   {ex}
                 </button>
               ))}
@@ -332,34 +587,34 @@ export default function AITangdou() {
         )}
 
         {messages.map((m, i) => (
-          <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', marginBottom: 16 }}>
+          <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', marginBottom: 14 }}>
             {m.role === 'ai' && (
               <div style={{
-                width: 32, height: 32, borderRadius: '50%', background: '#f5f0e8',
+                width: 30, height: 30, borderRadius: '50%', background: '#fef3c7',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 16, flexShrink: 0, marginRight: 10
+                fontSize: 15, flexShrink: 0, marginRight: 8
               }}>🍬</div>
             )}
             <div style={{
-              maxWidth: '78%', padding: m.image ? 0 : '12px 16px', borderRadius: 16,
-              background: m.role === 'user' ? '#c2410c' : '#f7f7f7',
-              color: m.role === 'user' ? '#fff' : '#333',
-              fontSize: 15, lineHeight: 1.7,
-              borderTopRightRadius: m.role === 'user' ? 4 : 16,
-              borderTopLeftRadius: m.role === 'user' ? 16 : 4,
+              maxWidth: '78%', padding: m.image ? 0 : '10px 14px', borderRadius: 14,
+              background: m.role === 'user' ? '#c2410c' : '#f5f5f5',
+              color: m.role === 'user' ? '#fff' : '#1c1814',
+              fontSize: 14, lineHeight: 1.7,
+              borderTopRightRadius: m.role === 'user' ? 4 : 14,
+              borderTopLeftRadius: m.role === 'user' ? 14 : 4,
               wordBreak: 'break-word', overflow: 'hidden'
             }}>
               {m.image && (
-                <div style={{ padding: '10px 10px 0' }}>
-                  <img src={m.image} alt="用户发送的图片" style={{ maxWidth: 200, maxHeight: 180, borderRadius: 10, display: 'block' }} />
+                <div style={{ padding: '8px 8px 0' }}>
+                  <img src={m.image} alt="用户发送的图片" style={{ maxWidth: 180, maxHeight: 160, borderRadius: 8, display: 'block' }} />
                 </div>
               )}
-              {m.image && m.content && <div style={{ padding: '8px 12px' }}>{m.content}</div>}
+              {m.image && m.content && <div style={{ padding: '6px 12px' }}>{m.content}</div>}
               {!m.image && m.role === 'ai' && renderMarkdown(m.content)}
               {!m.image && m.role === 'user' && <span style={{ whiteSpace: 'pre-wrap' }}>{m.content}</span>}
               {m.links && m.links.length > 0 && (
-                <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid #e5e5e5', fontSize: 13 }}>
-                  <div style={{ color: '#888', marginBottom: 4 }}>🔗 参考资料：</div>
+                <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #e5e5e5', fontSize: 12 }}>
+                  <div style={{ color: '#888', marginBottom: 3 }}>🔗 参考资料：</div>
                   {m.links.slice(0, 4).map((lk, j) => (
                     <a key={j} href={lk.url} target="_blank" rel="noopener noreferrer"
                        style={{ display: 'block', color: '#1d4ed8', marginBottom: 2, textDecoration: 'none' }}>
@@ -371,125 +626,145 @@ export default function AITangdou() {
             </div>
             {m.role === 'user' && !m.image && (
               <div style={{
-                width: 32, height: 32, borderRadius: '50%', background: '#e8e0d8',
+                width: 30, height: 30, borderRadius: '50%', background: '#e8e0d8',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 14, flexShrink: 0, marginLeft: 10
+                fontSize: 13, flexShrink: 0, marginLeft: 8
               }}>我</div>
             )}
           </div>
         ))}
 
         {loading && (
-          <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 14 }}>
             <div style={{
-              width: 32, height: 32, borderRadius: '50%', background: '#f5f0e8',
+              width: 30, height: 30, borderRadius: '50%', background: '#fef3c7',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 16, flexShrink: 0, marginRight: 10
+              fontSize: 15, flexShrink: 0, marginRight: 8
             }}>🍬</div>
             <div style={{
-              padding: '12px 16px', borderRadius: 16, background: '#f7f7f7',
-              borderTopLeftRadius: 4, fontSize: 14, color: '#666'
+              padding: '10px 14px', borderRadius: 14, background: '#f5f5f5',
+              borderTopLeftRadius: 4, fontSize: 13, color: '#666'
             }}>
-              <span style={{ marginRight: 8 }}>{phaseOf(elapsedMs)}</span>
-              <span style={{ color: '#aaa', fontSize: 12 }}>{(elapsedMs / 1000).toFixed(1)}s</span>
+              <span style={{ marginRight: 6 }}>{phaseOf(elapsedMs)}</span>
+              <span style={{ color: '#aaa', fontSize: 11 }}>{(elapsedMs / 1000).toFixed(1)}s</span>
             </div>
           </div>
         )}
 
-        {error && <div style={{ color: '#b42318', fontSize: 14, textAlign: 'center', margin: '12px 0' }}>出错了：{error}</div>}
+        {error && <div style={{ color: '#b42318', fontSize: 13, textAlign: 'center', margin: '10px 0' }}>出错了：{error}</div>}
         <div ref={endRef} />
       </div>
 
-      {/* 底部 */}
-      <div style={{ flexShrink: 0, borderTop: '1px solid #f0f0f0', background: '#fff' }}>
-        {/* 功能面板 */}
-        {showActions && (
+      {/* 底部输入区：上方一行小标签 + 细长输入条（豆包/千问风） */}
+      <div style={{ flexShrink: 0, background: '#fff' }}>
+        {/* 一行横排快捷功能（默认折叠，点 + 展开） */}
+        {showTags && (
           <div style={{
-            display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8,
-            padding: '12px 20px', borderBottom: '1px solid #f5f5f5'
-          }}>
-            {QUICK_ACTIONS.map((a) => (
-              <button key={a.label} onClick={() => useAction(a)} style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                padding: '10px 4px', borderRadius: 10, border: '1px solid #eee',
-                background: '#fafafa', cursor: 'pointer', transition: 'all .15s'
-              }} onMouseEnter={(e) => { e.currentTarget.style.background = '#f0f0f0'; e.currentTarget.style.borderColor = '#ddd' }}
-                 onMouseLeave={(e) => { e.currentTarget.style.background = '#fafafa'; e.currentTarget.style.borderColor = '#eee' }}>
-                <span style={{ fontSize: 20 }}>{a.icon}</span>
-                <span style={{ fontSize: 12, color: '#666' }}>{a.label}</span>
+            display: 'flex', gap: 8, overflowX: 'auto', padding: '8px 16px',
+            borderTop: '1px solid #f5f5f5', background: '#fafafa'
+          }} className="no-scrollbar">
+            {QUICK_TAGS.map(t => (
+              <button key={t.label} onClick={() => useTag(t)} style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                padding: '6px 12px', borderRadius: 14, border: '1px solid #e5e5e5',
+                background: '#fff', cursor: 'pointer', fontSize: 13, color: '#555',
+                whiteSpace: 'nowrap', transition: 'all .15s'
+              }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = '#c2410c'}
+                onMouseLeave={e => e.currentTarget.style.borderColor = '#e5e5e5'}>
+                <span>{t.icon}</span><span>{t.label}</span>
               </button>
             ))}
           </div>
         )}
 
-        {/* 待发送图片预览 */}
+        {/* 待发送图片预览（紧凑一行） */}
         {pendingImage && (
-          <div style={{ padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 10, background: '#fef3c7' }}>
-            <img src={pendingImage} alt="待发送" style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'cover' }} />
-            <span style={{ fontSize: 13, color: '#92400e' }}>图片已压缩，将与消息一起发送</span>
+          <div style={{
+            padding: '6px 16px', display: 'flex', alignItems: 'center', gap: 8,
+            background: '#fef3c7', borderTop: '1px solid #fde68a'
+          }}>
+            <img src={pendingImage} alt="待发送" style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover' }} />
+            <span style={{ fontSize: 12, color: '#92400e' }}>图片已压缩</span>
             <button onClick={removePendingImage} style={{
-              marginLeft: 'auto', border: 'none', background: '#f59e0b', color: '#fff',
-              borderRadius: 6, padding: '4px 12px', fontSize: 12, cursor: 'pointer'
+              marginLeft: 'auto', border: 'none', background: 'transparent',
+              color: '#92400e', fontSize: 12, cursor: 'pointer', padding: 0
             }}>移除</button>
           </div>
         )}
 
-        {/* 输入区 */}
-        <div style={{ padding: '12px 20px 16px' }}>
+        {/* 细长输入条：左边相机 + 中间输入 + 右边 +/发送 */}
+        <div style={{
+          display: 'flex', alignItems: 'flex-end', gap: 8,
+          padding: '10px 12px 12px', borderTop: '1px solid #f0f0f0'
+        }}>
+          <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
+          <button onClick={() => fileRef.current?.click()} title="图片" style={{
+            width: 38, height: 38, borderRadius: '50%', border: 'none', cursor: 'pointer',
+            background: pendingImage ? '#c2410c' : '#f5f5f5',
+            color: pendingImage ? '#fff' : '#666',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0, fontSize: 18, transition: 'all .15s'
+          }}>📷</button>
+
           <div style={{
-            display: 'flex', alignItems: 'flex-end', gap: 10,
-            border: '1px solid #e5e5e5', borderRadius: 12, padding: '8px 8px 8px 14px',
-            background: '#fafafa', transition: 'border-color .15s'
+            flex: 1, display: 'flex', alignItems: 'flex-end',
+            background: '#f5f5f5', borderRadius: 20,
+            padding: '8px 14px', minHeight: 38
           }}>
             <textarea
               ref={inputRef}
               value={input}
-              placeholder="发消息或点击下方功能…"
+              placeholder="发消息或按住说话…"
               onChange={(e) => { setInput(e.target.value); autoResize(e.target) }}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !loading) { e.preventDefault(); send() } }}
               rows={1}
               style={{
                 flex: 1, border: 'none', outline: 'none', background: 'transparent',
-                fontSize: 15, lineHeight: 1.6, resize: 'none', maxHeight: 160,
-                fontFamily: 'inherit', padding: '6px 0'
+                fontSize: 14, lineHeight: 1.5, resize: 'none', maxHeight: 120,
+                fontFamily: 'inherit', padding: 0
               }}
             />
-            <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
-            <button onClick={() => fileRef.current?.click()} title="上传图片" style={{
-              width: 36, height: 36, borderRadius: 8, border: 'none', cursor: 'pointer',
-              background: pendingImage ? '#c2410c' : '#f5f5f5', fontSize: 16, display: 'flex', alignItems: 'center',
-              justifyContent: 'center', flexShrink: 0, transition: 'all .15s'
-            }}>📷</button>
-            <button onClick={newChat} title="新对话" style={{
-              width: 36, height: 36, borderRadius: 8, border: 'none', cursor: 'pointer',
-              background: '#f5f5f5', fontSize: 16, display: 'flex', alignItems: 'center',
-              justifyContent: 'center', flexShrink: 0, transition: 'all .15s'
-            }}>＋</button>
-            <button onClick={() => setShowActions((v) => !v)} title="快捷功能" style={{
-              width: 36, height: 36, borderRadius: 8, border: 'none', cursor: 'pointer',
-              background: showActions ? '#c2410c' : '#eee', color: showActions ? '#fff' : '#666',
-              fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0, transition: 'all .15s'
-            }}>⚡</button>
-            {loading ? (
-              <button onClick={stop} style={{
-                width: 36, height: 36, borderRadius: 8, border: 'none', cursor: 'pointer',
-                background: '#eee', fontSize: 14, flexShrink: 0
-              }}>⏹</button>
-            ) : (
-              <button onClick={() => send()} disabled={!input.trim() && !pendingImage} style={{
-                width: 36, height: 36, borderRadius: 8, border: 'none', cursor: (input.trim() || pendingImage) ? 'pointer' : 'default',
-                background: (input.trim() || pendingImage) ? '#c2410c' : '#eee', color: (input.trim() || pendingImage) ? '#fff' : '#aaa',
-                fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                flexShrink: 0, transition: 'all .15s'
-              }}>↑</button>
-            )}
           </div>
-          <div style={{ textAlign: 'center', fontSize: 11, color: '#bbb', marginTop: 6 }}>
-            糖豆 由择校通平台提供 · 内容仅供参考
-          </div>
+
+          <button onClick={() => setShowTags(v => !v)} title="快捷功能" style={{
+            width: 38, height: 38, borderRadius: '50%', border: 'none', cursor: 'pointer',
+            background: showTags ? '#c2410c' : '#f5f5f5',
+            color: showTags ? '#fff' : '#666',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0, fontSize: 16, transition: 'all .15s'
+          }}>＋</button>
+
+          {loading ? (
+            <button onClick={stop} style={{
+              width: 38, height: 38, borderRadius: '50%', border: 'none', cursor: 'pointer',
+              background: '#f5f5f5', color: '#666', fontSize: 14, flexShrink: 0
+            }}>⏹</button>
+          ) : (input.trim() || pendingImage) ? (
+            <button onClick={() => send()} style={{
+              width: 38, height: 38, borderRadius: '50%', border: 'none', cursor: 'pointer',
+              background: '#c2410c', color: '#fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0, fontSize: 16
+            }}>↑</button>
+          ) : null}
+        </div>
+
+        <div style={{ textAlign: 'center', fontSize: 11, color: '#bbb', paddingBottom: 6 }}>
+          糖豆 由择校通平台提供 · 内容仅供参考
         </div>
       </div>
+
+      {/* 历史抽屉 */}
+      <HistoryPanel
+        open={historyOpen}
+        currentId={currentConvId}
+        onClose={() => setHistoryOpen(false)}
+        onSelect={loadConv}
+        onRename={renameConv}
+        onDelete={deleteConv}
+        onNew={startNewChat}
+      />
     </div>
   )
 }
