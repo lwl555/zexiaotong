@@ -643,7 +643,8 @@ export default function AITangdou() {
   const messageArea = (
     <div style={{
       flex: 1, overflowY: 'auto',
-      padding: hasMessages ? (isMobile ? '20px 16px' : '32px 48px') : 0
+      // 不论有无消息，都保留上下 padding，让内容居中 / 第一个消息有安全距离
+      padding: isMobile ? '16px' : '32px 48px'
     }}>
       {!hasMessages && !loading && (
         <div style={{
@@ -933,9 +934,10 @@ export default function AITangdou() {
       {/* 顶部条：mobile 三件套，PC 极简只显示中间标题 */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: isMobile ? '10px 16px' : '12px 32px',
-        borderBottom: isMobile ? '1px solid #f0f0f0' : 'none',
-        background: '#fff', flexShrink: 0
+        padding: isMobile ? '10px 16px' : '14px 32px',
+        borderBottom: '1px solid #f0f0f0',   // PC 端也加细线分隔，避免顶栏颜色混在一起
+        background: '#fff', flexShrink: 0,
+        minHeight: 48                       // 固定最小高度，避免被压缩
       }}>
         {isMobile ? (
           <>
