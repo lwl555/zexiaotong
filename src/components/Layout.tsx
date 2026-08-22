@@ -1,43 +1,18 @@
-import { useState, useEffect, useRef } from 'react'
+import { ReactNode, useState, useEffect, useRef } from 'react'
 import { NavLink, useNavigate, Outlet, useLocation } from 'react-router-dom'
 import HistoryDrawer from './HistoryDrawer'
 import { primaryNav, moreNav, type NavDef } from '../lib/nav'
-import { Clock, Home, PlusCircle, ShoppingBag, MessageSquare, User } from 'lucide-react'
-
-const bottomTabs = [
-  { to: '/', label: '首页', icon: Home, end: true },
-  { to: '/publish', label: '发布', icon: PlusCircle, end: false },
-  { to: '/goods', label: '二手', icon: ShoppingBag, end: false },
-  { to: '/community', label: '社区', icon: MessageSquare, end: false },
-  { to: '/mine', label: '我的', icon: User, end: false }
-]
+import { Clock } from 'lucide-react'
 
 export default function Layout() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
-  const [topBarVisible, setTopBarVisible] = useState(true)
   const moreRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const nav = useNavigate()
   const loc = useLocation()
   const isTangdou = loc.pathname === '/ai-tangdou'
-  const isNarrow = typeof window !== 'undefined' && window.innerWidth <= 820
-
-  // 窄屏：滚动时自动隐藏/显示顶部状态栏（收纳功能）
-  useEffect(() => {
-    if (!isNarrow || isTangdou) return
-    let lastY = window.scrollY
-    const onScroll = () => {
-      const y = window.scrollY
-      if (y < 40) setTopBarVisible(true)
-      else if (y > lastY + 5) setTopBarVisible(false)
-      else if (y < lastY - 5) setTopBarVisible(true)
-      lastY = y
-    }
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [isNarrow, isTangdou])
 
   // 点外面关掉「更多」下拉
   useEffect(() => {
@@ -49,7 +24,7 @@ export default function Layout() {
     return () => document.removeEventListener('mousedown', onDoc)
   }, [moreOpen])
 
-  // 点外面关掉窄屏菜单
+  // 点外面关掉移动端汉堡菜单
   useEffect(() => {
     if (!menuOpen) return
     const onDoc = (e: MouseEvent) => {
@@ -61,25 +36,16 @@ export default function Layout() {
   }, [menuOpen])
 
   return (
-    <div className="shell flex flex-col" style={{ minHeight: '100vh' }}>
-      {/* ── 顶部状态栏 ─────────────────────────────────────────── */}
-      <header
-        className="topbar"
-        style={{
-          position: isNarrow ? 'sticky' : 'relative',
-          top: 0,
-          zIndex: 50,
-          transform: isNarrow && !topBarVisible ? 'translateY(-100%)' : 'none',
-          transition: 'transform .25s ease'
-        }}
-      >
+    <div className="shell">
+      <header className="topbar">
         <div className="topbar-inner">
+          {/* 左：极简紫色 logo */}
           <NavLink to="/" className="brand" end>
             <span className="brand-mark">择</span>
             <span className="brand-text">择校通</span>
           </NavLink>
 
-          {/* 宽屏：横排导航 */}
+          {/* 中：4 个主链接 + 「更多」下拉（仅在桌面显示，窄屏由汉堡菜单接管） */}
           <nav className="nav desktop-nav">
             {primaryNav.map((n) => (
               <NavLink
@@ -122,7 +88,7 @@ export default function Layout() {
             </div>
           </nav>
 
-          {/* 右侧：历史 + 头像 + 窄屏汉堡 */}
+          {/* 右：克制 — 历史按钮 + 头像下拉（含 uid）+ 汉堡（仅窄屏显示） */}
           <div className="topbar-right">
             <button
               className="ghost-btn"
@@ -134,21 +100,21 @@ export default function Layout() {
             <div className="avatar" onClick={() => nav('/about')} title="关于本站">
               兄
             </div>
-            {isNarrow && (
-              <button
-                className={'hamburger' + (menuOpen ? ' open' : '')}
-                onClick={() => setMenuOpen((v) => !v)}
-                aria-label="打开菜单"
-                aria-expanded={menuOpen}
-              >
-                <span /><span /><span />
-              </button>
-            )}
+            <button
+              className={'hamburger' + (menuOpen ? ' open' : '')}
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-label="打开菜单"
+              aria-expanded={menuOpen}
+            >
+              <span />
+              <span />
+              <span />
+            </button>
           </div>
         </div>
 
-        {/* 窄屏：下拉菜单收纳全部导航 */}
-        {isNarrow && menuOpen && (
+        {/* 移动端下拉菜单：收纳全部导航（主 + 更多），窄屏替代桌面横排 */}
+        {menuOpen && (
           <div className="mobile-menu" ref={menuRef}>
             {[...primaryNav, ...moreNav].map((n) => (
               <NavLink
@@ -167,7 +133,7 @@ export default function Layout() {
         )}
       </header>
 
-      {/* ── 主内容区 ──────────────────────────────────────────── */}
+      {/* 糖豆页面：footer 隐藏，去掉 container padding，让糖豆 fixed 容器完美占满 */}
       {isTangdou ? (
         <main style={{ flex: 1, minHeight: 0, position: 'relative' }}>
           <Outlet />
@@ -176,32 +142,11 @@ export default function Layout() {
         <main className="container"><Outlet /></main>
       )}
 
-      {/* ── 底部：宽屏 footer / 窄屏 Tab 栏 ───────────────────── */}
-      {!isTangdou && !isNarrow && (
+      {!isTangdou && (
         <footer className="footer">
           <b>择校通</b> · 真实 · 直接 · 不客气 — AI 只说大实话，不粉饰、不回避、不绕弯子。
         </footer>
       )}
-
-      {/* 窄屏：底部固定 Tab 栏 */}
-      {isNarrow && !isTangdou && (
-        <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] h-14 bg-white border-t border-gray-100 flex items-center px-1 z-40">
-          {bottomTabs.map(t => (
-            <NavLink
-              key={t.to}
-              to={t.to}
-              end={t.end}
-              className={({ isActive }) => 'flex-1 flex flex-col items-center gap-0.5 py-1 ' + (isActive ? 'text-brand-600' : 'text-gray-400')}
-            >
-              <t.icon size={20} />
-              <span className="text-[10px]">{t.label}</span>
-            </NavLink>
-          ))}
-        </nav>
-      )}
-
-      {/* 窄屏：底部留白（防止内容被 fixed Tab 栏遮挡） */}
-      {isNarrow && !isTangdou && <div style={{ height: 56, flexShrink: 0 }} />}
 
       <HistoryDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </div>
