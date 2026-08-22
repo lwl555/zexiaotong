@@ -1091,7 +1091,7 @@ export default function AITangdou() {
   return (
     <div style={{
       position: 'fixed',
-      top: 0,
+      top: isMobile ? 0 : 60,
       left: 0,
       right: 0,
       bottom: isMobile ? 64 : 0,
