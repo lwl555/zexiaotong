@@ -43,8 +43,8 @@ const QUICK_TAGS = [
   { icon: Code2, label: '写代码' },
   { icon: Calculator, label: '算题' },
   { icon: Lightbulb, label: '头脑风暴' },
-  { icon: Table2, label: '做表格' },
-  { icon: Search, label: '联网搜索' }
+  { icon: Table2, label: '做表格' }
+  // 注意："联网搜索"已从此处移除 —— 它现在是独立的搜索模式开关（自动/手动/关闭），不再是快捷模式
 ]
 
 // 模式 = 注入系统提示词的「行为增量」（参考 Omnifact Response Modes / Gemini Gems / 豆包快捷指令）
@@ -376,6 +376,8 @@ export default function AITangdou() {
   const [mode, setMode] = useState<'chat' | 'work'>('chat')  // 对话 / 工作模式（PC端 tab）
   const [sidebarConvs, setSidebarConvs] = useState<Conversation[]>([])
   const [activeMode, setActiveMode] = useState<string | null>(null)  // 快捷模式：选中后持续注入系统提示词
+  const [searchMode, setSearchMode] = useState<'auto' | 'manual' | 'off'>('auto')  // 联网搜索：自动判断 / 手动强制 / 关闭
+  const [reasoningExpanded, setReasoningExpanded] = useState<Record<number, boolean>>({})  // 每条AI消息的思考过程展开状态
   const abortRef = useRef<AbortController | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -474,7 +476,8 @@ export default function AITangdou() {
       }
 
       const { content, search, reasoning } = await agnesChat(chatMessages, {
-        autoSearch: true,
+        autoSearch: searchMode === 'auto',
+        webSearch: searchMode === 'manual',
         signal: controller.signal
       })
 
@@ -583,7 +586,6 @@ export default function AITangdou() {
       <div style={{ padding: '4px 8px', display: 'flex', flexDirection: 'column', gap: 2 }}>
         {[
           { icon: MessageSquare, label: '新对话', onClick: startNewChat },
-          { icon: Search, label: '联网搜索', onClick: () => useTag({ icon: Search, label: '联网搜索' }) },
           { icon: PenLine, label: '帮我写作', onClick: () => useTag({ icon: SquarePen, label: '帮我写作' }) },
           { icon: Table2, label: '做表格', onClick: () => useTag({ icon: Table2, label: '做表格' }) },
           { icon: Languages, label: '翻译', onClick: () => useTag({ icon: Languages, label: '翻译' }) },
@@ -605,6 +607,33 @@ export default function AITangdou() {
             </button>
           )
         })}
+      </div>
+
+      {/* 联网搜索模式切换（PC 端）：自动 / 手动 / 关闭 */}
+      <div style={{
+        padding: '6px 14px 10px', marginTop: 4,
+        borderTop: '1px solid #f0f0f0',
+        display: 'flex', alignItems: 'center', gap: 6
+      }}>
+        <Search size={15} strokeWidth={1.9} color="#666" />
+        <span style={{ fontSize: 12, color: '#666' }}>联网</span>
+        <div style={{
+          marginLeft: 'auto',
+          display: 'inline-flex', borderRadius: 6, overflow: 'hidden',
+          border: '1px solid #e5e5e5'
+        }}>
+          {(['auto', 'manual', 'off'] as const).map(s => (
+            <button key={s} onClick={() => setSearchMode(s)} style={{
+              padding: '3px 8px', fontSize: 11, border: 'none', cursor: 'pointer',
+              background: searchMode === s ? '#1c1814' : '#fff',
+              color: searchMode === s ? '#fff' : '#666',
+              transition: 'all .15s',
+              borderRight: s !== 'off' ? '1px solid #e5e5e5' : 'none'
+            }}>
+              {s === 'auto' ? '自动' : s === 'manual' ? '手动' : '关闭'}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* 历史对话 */}
@@ -749,6 +778,33 @@ export default function AITangdou() {
             {m.image && m.content && <div style={{ padding: '6px 12px' }}>{m.content}</div>}
             {!m.image && m.role === 'ai' && renderMarkdown(m.content)}
             {!m.image && m.role === 'user' && <span style={{ whiteSpace: 'pre-wrap' }}>{m.content}</span>}
+            {/* 深度思考过程（可折叠） */}
+            {m.role === 'ai' && m.reasoning && (
+              <div style={{ marginTop: 8, borderTop: '1px solid #e5e5e5', paddingTop: 6 }}>
+                <button
+                  onClick={() => setReasoningExpanded(prev => ({ ...prev, [i]: !prev[i] }))}
+                  style={{
+                    background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#888'
+                  }}>
+                  <ChevronDown size={12} strokeWidth={2} style={{
+                    transform: reasoningExpanded[i] ? 'rotate(0deg)' : 'rotate(-90deg)',
+                    transition: 'transform .15s'
+                  }} />
+                  <span>深度思考</span>
+                </button>
+                {reasoningExpanded[i] && (
+                  <div style={{
+                    marginTop: 6, padding: 10, borderRadius: 8,
+                    background: '#fafafa', border: '1px solid #f0f0f0',
+                    fontSize: 12, lineHeight: 1.6, color: '#666',
+                    whiteSpace: 'pre-wrap', wordBreak: 'break-word'
+                  }}>
+                    {m.reasoning}
+                  </div>
+                )}
+              </div>
+            )}
             {m.links && m.links.length > 0 && (
               <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #e5e5e5', fontSize: 12 }}>
                 <div style={{ color: '#888', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 4 }}><Link2 size={12} strokeWidth={1.9} /> 参考资料：</div>
@@ -827,6 +883,35 @@ export default function AITangdou() {
             color: '#999', fontSize: 12, cursor: 'pointer', padding: 0,
             display: 'inline-flex', alignItems: 'center', gap: 2
           }}><X size={12} strokeWidth={2} /> 退出</button>
+        </div>
+      )}
+
+      {/* Mobile 端：联网搜索模式切换（自动/手动/关闭） */}
+      {isMobile && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '6px 12px',
+          background: '#fafafa', borderTop: '1px solid #f5f5f5'
+        }}>
+          <Search size={13} strokeWidth={1.9} color="#666" />
+          <span style={{ fontSize: 11, color: '#666' }}>联网</span>
+          <div style={{
+            marginLeft: 'auto',
+            display: 'inline-flex', borderRadius: 6, overflow: 'hidden',
+            border: '1px solid #e5e5e5'
+          }}>
+            {(['auto', 'manual', 'off'] as const).map(s => (
+              <button key={s} onClick={() => setSearchMode(s)} style={{
+                padding: '3px 8px', fontSize: 11, border: 'none', cursor: 'pointer',
+                background: searchMode === s ? '#1c1814' : '#fff',
+                color: searchMode === s ? '#fff' : '#666',
+                transition: 'all .15s',
+                borderRight: s !== 'off' ? '1px solid #e5e5e5' : 'none'
+              }}>
+                {s === 'auto' ? '自动' : s === 'manual' ? '手动' : '关闭'}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -1005,17 +1090,15 @@ export default function AITangdou() {
   // 手机端走 normal flow 让 MobileLayout 底栏正常露出（fixed z-100 会挡住 z-30 的底栏）。
   return (
     <div style={{
-      position: isMobile ? 'static' : 'fixed',
-      top: isMobile ? undefined : 60,
-      left: isMobile ? undefined : 0,
-      right: isMobile ? undefined : 0,
-      bottom: isMobile ? undefined : 0,
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: isMobile ? 64 : 0,
       display: 'flex',
       flexDirection: isMobile ? 'column' : 'row',
-      width: isMobile ? '100%' : undefined,
-      height: isMobile ? '100%' : undefined,
       background: '#fff',
-      zIndex: isMobile ? undefined : 100,
+      zIndex: isMobile ? 50 : 100,
       overflow: 'hidden'
     }}>
       {sidebar}
