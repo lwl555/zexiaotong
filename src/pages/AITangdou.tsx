@@ -383,21 +383,8 @@ export default function AITangdou() {
     }
   }, [messages, loading])
 
-  // 锁死整页滚动条：糖豆界面 mount 时禁止 body 滚动，unmount 时还原
-  // 否则 Layout 的 .container padding-bottom 80px + footer ~76px 会把整页撑高
-  useEffect(() => {
-    const prevOverflow = document.body.style.overflow
-    const prevHtmlOverflow = document.documentElement.style.overflow
-    const prevBodyHeight = document.body.style.height
-    document.body.style.overflow = 'hidden'
-    document.documentElement.style.overflow = 'hidden'
-    document.body.style.height = '100vh'
-    return () => {
-      document.body.style.overflow = prevOverflow
-      document.documentElement.style.overflow = prevHtmlOverflow
-      document.body.style.height = prevBodyHeight
-    }
-  }, [])
+  // 不再锁 body 滚动 —— 副作用：顶部内容会被吞掉
+  // 改用 position: fixed 方案（见下方 return），自然无需锁滚动条
 
   function loadConv(c: Conversation) {
     setCurrentConvId(c.id)
@@ -977,16 +964,16 @@ export default function AITangdou() {
     </div>
   )
 
+  // 用 position: fixed 把糖豆容器从正常文档流抽离
+  // 这样 .container 的 padding-bottom:80px + footer 不会撑大整页
   return (
     <div style={{
+      position: 'fixed',
+      top: 60, left: 0, right: 0, bottom: 0,
       display: 'flex',
-      // body 已被 useEffect 锁死 overflow:hidden；这里只需扣顶栏 60px
-      height: 'calc(100vh - 60px)',
       background: '#fff',
-      maxWidth: isMobile ? 880 : '100%',
-      margin: '0 auto', width: '100%',
-      overflow: 'hidden',
-      boxSizing: 'border-box'
+      zIndex: 100,
+      overflow: 'hidden'
     }}>
       {sidebar}
       {mainArea}

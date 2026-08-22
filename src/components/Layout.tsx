@@ -1,5 +1,5 @@
 import { ReactNode, useState, useEffect, useRef } from 'react'
-import { NavLink, useNavigate, Outlet } from 'react-router-dom'
+import { NavLink, useNavigate, Outlet, useLocation } from 'react-router-dom'
 import HistoryDrawer from './HistoryDrawer'
 import { primaryNav, moreNav, type NavDef } from '../lib/nav'
 
@@ -10,6 +10,8 @@ export default function Layout() {
   const moreRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const nav = useNavigate()
+  const loc = useLocation()
+  const isTangdou = loc.pathname === '/ai-tangdou'
 
   // 点外面关掉「更多」下拉
   useEffect(() => {
@@ -130,11 +132,20 @@ export default function Layout() {
         )}
       </header>
 
-      <main className="container"><Outlet /></main>
+      {/* 糖豆页面：footer 隐藏，去掉 container padding，让糖豆 fixed 容器完美占满 */}
+      {isTangdou ? (
+        <main style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+          <Outlet />
+        </main>
+      ) : (
+        <main className="container"><Outlet /></main>
+      )}
 
-      <footer className="footer">
-        <b>择校通</b> · 真实 · 直接 · 不客气 — AI 只说大实话，不粉饰、不回避、不绕弯子。
-      </footer>
+      {!isTangdou && (
+        <footer className="footer">
+          <b>择校通</b> · 真实 · 直接 · 不客气 — AI 只说大实话，不粉饰、不回避、不绕弯子。
+        </footer>
+      )}
 
       <HistoryDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </div>
