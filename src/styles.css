@@ -1,24 +1,24 @@
 :root {
-  /* 暖编辑风：纸感暖底 + 墨黑 + 陶土强调色 —— 刻意避开 AI 默认的紫/靛 */
-  --bg: #ffffff;              /* PC 背景：纯白（简洁） */
-  --surface: #fffdf8;         /* 暖白 */
-  --fg: #1c1814;              /* 墨黑 */
-  --muted: #6b6258;           /* 暖灰 */
-  --faint: #9a9085;
-  --border: #e7ddcb;          /* 暖色细线 */
-  --border-strong: #d8cbb2;
-  --accent: #c2410c;          /* 陶土橙 —— 主强调，非装饰 */
-  --accent-2: #e2622b;        /* 浅陶土 */
-  --accent-3: #8a3410;        /* 深陶土 */
-  --accent-soft: #fbeede;     /* 陶土浅染 */
+  /* 黑白灰配色：默认所有板块 */
+  --bg: #ffffff;
+  --surface: #f8f8f8;
+  --fg: #1a1a1a;
+  --muted: #666666;
+  --faint: #999999;
+  --border: #e0e0e0;
+  --border-strong: #d0d0d0;
+  --accent: #1a1a1a;           /* 墨黑作为主强调 */
+  --accent-2: #333333;         /* 深灰 */
+  --accent-3: #0a0a0a;         /* 更深黑 */
+  --accent-soft: #f0f0f0;      /* 极浅灰 */
   --accent-fg: #ffffff;
-  --danger: #b42318;
-  --ok: #2f7d4f;
-  --warn: #b45309;
-  --radius: 13px;             /* 偏小圆角 = 更有编辑感 */
+  --danger: #dc2626;
+  --ok: #16a34a;
+  --warn: #ca8a04;
+  --radius: 13px;
   --radius-sm: 9px;
-  --shadow: 0 1px 2px rgba(28, 24, 20, 0.05), 0 16px 34px rgba(28, 24, 20, 0.07);
-  --shadow-sm: 0 1px 2px rgba(28, 24, 20, 0.05);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 16px 34px rgba(0, 0, 0, 0.08);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
   --maxw: 1200px;
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
     "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
@@ -26,13 +26,35 @@
     Georgia, "Times New Roman", serif;
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Roboto Mono", Menlo, Consolas, monospace;
 
-  /* 分类语义色：优点/缺点/亮点/重点（功能信号，沿用） */
+  /* 分类语义色：黑白灰化 */
+  --c-adv: #16a34a; --c-adv-bg: #f0fdf4; --c-adv-bar: #86efac;
+  --c-dis: #dc2626; --c-dis-bg: #fef2f2; --c-dis-bar: #fca5a5;
+  --c-hl:  #666;    --c-hl-bg:  #fafafa; --c-hl-bar:  #bbb;
+  --c-key: #2563eb; --c-key-bg: #f0f7ff; --c-key-bar: #93c5fd;
+
+  /* 业务主题色：黑白灰化 */
+  --theme-school: #666;
+  --theme-by-city: #2563eb;
+  --theme-by-company: #7c3aed;
+}
+
+/* 首页（PC 端）保留暖陶土+墨黑+纸感编辑风 */
+.theme-home {
+  --bg: #ffffff;
+  --surface: #fffdf8;
+  --fg: #1c1814;
+  --muted: #6b6258;
+  --faint: #9a9085;
+  --border: #e7ddcb;
+  --border-strong: #d8cbb2;
+  --accent: #c2410c;
+  --accent-2: var(--accent-2);
+  --accent-3: #8a3410;
+  --accent-soft: #fbeede;
   --c-adv: #15803d; --c-adv-bg: #ecfdf3; --c-adv-bar: #34d399;
   --c-dis: #b42318; --c-dis-bg: #fef2f2; --c-dis-bar: #f87171;
   --c-hl:  #b45309; --c-hl-bg:  #fffbeb; --c-hl-bar:  #fbbf24;
-  --c-key: #1d4ed8; --c-key-bg: #eff6ff; --c-key-bar: #93c5fd;
-
-  /* 业务主题色（频道区分，温和 earth 系） */
+  --c-key: #1d4ed8; --c-key-bg: #f0f7ff; --c-key-bar: #93c5fd;
   --theme-school: #b45309;
   --theme-by-city: #1d4ed8;
   --theme-by-company: #9d3b6a;
@@ -80,9 +102,9 @@ a { color: inherit; text-decoration: none; }
 .brand-mark {
   display: inline-grid; place-items: center;
   width: 28px; height: 28px; border-radius: 7px;
-  background: linear-gradient(135deg, #e2622b, #c2410c);
+  background: linear-gradient(135deg, var(--accent-2), var(--accent));
   color: #fff; font-size: 14px; font-weight: 800;
-  box-shadow: 0 3px 10px rgba(194, 65, 12, 0.26);
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--accent) 26%, transparent);
 }
 .brand-text { line-height: 1; }
 
@@ -123,7 +145,7 @@ a { color: inherit; text-decoration: none; }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow: 0 18px 40px rgba(28, 24, 20, 0.14);
+  box-shadow: 0 18px 40px color-mix(in srgb, var(--fg) 14%, transparent);
   padding: 6px;
   display: flex; flex-direction: column; gap: 2px;
   z-index: 30;
@@ -224,7 +246,7 @@ a { color: inherit; text-decoration: none; }
 }
 .cta.primary {
   background: var(--accent); color: #fff;
-  box-shadow: 0 6px 18px rgba(194, 65, 12, 0.26);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 26%, transparent);
 }
 .cta.primary:hover { background: var(--accent-3); transform: translateY(-1px); }
 .cta.ghost {
@@ -467,7 +489,7 @@ textarea { resize: vertical; min-height: 88px; }
   border: 1px solid transparent; border-radius: var(--radius-sm); padding: 10px 18px;
   transition: all 0.15s ease; white-space: nowrap;
 }
-.btn-primary { background: var(--accent); color: var(--accent-fg); box-shadow: 0 2px 8px rgba(194, 65, 12, 0.25); }
+.btn-primary { background: var(--accent); color: var(--accent-fg); box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 25%, transparent); }
 .btn-primary:hover { background: var(--accent-3); }
 .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
 .btn-ghost { background: var(--surface); color: var(--fg); border-color: var(--border-strong); }
@@ -494,9 +516,9 @@ textarea { resize: vertical; min-height: 88px; }
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
   box-shadow: var(--shadow-sm); overflow: hidden;
 }
-.theme-school { --theme: var(--theme-school); --theme-soft: #eef2ff; }
-.theme-by-city { --theme: var(--theme-by-city); --theme-soft: #eff6ff; }
-.theme-by-company { --theme: var(--theme-by-company); --theme-soft: #f5f3ff; }
+.theme-school { --theme: var(--theme-school); --theme-soft: #f0f0f0; }
+.theme-by-city { --theme: var(--theme-by-city); --theme-soft: #f0f0f0; }
+.theme-by-company { --theme: var(--theme-by-company); --theme-soft: #f0f0f0; }
 
 .panel-head {
   padding: 14px 18px; border-bottom: 1px solid var(--border);
@@ -620,7 +642,7 @@ textarea { resize: vertical; min-height: 88px; }
   content: ""; width: 9px; height: 9px; border-radius: 3px;
   background: var(--cat, var(--theme)); flex: none;
 }
-.rep-section-body { color: #3f3f46; }
+.rep-section-body { color: #333; }
 .rep-p { margin: 0 0 10px; line-height: 1.7; white-space: pre-wrap; }
 .rep-sub { font-weight: 700; margin: 12px 0 6px; color: var(--fg); font-size: 14px; }
 
@@ -671,7 +693,7 @@ textarea { resize: vertical; min-height: 88px; }
   border-bottom: 1px solid var(--border-strong);
   white-space: nowrap;
 }
-.rep-table tbody tr:hover { background: rgba(194, 65, 12, 0.04); }
+.rep-table tbody tr:hover { background: color-mix(in srgb, var(--accent) 4%, transparent); }
 .rep-table tr:last-child td { border-bottom: none; }
 /* 首列加粗——读起来更像对照表，第一列是「维度」 */
 .rep-table td:first-child {
@@ -722,7 +744,7 @@ textarea { resize: vertical; min-height: 88px; }
 
 .note {
   font-size: 13.5px; color: var(--muted); background: var(--accent-soft);
-  border: 1px solid #f0d9c8; border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 18px; line-height: 1.6;
+  border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 18px; line-height: 1.6;
 }
 .note-sub { display: block; margin-top: 6px; font-size: 12.5px; color: var(--muted); }
 
@@ -941,7 +963,7 @@ textarea { resize: vertical; min-height: 88px; }
 .ts-time { font-variant-numeric: tabular-nums; color: var(--faint); font-size: 13px; white-space: nowrap; }
 .ts-eta { font-size: 12.5px; color: var(--faint); margin-top: 5px; line-height: 1.5; }
 .ts-bar { height: 4px; border-radius: 99px; background: var(--accent-soft); overflow: hidden; margin-top: 9px; }
-.ts-bar-fill { display: block; height: 100%; width: 38%; border-radius: 99px; background: linear-gradient(90deg, var(--accent), #e2622b); animation: ts-slide 1.4s ease-in-out infinite; }
+.ts-bar-fill { display: block; height: 100%; width: 38%; border-radius: 99px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); animation: ts-slide 1.4s ease-in-out infinite; }
 @keyframes ts-slide { 0% { transform: translateX(-110%); } 100% { transform: translateX(360%); } }
 .ts-spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--accent-soft); border-top-color: var(--accent); animation: ts-spin 0.8s linear infinite; flex: none; }
 @keyframes ts-spin { to { transform: rotate(360deg); } }
@@ -949,11 +971,11 @@ textarea { resize: vertical; min-height: 88px; }
 /* ===== 相关链接与地点卡片（检索来源可点击 / 复制） ===== */
 .links-card {
   margin: 10px 0 4px;
-  border: 1px solid var(--line, #e7dccf);
+  border: 1px solid var(--border);
   border-radius: 14px;
-  background: linear-gradient(180deg, #fff8f1 0%, #fdf3ea 100%);
+  background: linear-gradient(180deg, #fff 0%, #fafafa 100%);
   padding: 12px 14px 13px;
-  box-shadow: 0 1px 2px rgba(120, 80, 40, 0.05);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 .links-head {
   display: flex;
@@ -961,16 +983,16 @@ textarea { resize: vertical; min-height: 88px; }
   gap: 8px;
   font-size: 13.5px;
   font-weight: 700;
-  color: var(--accent, #c2410c);
+  color: var(--accent);
   margin-bottom: 9px;
 }
 .links-count {
   margin-left: auto;
   font-size: 11.5px;
   font-weight: 600;
-  color: var(--faint, #9a8a78);
+  color: var(--faint);
   background: #fff;
-  border: 1px solid var(--line, #e7dccf);
+  border: 1px solid var(--border);
   border-radius: 99px;
   padding: 1px 8px;
 }
@@ -981,11 +1003,11 @@ textarea { resize: vertical; min-height: 88px; }
   gap: 8px;
   border-radius: 10px;
   background: #fff;
-  border: 1px solid var(--line, #e7dccf);
+  border: 1px solid var(--border);
   padding: 7px 8px 7px 10px;
   transition: border-color .15s ease, box-shadow .15s ease;
 }
-.link-item:hover { border-color: var(--accent-soft, #f0c9a8); box-shadow: 0 2px 8px rgba(194, 65, 12, 0.08); }
+.link-item:hover { border-color: var(--accent-soft); box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 8%, transparent); }
 .link-url {
   display: flex;
   align-items: center;
@@ -1000,7 +1022,7 @@ textarea { resize: vertical; min-height: 88px; }
   font-size: 11px;
   font-weight: 700;
   color: #fff;
-  background: var(--accent, #c2410c);
+  background: var(--accent);
   border-radius: 6px;
   padding: 2px 7px;
   white-space: nowrap;
@@ -1008,22 +1030,22 @@ textarea { resize: vertical; min-height: 88px; }
 .link-title {
   font-size: 13px;
   line-height: 1.35;
-  color: var(--ink, #2b2620);
+  color: var(--fg);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.link-url:hover .link-title { color: var(--accent, #c2410c); text-decoration: underline; }
+.link-url:hover .link-title { color: var(--accent); text-decoration: underline; }
 .link-copy {
   flex: none;
   font-size: 12px;
   font-weight: 600;
-  color: var(--accent, #c2410c);
+  color: var(--accent);
   background: #fff;
-  border: 1px solid var(--accent-soft, #f0c9a8);
+  border: 1px solid var(--accent-soft);
   border-radius: 8px;
   padding: 4px 10px;
   cursor: pointer;
   transition: background .15s ease;
 }
-.link-copy:hover { background: var(--accent-soft, #f7e6d6); }
+.link-copy:hover { background: var(--accent-soft, var(--accent-soft)); }

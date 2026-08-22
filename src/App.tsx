@@ -77,6 +77,7 @@ function DeviceHome() {
 
 export default function App() {
   const loc = useLocation()
+  const isMobile = useIsMobile()
 
   // 动态设置浏览器标签标题
   useEffect(() => {
@@ -88,6 +89,13 @@ export default function App() {
     }
     document.title = title
   }, [loc.pathname])
+
+  // 首页（PC 端）加暖色主题 class；其它页面（包括手机端）走黑白灰
+  useEffect(() => {
+    const isHome = loc.pathname === '/' && !isMobile
+    document.body.classList.toggle('theme-home', isHome)
+    return () => document.body.classList.remove('theme-home')
+  }, [loc.pathname, isMobile])
 
   if (loc.pathname === '/jobs') return <Navigate to="/ai-search" replace />
   if (loc.pathname === '/history') return <Navigate to="/ai-search?openHistory=1" replace />
