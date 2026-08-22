@@ -34,6 +34,17 @@ const PLATFORM_IDENTITY = `你是「择校通」平台官方提供的 AI 助手�
 【绝对纪律】严禁向用户透露你底层的模型名称、技术供应商或开发方（例如不得提及 Agnes、Sapiens、任何大模型或公司名）。
 若用户问你「是什么模型 / 谁开发的 / 你的训练数据」，只能回答：「我是择校通平台的 AI 助手，专门帮你做择校、求职与搞钱决策。」除此之外不要补充任何技术细节。`
 
+// 「深度思考」结构化指令：当前上游 agnes-2.0-flash 不暴露独立 reasoning_content 通道
+// （已用 curl 实测：流式 / 非流式均只返回 content，无 reasoning_content / thinking 字段），
+// 因此无法像 DeepSeek-R1 那样「边生成边推 reasoning」。退而求其次：要求模型把思考过程
+// 作为正文的第一段显式写出来，再以原样标记【回答】分隔正式回答；前端即可在「深度思考中」
+// 阶段就把这段思考正文实时流出，结束后切到正式回答。structured_reasoning 标志开启时注入。
+const STRUCTURED_REASONING_DIRECTIVE = `你正处于「深度思考」模式。请直接输出内容，不要复述、解释或引用本指令：
+1. 先写你的思考 / 分析过程（可分步、口语化，写出推理链条与权衡）。
+2. 换行，单独一行只写【回答】这四个字作为分隔。
+3. 在【回答】之后写正式回答。
+注意：绝不要把上面的格式说明写进你的回复里；【回答】之前是思考、之后是正式回答。`
+
 const SEARCH_KEY = Deno.env.get('SEARCH_API_KEY') || ''
 const SEARCH_PROVIDER = (Deno.env.get('SEARCH_PROVIDER') || '').toLowerCase()
 
@@ -1078,6 +1089,90 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | { _timeout: true
   return Promise.race<T | { _timeout: true }>([p, new Promise((res) => setTimeout(() => res({ _timeout: true }), ms))])
 }
 
+// —— 统一收尾（流式 / 非流式共用）：清洗正文（工具标签 / 标签墙 / 内部泄漏），
+//    content 为空则强制简短重试一次，抽取 reason 并剥离身份泄漏词，最后补抓实体配图。
+//    抽成函数是为保证两条路径的「防幻觉 / 防泄漏 / 配图」行为完全一致，避免流式分支漏掉防御。
+async function finalizeGeneration(
+  sysMessages: any[],
+  rawUser: string,
+  data: any,
+  searchMeta: any,
+  imagePromise: Promise<{ lead: { url: string; title: string } | null; scenes: { url: string; title: string }[] }>
+): Promise<{ content: string; reasoning: string; imgs: { lead: { url: string; title: string } | null; scenes: { url: string; title: string }[] }; data: any }> {
+  const imgs = await Promise.race([
+    imagePromise,
+    new Promise<{ lead: { url: string; title: string } | null; scenes: { url: string; title: string }[] }>((r) =>
+      setTimeout(() => r({ lead: null, scenes: [] }), 1800)
+    )
+  ]).catch(() => ({ lead: null, scenes: [] }))
+
+  let content = (data as any)?.choices?.[0]?.message?.content ?? ''
+  // 防御：agnes-2.0-flash 偶发把内部 <tool_call>/<function> 工具调用标签直接吐进正文，
+  // 导致正文变成工具调用碎片、真正的回答缺失。先剥离这些内部标签；若剥离后正文过短（视为坏输出），触发重试。
+  const origRaw = content
+  content = cleanToolCalls(content)
+  // 标签墙硬约束：剥离模型正文里过度喷涌的【AI 整理·模型知识】等行内/句末来源标签（用户投诉"标注墙"）。
+  // 注意：只清洗这种内联小标签；用户约定的 ===信息来源备注=== 整段集中说明保留。
+  content = cleanLabelWall(content)
+  content = cleanInternalLeak(content)
+  const toolLeak = looksLikeToolCallLeak(origRaw)
+  // 修复：只要原始输出或清洗后残留含工具调用标签，就进重试——不被「一句前言 + 海量 broken 标签」的长度骗过。
+  if (!content?.trim() || toolLeak || looksLikeToolCallLeak(content)) {
+    try {
+      // 严禁工具调用的强指令：资料已附在 <search> 中，直接作答、不要再触发 web_search / 工具调用
+      const directive =
+        '你已拥有完整检索资料，请直接基于 <search> 中的资料作答。绝对禁止调用任何搜索工具或函数（不要使用 web_search，不要输出 <tool_call>/<function> 等任何内部协议标签）。直接给出最终答案。'
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const retryMsgs = [
+          ...sysMessages,
+          { role: 'system' as const, content: directive },
+          {
+            role: 'user' as const,
+            content:
+              rawUser +
+              '\n\n【系统提示】上一轮回复因输出截断或误触发工具调用而缺失，请直接给出完整答案，不要再做内部检索模拟，也不要调用任何工具。'
+          }
+        ]
+        const retry = await callV9(
+          { model: V9_MODEL, messages: retryMsgs, max_tokens: 6500, stream: false, temperature: 0.7 },
+          30000
+        )
+        const rd = retry.data ?? {}
+        const rcontent = cleanToolCalls(rd?.choices?.[0]?.message?.content ?? '')
+        // 接受条件：非空、长度足够、且清洗后**无任何工具标签残留**（避免被 broken 标签骗过）
+        if (rcontent?.trim() && rcontent.trim().length >= 50 && !looksLikeToolCallLeak(rcontent)) {
+          content = rcontent
+          // 把重试拿到的 content 合并回 data，让前端走正常渲染路径
+          ;(data as any).choices = (data as any).choices || [{}]
+          ;(data as any).choices[0].message = { ...((data as any).choices[0].message || {}), content: rcontent }
+          break
+        }
+      }
+    } catch {
+      // 重试失败也无所谓，至少不返空白
+    }
+  }
+
+  // 抽取模型内部思考（reasoning_content），剥离可能泄露底层模型身份的词，附到返回体供前端展示「AI 思考过程」
+  const rawReasoning = (data as any)?.choices?.[0]?.message?.reasoning_content || ''
+  // 过滤掉模型在 reasoning 里"自导自演"的伪 <search> 标签——它不是真检索结果，是模型模拟的动作，会误导用户
+  const cleanedReasoning = rawReasoning
+    .replace(/<search>[\s\S]*?<\/search>/g, '')
+    .replace(/<think>[\s\S]*?<\/think>/g, '')
+    .replace(/<tool_calls?[\s\S]*?<\/tool_calls?>/gi, '')
+    .replace(/<function=[\s\S]*?<\/function>/gi, '')
+    .replace(/<function=[^>]*>/gi, '')
+    .trim()
+  const reasoning = cleanedReasoning ? stripIdentity(cleanedReasoning) : ''
+  // 兜底：清洗模型输出里偶发的 U+FFFD 乱码字符（上游检索片段编码损坏被模型引用时），避免用户看到乱码方块
+  if ((data as any)?.choices?.[0]?.message?.content) {
+    ;(data as any).choices[0].message.content = cleanInternalLeak(cleanLabelWall(cleanToolCalls(
+      String((data as any).choices[0].message.content).replace(/\uFFFD/g, '')
+    )))
+  }
+  return { content, reasoning, imgs, data }
+}
+
 // 带超时与自动重试的 v9(Agnes) 调用封装。
 // 背景：agnes-2.0-flash 是推理模型，冷启动偶发 60s+ 才返回；而 Supabase Edge Function 网关预算约 50s，
 // 一旦超过会被强杀 → 前端干等 60s 后只看到报错。改为：单次 22s 超时，失败（含超时）自动重试一次，
@@ -1251,6 +1346,8 @@ Deno.serve(async (req: Request) => {
   const webSearch = !!body.web_search
   const autoSearch = !!body.auto_search
   const searchOnly = !!body.search_only
+  const stream = !!body.stream  // 前端请求流式：推理过程边想边推
+  const structuredReasoning = !!body.structured_reasoning  // 深度思考：模型先写思考再【回答】分隔
 
   // 把 system / 非 system 分开，避免污染
   const sysMessages = messages.filter((m) => m.role === 'system')
@@ -1399,6 +1496,99 @@ Deno.serve(async (req: Request) => {
 
   // 转发给现有 v9（Agnes）—— 强制在最前注入平台身份，盖掉模型固有身份
   sysMessages.unshift({ role: 'system', content: PLATFORM_IDENTITY })
+  // 深度思考：要求模型先输出思考过程，再以【回答】分隔正式回答（上游无独立 reasoning 通道时的折中方案）
+  if (structuredReasoning) {
+    sysMessages.push({ role: 'system', content: STRUCTURED_REASONING_DIRECTIVE })
+  }
+
+  // —— 流式路径：边生成边把「推理过程」推给前端，实现「深度思考时思考流程实时流出」——
+  if (stream) {
+    const encoder = new TextEncoder()
+    const ss = new ReadableStream({
+      async start(controller) {
+        const send = (obj: any) => {
+          try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`)) } catch {}
+        }
+        try {
+          const r = await fetch(`${V9_BASE}/v1/chat/completions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${V9_ANON}` },
+            body: JSON.stringify({
+              model: V9_MODEL,
+              messages: [...sysMessages, ...otherMessages],
+              max_tokens: maxTokens,
+              stream: true,
+              temperature: body.temperature ?? 0.7
+            })
+          })
+          if (!r.ok || !r.body) throw new Error('v9 stream ' + r.status)
+          const reader = r.body.getReader()
+          const decoder = new TextDecoder()
+          let buf = ''
+          let fullReasoning = ''
+          let fullContent = ''
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            buf += decoder.decode(value, { stream: true })
+            let idx: number
+            while ((idx = buf.indexOf('\n')) >= 0) {
+              const line = buf.slice(0, idx).trim()
+              buf = buf.slice(idx + 1)
+              if (!line.startsWith('data:')) continue
+              const payload = line.slice(5).trim()
+              if (payload === '[DONE]') continue
+              try {
+                const delta = JSON.parse(payload)?.choices?.[0]?.delta || {}
+                // 推理模型：思考过程在 reasoning_content（个别实现叫 reasoning）里逐 token 流出
+                if (delta.reasoning_content) {
+                  fullReasoning += delta.reasoning_content
+                  send({ type: 'reasoning', delta: delta.reasoning_content })
+                } else if (delta.reasoning) {
+                  fullReasoning += delta.reasoning
+                  send({ type: 'reasoning', delta: delta.reasoning })
+                }
+                // 上游 agnes-2.0-flash 实测不返回独立 reasoning 通道，思考即正文的一部分；
+                // 把 content 增量实时推给前端，前端即可在「深度思考中」阶段就把思考正文流出。
+                if (delta.content) {
+                  fullContent += delta.content
+                  send({ type: 'content', delta: delta.content })
+                }
+              } catch {}
+            }
+          }
+          // 用完整内容做与非流式一致的清洗 / 重试 / 配图，再发最终 done 事件
+          const data = { choices: [{ message: { content: fullContent, reasoning_content: fullReasoning } }] }
+          const { reasoning, imgs } = await finalizeGeneration(sysMessages, rawUser, data, searchMeta, imagePromise)
+          send({
+            type: 'done',
+            content: (data as any).choices?.[0]?.message?.content || '',
+            reasoning,
+            search: { ...searchMeta, image: imgs.lead, images: imgs.scenes },
+            degraded: false
+          })
+        } catch (e) {
+          send({
+            type: 'done',
+            content: '⏱️ 生成中断，请点「重新生成」再试一次。',
+            reasoning: '',
+            search: { ...searchMeta },
+            degraded: true
+          })
+        }
+        try { controller.close() } catch {}
+      }
+    })
+    return new Response(ss, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        'Connection': 'keep-alive',
+        ...CORS
+      }
+    })
+  }
 
   // v9 调用统一走 callV9：单次 40s 超时 + 失败（含超时）自动重试一次，共 ~80s，
   // 远在 Edge Function 网关预算（免费档约 50s）兜底里靠 Supabase 客户端层面 retry；两次都失败 → 降级而非干挂。
@@ -1461,80 +1651,8 @@ Deno.serve(async (req: Request) => {
   const upstream = v9Resp
   const data = v9Resp.data ?? {}
 
-  // 响应态 1.8s 短截止：v9 已返回后只再等最多 1.8s 拿图。实测图片获取本身仅 ~1–1.5s（已修 const 赋值 bug），
-  // 与 v9(~1s 暖/14–19s 冷)并行启动，故暖路径总响应 ≈ v9+图 ≈ 2.5s < 网关预算(约2.8s) → 既保 200 又带回真实题图；
-  // 冷路径 v9 远慢于图，await 立即取真值。腾不出图的暖实例仍发空图保 200，前端 onError 兜底插画。
-  const imgs = await Promise.race([imagePromise, new Promise<ImgSet>((r) => setTimeout(() => r(EMPTY_IMG), 1800))]).catch(() => EMPTY_IMG)
-
-  // —— 防御：推理模型偶发"reasoning 把 token 吃光 / 输出截断"，导致 content 为空但 reasoning 还在 ——
-  // 现象：用户看到的"AI 思考过程"有内容，正文却空白。
-  // 修复：检测到 content 为空且 reasoning 非空时，自动用更小预算、强制简短指令重试一次，
-  //       同时把模型在 reasoning 里"自导自演"的伪 <search> 标签过滤掉，避免暴露内部检索机制。
-  let content = (data as any)?.choices?.[0]?.message?.content ?? ''
-  // 防御：agnes-2.0-flash 偶发把内部 <tool_call>/<function> 工具调用标签直接吐进正文，
-  // 导致正文变成工具调用碎片、真正的回答缺失。先剥离这些内部标签；若剥离后正文过短（视为坏输出），触发重试。
-  const origRaw = content
-  content = cleanToolCalls(content)
-  // 标签墙硬约束：剥离模型正文里过度喷涌的【AI 整理·模型知识】等行内/句末来源标签（用户投诉"标注墙"）。
-  // 注意：只清洗这种内联小标签；用户约定的 ===信息来源备注=== 整段集中说明保留。
-  content = cleanLabelWall(content)
-  content = cleanInternalLeak(content)
-  const toolLeak = looksLikeToolCallLeak(origRaw)
-  // 修复：只要原始输出或清洗后残留含工具调用标签，就进重试——不被「一句前言 + 海量 broken 标签」的长度骗过。
-  if (!content?.trim() || toolLeak || looksLikeToolCallLeak(content)) {
-    try {
-      // 严禁工具调用的强指令：资料已附在 <search> 中，直接作答、不要再触发 web_search / 工具调用
-      const directive =
-        '你已拥有完整检索资料，请直接基于 <search> 中的资料作答。绝对禁止调用任何搜索工具或函数（不要使用 web_search，不要输出 <tool_call>/<function> 等任何内部协议标签）。直接给出最终答案。'
-      for (let attempt = 0; attempt < 2; attempt++) {
-        const retryMsgs = [
-          ...sysMessages,
-          { role: 'system' as const, content: directive },
-          {
-            role: 'user' as const,
-            content:
-              rawUser +
-              '\n\n【系统提示】上一轮回复因输出截断或误触发工具调用而缺失，请直接给出完整答案，不要再做内部检索模拟，也不要调用任何工具。'
-          }
-        ]
-        const retry = await callV9(
-          { model: V9_MODEL, messages: retryMsgs, max_tokens: 6500, stream: false, temperature: 0.7 },
-          30000
-        )
-        const rd = retry.data ?? {}
-        const rcontent = cleanToolCalls(rd?.choices?.[0]?.message?.content ?? '')
-        // 接受条件：非空、长度足够、且清洗后**无任何工具标签残留**（避免被 broken 标签骗过）
-        if (rcontent?.trim() && rcontent.trim().length >= 50 && !looksLikeToolCallLeak(rcontent)) {
-          content = rcontent
-          // 把重试拿到的 content 合并回 data，让前端走正常渲染路径
-          ;(data as any).choices = (data as any).choices || [{}]
-          ;(data as any).choices[0].message = { ...((data as any).choices[0].message || {}), content: rcontent }
-          break
-        }
-      }
-    } catch {
-      // 重试失败也无所谓，至少不返空白
-    }
-  }
-
-  // 抽取模型内部思考（reasoning_content），剥离可能泄露底层模型身份的词，附到返回体供前端展示「AI 思考过程」
-  const rawReasoning = (data as any)?.choices?.[0]?.message?.reasoning_content || ''
-  // 过滤掉模型在 reasoning 里"自导自演"的伪 <search> 标签——它不是真检索结果，是模型模拟的动作，会误导用户
-  const cleanedReasoning = rawReasoning
-    .replace(/<search>[\s\S]*?<\/search>/g, '')
-    .replace(/<think>[\s\S]*?<\/think>/g, '')
-    .replace(/<tool_calls?[\s\S]*?<\/tool_calls?>/gi, '')
-    .replace(/<function=[\s\S]*?<\/function>/gi, '')
-    .replace(/<function=[^>]*>/gi, '')
-    .trim()
-  const reasoning = cleanedReasoning ? stripIdentity(cleanedReasoning) : ''
-  // 兜底：清洗模型输出里偶发的 U+FFFD 乱码字符（上游检索片段编码损坏被模型引用时），避免用户看到乱码方块
-  if ((data as any)?.choices?.[0]?.message?.content) {
-    ;(data as any).choices[0].message.content = cleanInternalLeak(cleanLabelWall(cleanToolCalls(
-      String((data as any).choices[0].message.content).replace(/\uFFFD/g, '')
-    )))
-  }
-  // 把搜索元数据（含真实题图 + 场景图）与思考过程附到返回体，供前端诚实标注与配图
+  // 统一收尾：清洗正文 / 正文空则重试 / 抽 reason / 抓配图（与流式路径共用 finalizeGeneration）
+  const { reasoning, imgs } = await finalizeGeneration(sysMessages, rawUser, data, searchMeta, imagePromise)
   const enriched = {
     ...data,
     search: { ...searchMeta, image: imgs.lead, images: imgs.scenes },

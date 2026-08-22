@@ -1,19 +1,19 @@
 // agnes-proxy — Supabase Edge Function (Deno)
-// 转发 chat/completions 到上游模型（默认 DeepSeek），并支持「服务端联网搜索」。
+// 转发 chat/completions 到上游 Agnes 平台（agnes-2.0-flash），并支持「流式透传」（用于深度思考实时流出）。
 //
 // 部署：
 //   supabase functions deploy agnes-proxy --project-ref wcnssyiqitugqfmcbdhe
 // Secrets（在 Supabase 后台 Functions → agnes-proxy → Add secret）：
-//   DEEPSEEK_KEY   必填，上游模型 key
-//   UPSTREAM_BASE  可选，默认 https://api.deepseek.com
-//   SERPER_API_KEY 可选，配置了就用 Serper 做真·搜索；没配则 DuckDuckGo HTML 兜底
+//   AGNES_KEY / AGNES_API_KEY   必填，上游 Agnes 平台 key（真实值已配置在 Secret 中，本仓库示例值无效）
+//   UPSTREAM_BASE               可选，默认 https://api.agnes-ai.cn/v1
+//   SERPER_API_KEY              可选，配置了就用 Serper 做真·搜索；没配则 DuckDuckGo HTML 兜底
 //
 // 前端调用：POST {VITE_AGNES_BASE}/v1/chat/completions
-//   请求体：{ model, messages, max_tokens, web_search? }
+//   请求体：{ model, messages, max_tokens, stream?, web_search? }
 //   鉴权：Supabase 匿名 key（Authorization: Bearer <anon>）—— 仅用于鉴权「能否调用本函数」
 
-const UPSTREAM_BASE = Deno.env.get('UPSTREAM_BASE') || 'https://api.deepseek.com'
-const UPSTREAM_KEY = Deno.env.get('DEEPSEEK_KEY') || ''
+const UPSTREAM_BASE = Deno.env.get('UPSTREAM_BASE') || 'https://api.agnes-ai.cn/v1'
+const UPSTREAM_KEY = Deno.env.get('AGNES_KEY') || Deno.env.get('AGNES_API_KEY') || ''
 const SERPER_KEY = Deno.env.get('SERPER_API_KEY') || ''
 
 const CORS = {
@@ -91,7 +91,7 @@ Deno.serve(async (req: Request) => {
     return json({ error: 'invalid json' }, 400)
   }
 
-  const model = body.model || 'deepseek-v4-flash'
+  const model = body.model || 'agnes-2.0-flash'
   const messages: any[] = body.messages || []
   const maxTokens = Math.min(body.max_tokens ?? 4096, 8192)
   const webSearch = !!body.web_search
@@ -114,6 +114,8 @@ Deno.serve(async (req: Request) => {
 
   if (!UPSTREAM_KEY) return json({ error: 'UPSTREAM_KEY (DEEPSEEK_KEY) 未配置' }, 500)
 
+  const useStream = !!body.stream
+
   const upstream = await fetch(`${UPSTREAM_BASE}/chat/completions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${UPSTREAM_KEY}` },
@@ -121,9 +123,22 @@ Deno.serve(async (req: Request) => {
       model,
       messages: [...sysMessages, ...otherMessages],
       max_tokens: maxTokens,
-      stream: false
+      stream: useStream
     })
   })
+
+  // 流式：直接把上游 SSE 透传给调用方（agnes-search 再转发给前端），实现「思考过程实时流出」
+  if (useStream) {
+    return new Response(upstream.body, {
+      status: upstream.status,
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        'Connection': 'keep-alive',
+        ...CORS
+      }
+    })
+  }
 
   const data = await upstream.json().catch(() => ({}))
   return json(data, upstream.status)

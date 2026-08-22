@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { agnesChat, ChatMsg, LinkInfo } from '../lib/agnes'
+import { agnesChatStream, ChatMsg, LinkInfo } from '../lib/agnes'
 import { useIsMobile } from '../lib/useIsMobile'
 import {
   MessageSquare, Search, PenLine, Table2, Globe, Image as ImageIcon,
@@ -378,9 +378,7 @@ export default function AITangdou() {
   const [activeMode, setActiveMode] = useState<string | null>(null)  // 快捷模式：选中后持续注入系统提示词
   const [searchMode, setSearchMode] = useState<'auto' | 'manual' | 'off'>('auto')  // 联网搜索：自动判断 / 手动强制 / 关闭
   const [reasoningExpanded, setReasoningExpanded] = useState<Record<number, boolean>>({})  // 每条AI消息的思考过程展开状态
-  // 深度思考「逐字弹出」：第 i 条 AI 消息已显示的 reasoning 字符数（undefined=未开始/未返回）
-  const [typedReasoning, setTypedReasoning] = useState<Record<number, number>>({})
-  const typingRef = useRef<Set<number>>(new Set())  // 防止同一条消息重复启动打字机
+  const [liveReasoning, setLiveReasoning] = useState('')  // 流式：AI 思考过程中的实时增量，loading 气泡里实时展示
   const abortRef = useRef<AbortController | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -388,28 +386,6 @@ export default function AITangdou() {
   const startRef = useRef<number>(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const isMobile = useIsMobile()
-
-  // 深度思考「逐字弹出」：拿到 reasoning 后自动展开，并像打字机一样一个字一个字显示
-  useEffect(() => {
-    const last = messages.length - 1
-    messages.forEach((m, i) => {
-      // 只对本轮最新一条 AI 消息启动打字机，避免刷新历史对话时重播动画
-      if (m.role === 'ai' && m.reasoning && i === last && !typingRef.current.has(i)) {
-        typingRef.current.add(i)
-        setReasoningExpanded(prev => ({ ...prev, [i]: true }))  // 自动展开，无需点击
-        let n = 0
-        const full = m.reasoning
-        const id = setInterval(() => {
-          n = Math.min(n + 2, full.length)
-          setTypedReasoning(prev => ({ ...prev, [i]: n }))
-          if (n >= full.length) {
-            clearInterval(id)
-            typingRef.current.delete(i)
-          }
-        }, 18)
-      }
-    })
-  }, [messages])
 
   // 启动时尝试恢复最近一条对话
   useEffect(() => {
@@ -450,8 +426,7 @@ export default function AITangdou() {
     setPendingImage(null)
     setActiveMode(null)
     setError('')
-    setTypedReasoning({})
-    typingRef.current.clear()
+    setLiveReasoning('')
   }
 
   function persist(messages: Msg[]) {
@@ -473,6 +448,7 @@ export default function AITangdou() {
 
   async function run(next: Msg[], modeOverride?: string | null) {
     setLoading(true)
+    setLiveReasoning('')
     startRef.current = Date.now()
     setElapsedMs(0)
     if (timerRef.current) clearInterval(timerRef.current)
@@ -502,22 +478,49 @@ export default function AITangdou() {
         chatMessages.push({ role: 'user', content: lastMsg.content })
       }
 
-      const { content, search, reasoning } = await agnesChat(chatMessages, {
+      // 流式：正文增量边生成边通过 onContent 推到 loading 气泡（"深度思考中"阶段即可看到思考流出）；
+      // 上游 agnes-2.0-flash 无独立 reasoning 通道，故让模型先写思考再以【回答】分隔，结束后在此拆分。
+      let settled = false
+      await agnesChatStream(chatMessages, {
         autoSearch: searchMode === 'auto',
         webSearch: searchMode === 'manual',
-        signal: controller.signal
+        structuredReasoning: true,
+        signal: controller.signal,
+        onContent: (delta) => {
+          // 首个增量到达即自动展开思考区，用户立刻看到「思考流程在流出」
+          setLiveReasoning(prev => prev + delta)
+        },
+        onDone: (res) => {
+          settled = true
+          const raw = (res.content || '').trim() || '这一轮没拿到回复，请换个说法再试试。'
+          // 拆分思考过程与正式回答：模型在【回答】前写思考，之后写正式回答
+          let reasoning: string | null = null
+          let answer = raw
+          const marker = raw.indexOf('【回答】')
+          if (marker >= 0) {
+            const r = raw.slice(0, marker).trim()
+            const a = raw.slice(marker + '【回答】'.length).trim()
+            if (r) reasoning = r
+            if (a) answer = a
+          }
+          const aiMsg: Msg = {
+            role: 'ai',
+            content: answer,
+            reasoning,
+            links: res.search?.links ?? null
+          }
+          const allMsgs = [...next, aiMsg]
+          setMessages(allMsgs)
+          persist(allMsgs)
+        }
       })
-
-      const safeContent = content?.trim() || '这一轮没拿到回复，请换个说法再试试。'
-      const aiMsg: Msg = { role: 'ai', content: safeContent, reasoning: reasoning ?? null, links: search?.links ?? null }
-      const allMsgs = [...next, aiMsg]
-      setMessages(allMsgs)
-      persist(allMsgs)
+      if (!settled) throw new Error('未收到完成信号')
     } catch (e: any) {
       if (e?.name !== 'AbortError') setError(e?.message || '请求失败')
     } finally {
       if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
       setLoading(false)
+      setLiveReasoning('')
       abortRef.current = null
     }
   }
@@ -805,36 +808,36 @@ export default function AITangdou() {
             {m.image && m.content && <div style={{ padding: '6px 12px' }}>{m.content}</div>}
             {!m.image && m.role === 'ai' && renderMarkdown(m.content)}
             {!m.image && m.role === 'user' && <span style={{ whiteSpace: 'pre-wrap' }}>{m.content}</span>}
-            {/* 深度思考过程（自动展开 + 逐字弹出打字机） */}
-            {m.role === 'ai' && m.reasoning && (
-              <div style={{ marginTop: 8, borderTop: '1px solid #e5e5e5', paddingTop: 6 }}>
-                <button
-                  onClick={() => setReasoningExpanded(prev => ({ ...prev, [i]: !prev[i] }))}
-                  style={{
-                    background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#888'
-                  }}>
-                  <ChevronDown size={12} strokeWidth={2} style={{
-                    transform: reasoningExpanded[i] ? 'rotate(0deg)' : 'rotate(-90deg)',
-                    transition: 'transform .15s'
-                  }} />
-                  <span>深度思考</span>
-                </button>
-                {reasoningExpanded[i] && (
-                  <div style={{
-                    marginTop: 6, padding: 10, borderRadius: 8,
-                    background: '#fafafa', border: '1px solid #f0f0f0',
-                    fontSize: 12, lineHeight: 1.6, color: '#666',
-                    whiteSpace: 'pre-wrap', wordBreak: 'break-word'
-                  }}>
-                    {m.reasoning.slice(0, typedReasoning[i] ?? m.reasoning.length)}
-                    {typedReasoning[i] !== undefined && typedReasoning[i] < m.reasoning.length && (
-                      <span style={{ display: 'inline-block', color: '#bbb', marginLeft: 1 }}>▍</span>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
+            {/* 深度思考过程：最后一条 AI 消息默认展开（刚才已实时看过），其余可手动展开 */}
+            {m.role === 'ai' && m.reasoning && (() => {
+              const expanded = reasoningExpanded[i] ?? (i === messages.length - 1)
+              return (
+                <div style={{ marginTop: 8, borderTop: '1px solid #e5e5e5', paddingTop: 6 }}>
+                  <button
+                    onClick={() => setReasoningExpanded(prev => ({ ...prev, [i]: !expanded }))}
+                    style={{
+                      background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#888'
+                    }}>
+                    <ChevronDown size={12} strokeWidth={2} style={{
+                      transform: expanded ? 'rotate(0deg)' : 'rotate(-90deg)',
+                      transition: 'transform .15s'
+                    }} />
+                    <span>深度思考</span>
+                  </button>
+                  {expanded && (
+                    <div style={{
+                      marginTop: 6, padding: 10, borderRadius: 8,
+                      background: '#fafafa', border: '1px solid #f0f0f0',
+                      fontSize: 12, lineHeight: 1.6, color: '#666',
+                      whiteSpace: 'pre-wrap', wordBreak: 'break-word'
+                    }}>
+                      {m.reasoning}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
             {m.links && m.links.length > 0 && (
               <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #e5e5e5', fontSize: 12 }}>
                 <div style={{ color: '#888', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 4 }}><Link2 size={12} strokeWidth={1.9} /> 参考资料：</div>
@@ -865,11 +868,36 @@ export default function AITangdou() {
             flexShrink: 0, marginRight: 8
           }}><Sparkles size={16} color="#fff" strokeWidth={2} /></div>
           <div style={{
-            padding: '10px 14px', borderRadius: 14, background: '#f5f5f5',
+            maxWidth: isMobile ? '78%' : '80%', padding: '10px 14px', borderRadius: 14, background: '#f5f5f5',
             borderTopLeftRadius: 4, fontSize: 13, color: '#666'
           }}>
-            <span style={{ marginRight: 6 }}>● 深度思考中…</span>
-            <span style={{ color: '#aaa', fontSize: 11 }}>{(elapsedMs / 1000).toFixed(1)}s</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: liveReasoning ? 6 : 0 }}>
+              <span style={{ marginRight: 2 }}>● 深度思考中…</span>
+              <span style={{ color: '#aaa', fontSize: 11 }}>{(elapsedMs / 1000).toFixed(1)}s</span>
+            </div>
+            {liveReasoning ? (() => {
+              const switched = liveReasoning.includes('【回答】')
+              const thinkPart = switched ? liveReasoning.slice(0, liveReasoning.indexOf('【回答】')) : liveReasoning
+              const answerPart = switched ? liveReasoning.slice(liveReasoning.indexOf('【回答】') + '【回答】'.length).trim() : ''
+              return (
+                <div style={{
+                  maxHeight: isMobile ? 220 : 320, overflowY: 'auto',
+                  padding: '8px 10px', borderRadius: 8, background: '#fafafa', border: '1px solid #f0f0f0',
+                  fontSize: 12, lineHeight: 1.6, color: '#666', whiteSpace: 'pre-wrap', wordBreak: 'break-word'
+                }}>
+                  {thinkPart}
+                  {switched && (
+                    <div style={{ borderTop: '1px dashed #e0d8cf', margin: '6px 0 4px', color: '#c2410c', fontSize: 11 }}>
+                      —— 正式回答 ——
+                    </div>
+                  )}
+                  {answerPart}
+                  <span style={{ color: '#c2410c' }}>▍</span>
+                </div>
+              )
+            })() : (
+              <span style={{ color: '#bbb' }}>正在梳理思路…</span>
+            )}
           </div>
         </div>
       )}

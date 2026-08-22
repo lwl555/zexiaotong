@@ -172,6 +172,119 @@ export async function agnesChat(
   return { content, search, results, reasoning, degraded }
 }
 
+/**
+ * 流式 chat：边生成边把「思考/正文」增量回调给前端（onContent），结束后 onDone 给出完整结果。
+ * 后端（agnes-search）以 SSE 形式推送三类事件：
+ *   data: {"type":"reasoning","delta":"..."}   推理过程增量（上游支持时）
+ *   data: {"type":"content","delta":"..."}     正文增量（实时流出，用于「深度思考中」实时展示）
+ *   data: {"type":"done","content":..., "reasoning":..., "search":..., "degraded":...}  最终结果
+ * 若后端尚未升级（返回普通 JSON），则自动降级为一次性回调 onDone。
+ */
+export async function agnesChatStream(
+  messages: ChatMsg[],
+  opts: ChatOptions & {
+    /** 深度思考：要求模型先输出思考再【回答】分隔（agnes-search 据此注入结构化指令） */
+    structuredReasoning?: boolean
+    onContent?: (delta: string) => void
+    onDone?: (res: ChatResult) => void
+  } = {}
+): Promise<void> {
+  const base = resolveBase()
+  const url = `${base}/v1/chat/completions`
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...resolveAuthHeaders()
+  }
+  const body = JSON.stringify({
+    model: opts.model || DEFAULT_MODEL,
+    messages,
+    max_tokens: Math.min(opts.maxTokens ?? 8192, 8192),
+    stream: true,
+    structured_reasoning: opts.structuredReasoning ?? false,
+    web_search: opts.webSearch ?? false,
+    auto_search: opts.autoSearch ?? false,
+    search_only: opts.searchOnly ?? false
+  })
+
+  // 初始连接偶发被网关路由到卡死实例（503/无 CORS）→ 重试绕开
+  const MAX_ATTEMPTS = 4
+  let res: Response | null = null
+  let lastErr: any
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    try {
+      const r = await fetch(url, { method: 'POST', headers, body, signal: opts.signal })
+      if (r.ok) { res = r; break }
+      if ((r.status >= 500 || r.status === 429) && attempt < MAX_ATTEMPTS - 1) {
+        lastErr = new Error(`HTTP ${r.status}`)
+        await new Promise((rr) => setTimeout(rr, 500 * Math.pow(2, attempt) + Math.random() * 300))
+        continue
+      }
+      let msg = `HTTP ${r.status}`
+      try { const t = await r.text(); if (t) msg += ` ${t.slice(0, 200)}` } catch {}
+      throw new Error(msg)
+    } catch (e: any) {
+      if (e?.name === 'AbortError') throw e
+      const msg = String(e?.message || e)
+      if (/Failed to fetch|NetworkError|net::ERR|fetch failed|aborted/i.test(msg) && attempt < MAX_ATTEMPTS - 1) {
+        lastErr = e
+        await new Promise((rr) => setTimeout(rr, 500 * Math.pow(2, attempt) + Math.random() * 300))
+        continue
+      }
+      throw e
+    }
+  }
+  if (!res) throw lastErr || new Error('retry exhausted')
+
+  // 后端未升级：返回的是 JSON 而非 SSE，降级处理
+  const ct = res.headers.get('content-type') || ''
+  if (!ct.includes('text/event-stream')) {
+    const data = await res.json().catch(() => ({}))
+    const content = (data as any)?.choices?.[0]?.message?.content ?? ''
+    const search = (data as any)?.search as SearchMeta | undefined
+    const reasoning = (data as any)?.reasoning as string | undefined
+    const degraded = !!(data as any)?.degraded
+    opts.onDone?.({ content, search, results: (data as any)?.results, reasoning, degraded })
+    return
+  }
+
+  const reader = res.body!.getReader()
+  const decoder = new TextDecoder()
+  let buf = ''
+  let content = ''
+  let reasoning = ''
+  let search: any
+  let degraded = false
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buf += decoder.decode(value, { stream: true })
+    let idx: number
+    while ((idx = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, idx).trim()
+      buf = buf.slice(idx + 1)
+      if (!line.startsWith('data:')) continue
+      const payload = line.slice(5).trim()
+      if (payload === '[DONE]') continue
+      try {
+        const o = JSON.parse(payload)
+        if (o.type === 'reasoning' && o.delta) {
+          reasoning += o.delta
+          opts.onContent?.(o.delta)
+        } else if (o.type === 'content' && o.delta) {
+          content += o.delta
+          opts.onContent?.(o.delta)
+        } else if (o.type === 'done') {
+          content = o.content || content
+          reasoning = o.reasoning || reasoning
+          search = o.search
+          degraded = !!o.degraded
+        }
+      } catch {}
+    }
+  }
+  opts.onDone?.({ content, reasoning, search, degraded })
+}
+
 // —— 预热：页面加载 / 窗口聚焦时后台暖热 agnes-search 与 v9(agnes-proxy) 两个 Edge Function ——
 // 两者各自冷启动约 1.5s+，叠加后「用户首个真实提问」会撞双冷启动（耗时 10s+，偶发被网关掐断 → "Failed to fetch"）。
 // 这里在页面加载即无声发起一次极轻的请求（trivial query 仍会调 v9 以暖热它），结果被忽略，失败也无所谓；
