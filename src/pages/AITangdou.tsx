@@ -632,7 +632,7 @@ export default function AITangdou() {
       {!hasMessages && !loading && (
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          minHeight: '100%', padding: '60px 20px'
+          minHeight: '100%', padding: isMobile ? '40px 20px' : '40px 20px'
         }}>
           {!isMobile ? (
             /* PC端：豆包风 —— 大标题 + 双 tab + 推荐气泡 */
@@ -965,7 +965,8 @@ export default function AITangdou() {
       height: 'calc(100vh - 60px)',
       background: '#fff',
       maxWidth: isMobile ? 880 : '100%',
-      margin: '0 auto', width: '100%'
+      margin: '0 auto', width: '100%',
+      overflow: 'hidden'
     }}>
       {sidebar}
       {mainArea}
