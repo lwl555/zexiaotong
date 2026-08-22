@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
-import { Home as HomeIcon, PlusCircle, ShoppingBag, MessageSquare, User, Bell } from 'lucide-react'
+import { Home as HomeIcon, PlusCircle, ShoppingBag, MessageSquare, User, Bell, ChevronDown, ChevronUp } from 'lucide-react'
 import { useStore } from '../../store/store'
 
 const tabs = [
@@ -37,6 +37,8 @@ export default function MobileLayout() {
   const init = useStore(s => s.init)
   const unread = useStore(s => me ? s.notifications.filter(n => n.user_id === me.id && !n.read).length : 0)
   const [showSkip, setShowSkip] = useState(false)
+  // 底部导航栏可随时收纳（收起后内容区占满全屏，点展开按钮恢复）
+  const [navCollapsed, setNavCollapsed] = useState(false)
 
   useEffect(() => {
     if (loading) {
@@ -70,11 +72,20 @@ export default function MobileLayout() {
 
   return (
     <div className="app-shell flex flex-col" style={{ minHeight: '100vh' }}>
-      <div className="flex-1 overflow-y-auto no-scrollbar pb-20">
+      <div className="flex-1 overflow-y-auto no-scrollbar" style={{ paddingBottom: navCollapsed ? 12 : 80 }}>
         <Outlet />
       </div>
-      {/* 底部固定导航 */}
-      <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] h-16 bg-white border-t border-gray-100 flex items-center px-2 z-30">
+      {/* 底部固定导航（可随时收纳） */}
+      <nav
+        className="fixed bottom-0 inset-x-0 mx-auto w-full max-w-[480px] h-16 bg-white border-t border-gray-100 flex items-center px-2 z-30"
+        style={{ transform: navCollapsed ? 'translateY(115%)' : 'translateY(0)', transition: 'transform .28s ease' }}>
+        {/* 收纳把手：点一下整条滑下去 */}
+        <button
+          onClick={() => setNavCollapsed(true)}
+          aria-label="收起导航栏"
+          className="absolute -top-3 left-1/2 -translate-x-1/2 w-12 h-6 rounded-full bg-white border border-gray-100 shadow-sm flex items-center justify-center text-gray-400 active:bg-gray-50">
+          <ChevronDown size={16} />
+        </button>
         {tabs.map(t => (
           <NavLink key={t.to} to={t.to} end={t.end}
             className={({ isActive }) => 'flex-1 flex flex-col items-center gap-1 py-1 ' + (isActive ? 'text-brand-600' : 'text-gray-400')}>
@@ -83,8 +94,18 @@ export default function MobileLayout() {
           </NavLink>
         ))}
       </nav>
-      {/* 浮动通知入口 */}
-      <button onClick={() => nav('/notifications')} className="fixed bottom-20 right-[calc(50%-230px)] w-11 h-11 rounded-full bg-white shadow-card flex items-center justify-center text-brand-600 z-30">
+      {/* 收纳后：浮动展开按钮，随时恢复 */}
+      {navCollapsed && (
+        <button
+          onClick={() => setNavCollapsed(false)}
+          aria-label="展开导航栏"
+          className="fixed bottom-4 left-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-white border border-gray-100 shadow-card flex items-center justify-center text-gray-600 z-40 active:bg-gray-50">
+          <ChevronUp size={22} />
+        </button>
+      )}
+      {/* 浮动通知入口（收纳时上移到展开按钮之上，避免遮挡） */}
+      <button onClick={() => nav('/notifications')} className="fixed z-30 w-11 h-11 rounded-full bg-white shadow-card flex items-center justify-center text-brand-600"
+        style={{ bottom: navCollapsed ? 76 : 80, right: 'calc(50% - 230px)' }}>
         <Bell size={20} />
         {unread > 0 && <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">{unread}</span>}
       </button>
