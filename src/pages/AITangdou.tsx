@@ -378,6 +378,9 @@ export default function AITangdou() {
   const [activeMode, setActiveMode] = useState<string | null>(null)  // 快捷模式：选中后持续注入系统提示词
   const [searchMode, setSearchMode] = useState<'auto' | 'manual' | 'off'>('auto')  // 联网搜索：自动判断 / 手动强制 / 关闭
   const [reasoningExpanded, setReasoningExpanded] = useState<Record<number, boolean>>({})  // 每条AI消息的思考过程展开状态
+  // 深度思考「逐字弹出」：第 i 条 AI 消息已显示的 reasoning 字符数（undefined=未开始/未返回）
+  const [typedReasoning, setTypedReasoning] = useState<Record<number, number>>({})
+  const typingRef = useRef<Set<number>>(new Set())  // 防止同一条消息重复启动打字机
   const abortRef = useRef<AbortController | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -385,6 +388,28 @@ export default function AITangdou() {
   const startRef = useRef<number>(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const isMobile = useIsMobile()
+
+  // 深度思考「逐字弹出」：拿到 reasoning 后自动展开，并像打字机一样一个字一个字显示
+  useEffect(() => {
+    const last = messages.length - 1
+    messages.forEach((m, i) => {
+      // 只对本轮最新一条 AI 消息启动打字机，避免刷新历史对话时重播动画
+      if (m.role === 'ai' && m.reasoning && i === last && !typingRef.current.has(i)) {
+        typingRef.current.add(i)
+        setReasoningExpanded(prev => ({ ...prev, [i]: true }))  // 自动展开，无需点击
+        let n = 0
+        const full = m.reasoning
+        const id = setInterval(() => {
+          n = Math.min(n + 2, full.length)
+          setTypedReasoning(prev => ({ ...prev, [i]: n }))
+          if (n >= full.length) {
+            clearInterval(id)
+            typingRef.current.delete(i)
+          }
+        }, 18)
+      }
+    })
+  }, [messages])
 
   // 启动时尝试恢复最近一条对话
   useEffect(() => {
@@ -425,6 +450,8 @@ export default function AITangdou() {
     setPendingImage(null)
     setActiveMode(null)
     setError('')
+    setTypedReasoning({})
+    typingRef.current.clear()
   }
 
   function persist(messages: Msg[]) {
@@ -778,7 +805,7 @@ export default function AITangdou() {
             {m.image && m.content && <div style={{ padding: '6px 12px' }}>{m.content}</div>}
             {!m.image && m.role === 'ai' && renderMarkdown(m.content)}
             {!m.image && m.role === 'user' && <span style={{ whiteSpace: 'pre-wrap' }}>{m.content}</span>}
-            {/* 深度思考过程（可折叠） */}
+            {/* 深度思考过程（自动展开 + 逐字弹出打字机） */}
             {m.role === 'ai' && m.reasoning && (
               <div style={{ marginTop: 8, borderTop: '1px solid #e5e5e5', paddingTop: 6 }}>
                 <button
@@ -800,7 +827,10 @@ export default function AITangdou() {
                     fontSize: 12, lineHeight: 1.6, color: '#666',
                     whiteSpace: 'pre-wrap', wordBreak: 'break-word'
                   }}>
-                    {m.reasoning}
+                    {m.reasoning.slice(0, typedReasoning[i] ?? m.reasoning.length)}
+                    {typedReasoning[i] !== undefined && typedReasoning[i] < m.reasoning.length && (
+                      <span style={{ display: 'inline-block', color: '#bbb', marginLeft: 1 }}>▍</span>
+                    )}
                   </div>
                 )}
               </div>
@@ -838,7 +868,7 @@ export default function AITangdou() {
             padding: '10px 14px', borderRadius: 14, background: '#f5f5f5',
             borderTopLeftRadius: 4, fontSize: 13, color: '#666'
           }}>
-            <span style={{ marginRight: 6 }}>{phaseOf(elapsedMs)}</span>
+            <span style={{ marginRight: 6 }}>● 深度思考中…</span>
             <span style={{ color: '#aaa', fontSize: 11 }}>{(elapsedMs / 1000).toFixed(1)}s</span>
           </div>
         </div>
