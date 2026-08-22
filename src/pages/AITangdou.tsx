@@ -695,22 +695,22 @@ export default function AITangdou() {
 
         {/* 细长输入条：左边相机 + 中间输入 + 右边 +/发送 */}
         <div style={{
-          display: 'flex', alignItems: 'flex-end', gap: 8,
-          padding: '10px 12px 12px', borderTop: '1px solid #f0f0f0'
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '8px 12px', borderTop: '1px solid #f0f0f0'
         }}>
           <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
           <button onClick={() => fileRef.current?.click()} title="图片" style={{
-            width: 38, height: 38, borderRadius: '50%', border: 'none', cursor: 'pointer',
+            width: 32, height: 32, borderRadius: '50%', border: 'none', cursor: 'pointer',
             background: pendingImage ? '#c2410c' : '#f5f5f5',
             color: pendingImage ? '#fff' : '#666',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0, fontSize: 18, transition: 'all .15s'
+            flexShrink: 0, fontSize: 16, transition: 'all .15s'
           }}>📷</button>
 
           <div style={{
-            flex: 1, display: 'flex', alignItems: 'flex-end',
-            background: '#f5f5f5', borderRadius: 20,
-            padding: '8px 14px', minHeight: 38
+            flex: 1, display: 'flex', alignItems: 'center',
+            background: '#f5f5f5', borderRadius: 18,
+            padding: '0 12px', height: 36
           }}>
             <textarea
               ref={inputRef}
@@ -721,36 +721,36 @@ export default function AITangdou() {
               rows={1}
               style={{
                 flex: 1, border: 'none', outline: 'none', background: 'transparent',
-                fontSize: 14, lineHeight: 1.5, resize: 'none', maxHeight: 120,
-                fontFamily: 'inherit', padding: 0
+                fontSize: 14, lineHeight: '36px', resize: 'none', maxHeight: 120,
+                fontFamily: 'inherit', padding: 0, height: 36
               }}
             />
           </div>
 
           <button onClick={() => setShowTags(v => !v)} title="快捷功能" style={{
-            width: 38, height: 38, borderRadius: '50%', border: 'none', cursor: 'pointer',
+            width: 32, height: 32, borderRadius: '50%', border: 'none', cursor: 'pointer',
             background: showTags ? '#c2410c' : '#f5f5f5',
             color: showTags ? '#fff' : '#666',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0, fontSize: 16, transition: 'all .15s'
+            flexShrink: 0, fontSize: 14, transition: 'all .15s'
           }}>＋</button>
 
           {loading ? (
             <button onClick={stop} style={{
-              width: 38, height: 38, borderRadius: '50%', border: 'none', cursor: 'pointer',
-              background: '#f5f5f5', color: '#666', fontSize: 14, flexShrink: 0
+              width: 32, height: 32, borderRadius: '50%', border: 'none', cursor: 'pointer',
+              background: '#f5f5f5', color: '#666', fontSize: 13, flexShrink: 0
             }}>⏹</button>
           ) : (input.trim() || pendingImage) ? (
             <button onClick={() => send()} style={{
-              width: 38, height: 38, borderRadius: '50%', border: 'none', cursor: 'pointer',
+              width: 32, height: 32, borderRadius: '50%', border: 'none', cursor: 'pointer',
               background: '#c2410c', color: '#fff',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0, fontSize: 16
+              flexShrink: 0, fontSize: 14
             }}>↑</button>
           ) : null}
         </div>
 
-        <div style={{ textAlign: 'center', fontSize: 11, color: '#bbb', paddingBottom: 6 }}>
+        <div style={{ textAlign: 'center', fontSize: 11, color: '#bbb', paddingBottom: 4 }}>
           糖豆 由择校通平台提供 · 内容仅供参考
         </div>
       </div>
