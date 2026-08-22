@@ -822,7 +822,7 @@ export default function AITangdou() {
             }}
               onMouseEnter={e => e.currentTarget.style.borderColor = '#c2410c'}
               onMouseLeave={e => e.currentTarget.style.borderColor = '#e5e5e5'}>
-              <span>{t.icon}</span><span>{t.label}</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center' }}><t.icon size={14} strokeWidth={1.9} /></span><span>{t.label}</span>
             </button>
           ))}
         </div>
