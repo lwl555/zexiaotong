@@ -702,7 +702,7 @@ export default function AITangdou() {
     <div style={{
       flex: 1, overflowY: 'auto',
       // 不论有无消息，都保留上下 padding，让内容居中 / 第一个消息有安全距离
-      padding: isMobile ? '16px' : '32px 48px'
+      padding: isMobile ? '12px' : '32px 48px'
     }}>
       {!hasMessages && !loading && (
         <div style={{
@@ -783,19 +783,25 @@ export default function AITangdou() {
       )}
 
       {messages.map((m, i) => (
-        <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', marginBottom: 14 }}>
+        <div key={i} style={{
+          display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start',
+          marginBottom: isMobile ? 8 : 14
+        }}>
           {m.role === 'ai' && (
             <div style={{
-              width: 30, height: 30, borderRadius: '50%', background: '#1c1814',
+              width: isMobile ? 26 : 30, height: isMobile ? 26 : 30, borderRadius: '50%', background: '#1c1814',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0, marginRight: 8
-            }}><Sparkles size={16} color="#fff" strokeWidth={2} /></div>
+              flexShrink: 0, marginRight: 6
+            }}><Sparkles size={isMobile ? 13 : 16} color="#fff" strokeWidth={2} /></div>
           )}
           <div style={{
-            maxWidth: isMobile ? '78%' : '70%', padding: m.image ? 0 : '10px 14px', borderRadius: 14,
+            maxWidth: isMobile ? '82%' : '70%',
+            padding: m.image ? 0 : (isMobile ? '8px 11px' : '10px 14px'),
+            borderRadius: 14,
             background: m.role === 'user' ? '#c2410c' : '#f5f5f5',
             color: m.role === 'user' ? '#fff' : '#1c1814',
-            fontSize: 14, lineHeight: 1.7,
+            fontSize: isMobile ? 13.5 : 14,
+            lineHeight: isMobile ? 1.55 : 1.7,
             borderTopRightRadius: m.role === 'user' ? 4 : 14,
             borderTopLeftRadius: m.role === 'user' ? 14 : 4,
             wordBreak: 'break-word', overflow: 'hidden'
@@ -827,10 +833,16 @@ export default function AITangdou() {
                   </button>
                   {expanded && (
                     <div style={{
-                      marginTop: 6, padding: 10, borderRadius: 8,
+                      marginTop: isMobile ? 4 : 6,
+                      padding: isMobile ? '6px 8px' : 10,
+                      borderRadius: 8,
                       background: '#fafafa', border: '1px solid #f0f0f0',
-                      fontSize: 12, lineHeight: 1.6, color: '#666',
-                      whiteSpace: 'pre-wrap', wordBreak: 'break-word'
+                      fontSize: isMobile ? 11.5 : 12,
+                      lineHeight: isMobile ? 1.5 : 1.6,
+                      color: '#666',
+                      whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                      maxHeight: isMobile ? 180 : 320,
+                      overflowY: 'auto'
                     }}>
                       {m.reasoning}
                     </div>
@@ -852,26 +864,30 @@ export default function AITangdou() {
           </div>
           {m.role === 'user' && !m.image && (
             <div style={{
-              width: 30, height: 30, borderRadius: '50%', background: '#e8e0d8',
+              width: isMobile ? 26 : 30, height: isMobile ? 26 : 30, borderRadius: '50%', background: '#e8e0d8',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 13, flexShrink: 0, marginLeft: 8
+              fontSize: isMobile ? 11 : 13, flexShrink: 0, marginLeft: 6
             }}>我</div>
           )}
         </div>
       ))}
 
       {loading && (
-        <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: isMobile ? 8 : 14 }}>
           <div style={{
-            width: 30, height: 30, borderRadius: '50%', background: '#1c1814',
+            width: isMobile ? 26 : 30, height: isMobile ? 26 : 30, borderRadius: '50%', background: '#1c1814',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0, marginRight: 8
-          }}><Sparkles size={16} color="#fff" strokeWidth={2} /></div>
+            flexShrink: 0, marginRight: 6
+          }}><Sparkles size={isMobile ? 13 : 16} color="#fff" strokeWidth={2} /></div>
           <div style={{
-            maxWidth: isMobile ? '78%' : '80%', padding: '10px 14px', borderRadius: 14, background: '#f5f5f5',
-            borderTopLeftRadius: 4, fontSize: 13, color: '#666'
+            maxWidth: isMobile ? '82%' : '80%',
+            padding: isMobile ? '8px 11px' : '10px 14px',
+            borderRadius: 14, background: '#f5f5f5',
+            borderTopLeftRadius: 4,
+            fontSize: isMobile ? 12.5 : 13,
+            lineHeight: 1.55, color: '#666'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: liveReasoning ? 6 : 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: liveReasoning ? 4 : 0 }}>
               <span style={{ marginRight: 2 }}>● 深度思考中…</span>
               <span style={{ color: '#aaa', fontSize: 11 }}>{(elapsedMs / 1000).toFixed(1)}s</span>
             </div>
@@ -881,13 +897,14 @@ export default function AITangdou() {
               const answerPart = switched ? liveReasoning.slice(liveReasoning.indexOf('【回答】') + '【回答】'.length).trim() : ''
               return (
                 <div style={{
-                  maxHeight: isMobile ? 220 : 320, overflowY: 'auto',
-                  padding: '8px 10px', borderRadius: 8, background: '#fafafa', border: '1px solid #f0f0f0',
-                  fontSize: 12, lineHeight: 1.6, color: '#666', whiteSpace: 'pre-wrap', wordBreak: 'break-word'
+                  maxHeight: isMobile ? 160 : 320, overflowY: 'auto',
+                  padding: isMobile ? '5px 8px' : '8px 10px', borderRadius: 8, background: '#fafafa', border: '1px solid #f0f0f0',
+                  fontSize: isMobile ? 11.5 : 12, lineHeight: isMobile ? 1.5 : 1.6, color: '#666',
+                  whiteSpace: 'pre-wrap', wordBreak: 'break-word'
                 }}>
                   {thinkPart}
                   {switched && (
-                    <div style={{ borderTop: '1px dashed #e0d8cf', margin: '6px 0 4px', color: '#c2410c', fontSize: 11 }}>
+                    <div style={{ borderTop: '1px dashed #e0d8cf', margin: '5px 0 3px', color: '#c2410c', fontSize: 11 }}>
                       —— 正式回答 ——
                     </div>
                   )}
@@ -944,75 +961,81 @@ export default function AITangdou() {
         </div>
       )}
 
-      {/* Mobile 端：联网搜索模式切换（自动/手动/关闭） */}
-      {isMobile && (
+      {/* Mobile 端：「+」功能弹层（默认折叠）。包含：联网三态切换 + 6 个快捷功能 + 关于说明。
+          一次性收起所有次要控件，底部常驻只剩一行输入条。 */}
+      {showTags && isMobile && (
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          padding: '6px 12px',
-          background: '#fafafa', borderTop: '1px solid #f5f5f5'
+          background: '#fafafa', borderTop: '1px solid #f5f5f5',
+          padding: '10px 12px 8px'
         }}>
-          <Search size={13} strokeWidth={1.9} color="#666" />
-          <span style={{ fontSize: 11, color: '#666' }}>联网</span>
+          {/* 联网搜索模式切换 */}
           <div style={{
-            marginLeft: 'auto',
-            display: 'inline-flex', borderRadius: 6, overflow: 'hidden',
-            border: '1px solid #e5e5e5'
+            display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10
           }}>
-            {(['auto', 'manual', 'off'] as const).map(s => (
-              <button key={s} onClick={() => setSearchMode(s)} style={{
-                padding: '3px 8px', fontSize: 11, border: 'none', cursor: 'pointer',
-                background: searchMode === s ? '#1c1814' : '#fff',
-                color: searchMode === s ? '#fff' : '#666',
-                transition: 'all .15s',
-                borderRight: s !== 'off' ? '1px solid #e5e5e5' : 'none'
-              }}>
-                {s === 'auto' ? '自动' : s === 'manual' ? '手动' : '关闭'}
+            <Search size={13} strokeWidth={1.9} color="#666" />
+            <span style={{ fontSize: 12, color: '#666' }}>联网搜索</span>
+            <div style={{
+              marginLeft: 'auto',
+              display: 'inline-flex', borderRadius: 6, overflow: 'hidden',
+              border: '1px solid #e5e5e5'
+            }}>
+              {(['auto', 'manual', 'off'] as const).map(s => (
+                <button key={s} onClick={() => setSearchMode(s)} style={{
+                  padding: '4px 10px', fontSize: 11, border: 'none', cursor: 'pointer',
+                  background: searchMode === s ? '#1c1814' : '#fff',
+                  color: searchMode === s ? '#fff' : '#666',
+                  transition: 'all .15s',
+                  borderRight: s !== 'off' ? '1px solid #e5e5e5' : 'none'
+                }}>
+                  {s === 'auto' ? '自动' : s === 'manual' ? '手动' : '关闭'}
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* 6 个快捷功能（2 行 × 3 列，节省横向滚动） */}
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6
+          }}>
+            {QUICK_TAGS.map(t => (
+              <button key={t.label} onClick={() => useTag(t)} style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
+                padding: '8px 4px', borderRadius: 8, border: '1px solid #e5e5e5',
+                background: '#fff', cursor: 'pointer', color: '#555',
+                transition: 'all .15s'
+              }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = '#c2410c'}
+                onMouseLeave={e => e.currentTarget.style.borderColor = '#e5e5e5'}>
+                <span style={{ display: 'inline-flex', alignItems: 'center' }}><t.icon size={16} strokeWidth={1.9} /></span>
+                <span style={{ fontSize: 11, color: '#666' }}>{t.label}</span>
               </button>
             ))}
+          </div>
+          {/* 关于说明（从底部输入区搬来） */}
+          <div style={{ textAlign: 'center', fontSize: 10, color: '#bbb', marginTop: 8, lineHeight: 1.4 }}>
+            糖豆 由择校通平台提供 · 内容仅供参考
           </div>
         </div>
       )}
 
-      {/* Mobile 端：一行横排快捷功能（默认折叠，点 + 展开） */}
-      {showTags && isMobile && (
-        <div style={{
-          display: 'flex', gap: 8, overflowX: 'auto', padding: '8px 16px',
-          borderTop: '1px solid #f5f5f5', background: '#fafafa'
-        }} className="no-scrollbar">
-          {QUICK_TAGS.map(t => (
-            <button key={t.label} onClick={() => useTag(t)} style={{
-              display: 'flex', alignItems: 'center', gap: 4,
-              padding: '6px 12px', borderRadius: 14, border: '1px solid #e5e5e5',
-              background: '#fff', cursor: 'pointer', fontSize: 13, color: '#555',
-              whiteSpace: 'nowrap', transition: 'all .15s'
-            }}
-              onMouseEnter={e => e.currentTarget.style.borderColor = '#c2410c'}
-              onMouseLeave={e => e.currentTarget.style.borderColor = '#e5e5e5'}>
-              <span style={{ display: 'inline-flex', alignItems: 'center' }}><t.icon size={14} strokeWidth={1.9} /></span><span>{t.label}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* 细长输入条 */}
+      {/* 细长输入条（手机端进一步收紧：按钮 30×30，胶囊 32 高） */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-        padding: isMobile ? '8px 12px' : '10px 20px', borderTop: '1px solid #f0f0f0'
+        display: 'flex', alignItems: 'center', gap: 6,
+        padding: isMobile ? '6px 10px' : '10px 20px', borderTop: '1px solid #f0f0f0'
       }}>
         <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
         <button onClick={() => fileRef.current?.click()} title="图片" style={{
-          width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius: '50%', border: 'none', cursor: 'pointer',
+          width: isMobile ? 30 : 36, height: isMobile ? 30 : 36, borderRadius: '50%', border: 'none', cursor: 'pointer',
           background: pendingImage ? '#c2410c' : '#f5f5f5',
           color: pendingImage ? '#fff' : '#666',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           flexShrink: 0, fontSize: 16, transition: 'all .15s'
-        }}><ImageIcon size={18} strokeWidth={1.9} /></button>
+        }}><ImageIcon size={17} strokeWidth={1.9} /></button>
 
         <div style={{
           flex: 1, display: 'flex', alignItems: 'center',
-          background: '#f5f5f5', borderRadius: isMobile ? 18 : 22,
-          padding: '0 14px', height: isMobile ? 36 : 40,
-          minHeight: isMobile ? 36 : 40, maxHeight: isMobile ? 36 : 40,
+          background: '#f5f5f5', borderRadius: isMobile ? 16 : 22,
+          padding: '0 12px', height: isMobile ? 32 : 40,
+          minHeight: isMobile ? 32 : 40, maxHeight: isMobile ? 32 : 40,
           overflow: 'hidden', boxSizing: 'border-box'
         }}>
           <textarea
@@ -1026,18 +1049,18 @@ export default function AITangdou() {
               flex: 1, border: 'none', outline: 'none', background: 'transparent',
               fontSize: 14, lineHeight: 1.4, resize: 'none',
               fontFamily: 'inherit', padding: 0,
-              height: isMobile ? 36 : 40,
+              height: isMobile ? 32 : 40,
               boxSizing: 'border-box',
-              minHeight: isMobile ? 36 : 40, maxHeight: 120,
+              minHeight: isMobile ? 32 : 40, maxHeight: 120,
               overflow: 'auto'
             }}
           />
         </div>
 
-        {/* Mobile 端保留 + 按钮（快捷功能） */}
+        {/* Mobile 端保留 + 按钮（功能弹层） */}
         {isMobile && (
-          <button onClick={() => setShowTags(v => !v)} title="快捷功能" style={{
-            width: 32, height: 32, borderRadius: '50%', border: 'none', cursor: 'pointer',
+          <button onClick={() => setShowTags(v => !v)} title="功能" style={{
+            width: 30, height: 30, borderRadius: '50%', border: 'none', cursor: 'pointer',
             background: showTags ? '#c2410c' : '#f5f5f5',
             color: showTags ? '#fff' : '#666',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1047,13 +1070,13 @@ export default function AITangdou() {
 
         {loading ? (
           <button onClick={stop} style={{
-            width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius: '50%', border: 'none', cursor: 'pointer',
+            width: isMobile ? 30 : 36, height: isMobile ? 30 : 36, borderRadius: '50%', border: 'none', cursor: 'pointer',
             background: '#f5f5f5', color: '#666', flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}><Square size={14} strokeWidth={2.4} fill="#666" /></button>
+          }}><Square size={12} strokeWidth={2.4} fill="#666" /></button>
         ) : (input.trim() || pendingImage) ? (
           <button onClick={() => send()} style={{
-            width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius: '50%', border: 'none', cursor: 'pointer',
+            width: isMobile ? 30 : 36, height: isMobile ? 30 : 36, borderRadius: '50%', border: 'none', cursor: 'pointer',
             background: '#c2410c', color: '#fff',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             flexShrink: 0, fontSize: 14
@@ -1084,8 +1107,8 @@ export default function AITangdou() {
         </div>
       )}
 
-      <div style={{ textAlign: 'center', fontSize: 11, color: '#bbb', paddingBottom: 4 }}>
-        糖豆 由择校通平台提供 · 内容仅供参考
+      <div style={{ textAlign: 'center', fontSize: 10, color: 'transparent', paddingBottom: 2, userSelect: 'none' }}>
+        ·
       </div>
     </div>
   )
