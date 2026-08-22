@@ -378,6 +378,7 @@ export default function AITangdou() {
   const [sidebarConvs, setSidebarConvs] = useState<Conversation[]>([])
   const [activeMode, setActiveMode] = useState<string | null>(null)  // 快捷模式：选中后持续注入系统提示词
   const [searchMode, setSearchMode] = useState<'auto' | 'manual' | 'off'>('auto')  // 联网搜索：自动判断 / 手动强制 / 关闭
+  const [deepThink, setDeepThink] = useState(false)  // 深度思考常驻开关（千问式，输入框附近一行）
   const [reasoningExpanded, setReasoningExpanded] = useState<Record<number, boolean>>({})  // 每条AI消息的思考过程展开状态
   const [liveReasoning, setLiveReasoning] = useState('')  // 流式：AI 思考过程中的实时增量，loading 气泡里实时展示
   const abortRef = useRef<AbortController | null>(null)
@@ -487,7 +488,7 @@ export default function AITangdou() {
       await agnesChatStream(chatMessages, {
         autoSearch: searchMode === 'auto',
         webSearch: searchMode === 'manual',
-        structuredReasoning: true,
+        structuredReasoning: deepThink,  // 深度思考开关：开=三段式推理；关=轻量直接回答
         signal: controller.signal,
         onContent: (delta) => {
           // 首个增量到达即自动展开思考区，用户立刻看到「思考流程在流出」
@@ -754,28 +755,32 @@ export default function AITangdou() {
               </div>
             </>
           ) : (
-            /* Mobile端：圆形头像 + 标题 */
+            /* Mobile端：圆形头像 + 标题 + 2 列示例卡片网格（对齐千问/豆包/元宝空状态） */
             <>
               <div style={{
-                width: 64, height: 64, borderRadius: '50%',
+                width: 56, height: 56, borderRadius: '50%',
                 background: '#1c1814', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                marginBottom: 14
-              }}><Sparkles size={30} color="#fff" strokeWidth={1.8} /></div>
-              <div style={{ fontSize: 20, fontWeight: 600, color: '#1c1814', marginBottom: 6 }}>
+                marginBottom: 12
+              }}><Sparkles size={26} color="#fff" strokeWidth={1.8} /></div>
+              <div style={{ fontSize: 19, fontWeight: 600, color: '#1c1814', marginBottom: 5 }}>
                 你好，我是糖豆
               </div>
-              <div style={{ fontSize: 13, color: '#888', marginBottom: 24, textAlign: 'center' }}>
+              <div style={{ fontSize: 12.5, color: '#999', marginBottom: 20, textAlign: 'center' }}>
                 可以帮你写作、翻译、算题、写代码、识图分析，或者随便聊聊天
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', maxWidth: 380 }}>
+              <div style={{
+                display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8,
+                width: '100%', maxWidth: 420
+              }}>
                 {WELCOME_EXAMPLES.map(ex => (
                   <button key={ex} onClick={() => send(ex)} style={{
-                    padding: '12px 16px', borderRadius: 12, border: '1px solid #e8e8e8',
-                    background: '#fff', cursor: 'pointer', fontSize: 14, color: '#555',
-                    textAlign: 'left', transition: 'all .15s'
+                    padding: '10px 12px', borderRadius: 12, border: '1px solid #ececec',
+                    background: '#fff', cursor: 'pointer', fontSize: 13, color: '#555',
+                    textAlign: 'left', lineHeight: 1.4, minHeight: 44,
+                    transition: 'all .15s', boxShadow: '0 1px 2px rgba(0,0,0,.03)'
                   }}
                     onMouseEnter={e => { e.currentTarget.style.background = '#fafafa'; e.currentTarget.style.borderColor = '#c2410c' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = '#e8e8e8' }}>
+                    onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = '#ececec' }}>
                     {ex}
                   </button>
                 ))}
@@ -891,7 +896,7 @@ export default function AITangdou() {
             lineHeight: 1.55, color: '#666'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: liveReasoning ? 4 : 0 }}>
-              <span style={{ marginRight: 2 }}>● 深度思考中…</span>
+              <span style={{ marginRight: 2 }}>{deepThink ? '● 深度思考中…' : '● 思考中…'}</span>
               <span style={{ color: '#aaa', fontSize: 11 }}>{(elapsedMs / 1000).toFixed(1)}s</span>
             </div>
             {liveReasoning ? (() => {
@@ -1017,6 +1022,37 @@ export default function AITangdou() {
           <div style={{ textAlign: 'center', fontSize: 10, color: '#bbb', marginTop: 8, lineHeight: 1.4 }}>
             糖豆 由择校通平台提供 · 内容仅供参考
           </div>
+        </div>
+      )}
+
+      {/* Mobile 端：常驻快捷开关行（千问式）——深度思考常驻可见，联网三态收进 + 弹层 */}
+      {isMobile && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '6px 12px', background: '#fff', borderTop: '1px solid #f5f5f5'
+        }}>
+          <button onClick={() => setDeepThink(v => !v)} style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5,
+            padding: '4px 10px', borderRadius: 14, border: '1px solid',
+            borderColor: deepThink ? '#c2410c' : '#e5e5e5',
+            background: deepThink ? '#fff7ed' : '#fff',
+            color: deepThink ? '#c2410c' : '#666',
+            fontSize: 12, cursor: 'pointer', transition: 'all .15s'
+          }}>
+            <span style={{
+              width: 13, height: 13, borderRadius: '50%',
+              background: deepThink ? '#c2410c' : '#e5e5e5',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              color: '#fff', fontSize: 9, fontWeight: 700
+            }}>{deepThink ? '✓' : ''}</span>
+            深度思考
+          </button>
+          <span style={{ fontSize: 11, color: '#bbb' }}>
+            {deepThink ? '已开启' : '轻量回答'}
+          </span>
+          <span style={{ marginLeft: 'auto', fontSize: 11, color: '#bbb' }}>
+            点 ＋ 设置联网
+          </span>
         </div>
       )}
 
