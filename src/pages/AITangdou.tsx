@@ -524,8 +524,11 @@ export default function AITangdou() {
   }
 
   function autoResize(el: HTMLTextAreaElement) {
-    el.style.height = 'auto'
-    el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+    // 固定初始高度（mobile 36 / PC 40），只在内容溢出时生长，最大 120
+    const base = isMobile ? 36 : 40
+    el.style.height = base + 'px'
+    const next = Math.min(el.scrollHeight, 120)
+    if (next > base) el.style.height = next + 'px'
   }
 
   const hasMessages = messages.length > 0
@@ -830,7 +833,9 @@ export default function AITangdou() {
         <div style={{
           flex: 1, display: 'flex', alignItems: 'center',
           background: '#f5f5f5', borderRadius: isMobile ? 18 : 22,
-          padding: '0 14px', height: isMobile ? 36 : 40
+          padding: '0 14px', height: isMobile ? 36 : 40,
+          minHeight: isMobile ? 36 : 40, maxHeight: isMobile ? 36 : 40,
+          overflow: 'hidden', boxSizing: 'border-box'
         }}>
           <textarea
             ref={inputRef}
@@ -841,8 +846,12 @@ export default function AITangdou() {
             rows={1}
             style={{
               flex: 1, border: 'none', outline: 'none', background: 'transparent',
-              fontSize: 14, lineHeight: isMobile ? '36px' : '40px', resize: 'none', maxHeight: 120,
-              fontFamily: 'inherit', padding: 0, height: isMobile ? 36 : 40
+              fontSize: 14, lineHeight: 1.4, resize: 'none',
+              fontFamily: 'inherit', padding: 0,
+              height: isMobile ? 36 : 40,
+              boxSizing: 'border-box',
+              minHeight: isMobile ? 36 : 40, maxHeight: 120,
+              overflow: 'auto'
             }}
           />
         </div>
