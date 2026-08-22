@@ -1072,19 +1072,29 @@ export default function AITangdou() {
         )}
 
         {loading ? (
-          <button onClick={stop} style={{
+          <button onClick={stop} title="停止" style={{
             width: isMobile ? 30 : 36, height: isMobile ? 30 : 36, borderRadius: '50%', border: 'none', cursor: 'pointer',
             background: '#f5f5f5', color: '#666', flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center'
           }}><Square size={12} strokeWidth={2.4} fill="#666" /></button>
-        ) : (input.trim() || pendingImage) ? (
-          <button onClick={() => send()} style={{
-            width: isMobile ? 30 : 36, height: isMobile ? 30 : 36, borderRadius: '50%', border: 'none', cursor: 'pointer',
-            background: '#c2410c', color: '#fff',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0, fontSize: 14
-          }}>↑</button>
-        ) : null}
+        ) : (
+          // 发送按钮：永远显示，避免用户在空状态下找不到「↑」而误以为功能缺失
+          // 空状态置灰禁用，有内容/有图时高亮可点（与主流 AI 聊天 app 一致）
+          <button
+            onClick={() => (input.trim() || pendingImage) && send()}
+            disabled={!(input.trim() || pendingImage)}
+            title="发送"
+            style={{
+              width: isMobile ? 30 : 36, height: isMobile ? 30 : 36, borderRadius: '50%',
+              border: 'none',
+              cursor: (input.trim() || pendingImage) ? 'pointer' : 'not-allowed',
+              background: (input.trim() || pendingImage) ? '#c2410c' : '#f5f5f5',
+              color: (input.trim() || pendingImage) ? '#fff' : '#bbb',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0, fontSize: 14,
+              transition: 'all .15s'
+            }}>↑</button>
+        )}
       </div>
 
       {/* PC 端：输入条下方常驻一排小功能标签（豆包风） */}
