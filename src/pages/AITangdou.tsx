@@ -383,6 +383,22 @@ export default function AITangdou() {
     }
   }, [messages, loading])
 
+  // 锁死整页滚动条：糖豆界面 mount 时禁止 body 滚动，unmount 时还原
+  // 否则 Layout 的 .container padding-bottom 80px + footer ~76px 会把整页撑高
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow
+    const prevHtmlOverflow = document.documentElement.style.overflow
+    const prevBodyHeight = document.body.style.height
+    document.body.style.overflow = 'hidden'
+    document.documentElement.style.overflow = 'hidden'
+    document.body.style.height = '100vh'
+    return () => {
+      document.body.style.overflow = prevOverflow
+      document.documentElement.style.overflow = prevHtmlOverflow
+      document.body.style.height = prevBodyHeight
+    }
+  }, [])
+
   function loadConv(c: Conversation) {
     setCurrentConvId(c.id)
     setCurrentTitle(c.title)
@@ -962,11 +978,13 @@ export default function AITangdou() {
   return (
     <div style={{
       display: 'flex',
+      // body 已被 useEffect 锁死 overflow:hidden；这里只需扣顶栏 60px
       height: 'calc(100vh - 60px)',
       background: '#fff',
       maxWidth: isMobile ? 880 : '100%',
       margin: '0 auto', width: '100%',
-      overflow: 'hidden'
+      overflow: 'hidden',
+      boxSizing: 'border-box'
     }}>
       {sidebar}
       {mainArea}
