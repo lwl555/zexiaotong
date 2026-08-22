@@ -14,6 +14,19 @@ export default function MobileLayout() {
   const nav = useNavigate()
   const me = useStore(s => s.me)
   const unread = useStore(s => me ? s.notifications.filter(n => n.user_id === me.id && !n.read).length : 0)
+
+  // 数据未加载完前显示 loading，避免子页面读 null 崩溃
+  if (!me) {
+    return (
+      <div className="flex items-center justify-center" style={{ minHeight: '100vh' }}>
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-brand-200 border-t-brand-600 rounded-full animate-spin" />
+          <div className="text-sm text-gray-400">加载中...</div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="app-shell flex flex-col" style={{ minHeight: '100vh' }}>
       <div className="flex-1 overflow-y-auto no-scrollbar pb-20">
