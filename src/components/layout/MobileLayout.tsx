@@ -94,18 +94,18 @@ export default function MobileLayout() {
           </NavLink>
         ))}
       </nav>
-      {/* 收纳后：浮动展开按钮，随时恢复 */}
+      {/* 收纳后：底部小 pill（半透明白底 + 毛玻璃，紧贴屏幕底），像 iOS Home Indicator */}
       {navCollapsed && (
         <button
           onClick={() => setNavCollapsed(false)}
           aria-label="展开导航栏"
-          className="fixed bottom-4 left-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-white border border-gray-100 shadow-card flex items-center justify-center text-gray-600 z-40 active:bg-gray-50">
-          <ChevronUp size={22} />
+          className="fixed bottom-2 left-1/2 -translate-x-1/2 px-3 h-7 rounded-full bg-white/85 backdrop-blur border border-gray-200/80 shadow-sm flex items-center justify-center text-gray-500 z-40 active:bg-gray-100">
+          <ChevronUp size={14} strokeWidth={2} />
         </button>
       )}
       {/* 浮动通知入口（收纳时上移到展开按钮之上，避免遮挡） */}
       <button onClick={() => nav('/notifications')} className="fixed z-30 w-11 h-11 rounded-full bg-white shadow-card flex items-center justify-center text-brand-600"
-        style={{ bottom: navCollapsed ? 76 : 80, right: 'calc(50% - 230px)' }}>
+        style={{ bottom: navCollapsed ? 56 : 80, right: 'calc(50% - 230px)' }}>
         <Bell size={20} />
         {unread > 0 && <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">{unread}</span>}
       </button>
