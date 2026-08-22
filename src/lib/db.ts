@@ -19,44 +19,67 @@ export type { SupabaseClient }
 
 const STORAGE_KEY = 'zex:user_id'
 
+// 网络不稳定 / 微信内置浏览器 / 隐私模式下，supabase 调用可能长时间不返回。
+// 任何单次调用都强制限时：到点立刻拒掉，让 UI 立刻走兜底，不再"加载中..."无限转。
+// 浏览器杀 setTimeout 不会泄：Promise.race 之后未完成的 promise 仍会被 GC 回收。
+function withTimeout<T>(p: PromiseLike<T>, ms: number, label = 'query'): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((_, rej) =>
+      setTimeout(() => rej(new Error(`[db:${label}] 超时 ${ms}ms`)), ms)
+    )
+  ])
+}
+
 function ensureUserId(): string {
   let id = localStorage.getItem(STORAGE_KEY)
   if (!id) {
     // 匿名游客：生成随机 id，写入 profiles
-    id = crypto.randomUUID()
+    id = (crypto as any)?.randomUUID?.() || `anon-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
     localStorage.setItem(STORAGE_KEY, id)
   }
   return id
 }
 
+// 本地兜底用户：网络彻底不通时也要让 UI 跑起来，不能一直卡在「加载中...」转圈
+function localGuest(id: string): Profile {
+  return {
+    id,
+    phone: '',
+    nickname: '游客' + id.slice(-4),
+    avatar: '',
+    role: 'user',
+    balance: 0,
+    frozen: 0,
+    status: 'active'
+  } as Profile
+}
+
 export async function getCurrentUser(): Promise<Profile> {
   const id = ensureUserId()
-  const { data, error } = await supabase!
-    .from('profiles')
-    .select('*')
-    .eq('id', id)
-    .single()
+  const fallback = localGuest(id)
+  if (!supabase) return fallback
 
-  if (error || !data) {
-    // 不存在则自动注册
-    const newUser: Partial<Profile> = {
-      id,
-      phone: '',
-      nickname: '游客' + id.slice(-4),
-      avatar: '',
-      role: 'user',
-      balance: 0,
-      frozen: 0,
-      status: 'active'
-    }
-    const { data: created } = await supabase!
-      .from('profiles')
-      .insert(newUser)
-      .select()
-      .single()
-    return created as Profile
+  // 拉 profile（最多等 6 秒；微信内置浏览器慢/连接被掐时不能干等）
+  try {
+    const { data, error } = await withTimeout(
+      supabase.from('profiles').select('*').eq('id', id).single(),
+      6000,
+      'selectProfile'
+    )
+    if (!error && data) return data as Profile
+
+    // 拉不到 → 试着 insert 一个（匿名游客注册）；insert 也限时，失败直接返回本地兜底
+    const ins = await withTimeout(
+      supabase.from('profiles').insert(fallback).select().single(),
+      6000,
+      'insertProfile'
+    ).catch(() => ({ data: null as any, error: { message: 'insert timeout' } }))
+    return (ins?.data as Profile) || fallback
+  } catch {
+    // 任何超时 / 异常 → 直接返回本地兜底，保证 init() 不卡死
+    return fallback
   }
-  return data as Profile
 }
 
 export function logoutUser() {

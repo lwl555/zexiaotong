@@ -255,7 +255,7 @@ async function searchTavily(q: string, domains?: string[]): Promise<{ items: str
       query: q,
       // advanced 深度返回更长、更详细的正文片段；域作用域检索（社媒）必用 advanced 以拿到真实帖子内容
       search_depth: domains && domains.length ? 'advanced' : 'advanced',
-      max_results: 8,
+      max_results: 12,
       include_answer: false,
       language: 'zh'
     }
@@ -297,7 +297,7 @@ async function searchBrave(q: string): Promise<{ items: string[]; ok: boolean }>
       12000
     )
     const j = await r.json()
-    const results = (j.web?.results || []).slice(0, 6)
+    const results = (j.web?.results || []).slice(0, 8)
     const items = results.map((x: any) => `- ${x.title}：${stripHtml(x.description || '')}`)
     const links: LinkInfo[] = results.filter((x: any) => x.url).map((x: any) => ({ title: stripHtml(x.title || ''), url: String(x.url), source: 'brave' }))
     return { items, ok: items.length > 0, links }
@@ -318,7 +318,7 @@ async function searchSerper(q: string): Promise<{ items: string[]; ok: boolean }
       25000
     )
     const j = await r.json()
-    const results = (j.organic || []).slice(0, 6)
+    const results = (j.organic || []).slice(0, 8)
     const items = results.map((x: any) => `- ${x.title}：${stripHtml(x.snippet || '')}`)
     const links: LinkInfo[] = results.filter((x: any) => x.link).map((x: any) => ({ title: stripHtml(x.title || ''), url: String(x.link), source: 'serper' }))
     return { items, ok: items.length > 0, links }
@@ -350,7 +350,7 @@ async function searchWikipedia(q: string, lang: 'zh' | 'en'): Promise<{ items: s
     for (const v of variants) {
       const url =
         `https://${lang}.wikipedia.org/w/api.php?action=query&list=search` +
-        `&srsearch=${encodeURIComponent(v)}&srlimit=5&srprop=snippet&format=json`
+        `&srsearch=${encodeURIComponent(v)}&srlimit=8&srprop=snippet&format=json`
       const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'zexiaotong/1.0 (search)' } })
       const j = await r.json()
       const results = (j.query?.search || []).slice(0, 5)
@@ -382,7 +382,7 @@ async function searchDuckDuckGo(q: string): Promise<{ items: string[]; ok: boole
     const re = /<a[^>]*class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g
     let m: RegExpExecArray | null
     let i = 0
-    while ((m = re.exec(html)) !== null && i < 6) {
+    while ((m = re.exec(html)) !== null && i < 10) {
       const txt = stripHtml(m[1])
       if (txt) snippets.push('- ' + txt)
       i++
@@ -391,7 +391,7 @@ async function searchDuckDuckGo(q: string): Promise<{ items: string[]; ok: boole
     const reA = /<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g
     let ma: RegExpExecArray | null
     let li = 0
-    while ((ma = reA.exec(html)) !== null && li < 6) {
+    while ((ma = reA.exec(html)) !== null && li < 8) {
       let href = ma[1]
       const um = href.match(/[?&]uddg=([^&]+)/)
       if (um) { try { href = decodeURIComponent(um[1]) } catch {} }
@@ -725,7 +725,7 @@ async function searchGoogleNews(q: string): Promise<{ items: string[]; ok: boole
     const re = /<item>([\s\S]*?)<\/item>/g
     let m: RegExpExecArray | null
     let i = 0
-    while ((m = re.exec(xml)) !== null && i < 6) {
+    while ((m = re.exec(xml)) !== null && i < 10) {
       const block = m[1]
       const title = (block.match(/<title>([\s\S]*?)<\/title>/) || [])[1] || ''
       const src = (block.match(/<source[^>]*>([\s\S]*?)<\/source>/) || [])[1] || ''
@@ -747,7 +747,7 @@ async function searchHackerNews(q: string): Promise<{ items: string[]; ok: boole
     const url = 'https://hn.algolia.com/api/v1/search?query=' + encodeURIComponent(q) + '&hitsPerPage=5'
     const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'zexiaotong/1.0' } })
     const j = await r.json()
-    const hits = (j.hits || []).slice(0, 5)
+    const hits = (j.hits || []).slice(0, 8)
     const items = hits.map((h: any) => {
       const pts = h.points != null ? `（👍${h.points}）` : ''
       const d = h.created_at ? ` ${String(h.created_at).slice(0, 10)}` : ''
@@ -816,16 +816,16 @@ async function searchBing(q: string, siteScope?: string): Promise<{ items: strin
     const re = /<li class="b_algo"[\s\S]*?<p[^>]*>([\s\S]*?)<\/p>/g
     let m: RegExpExecArray | null
     let i = 0
-    while ((m = re.exec(html)) !== null && i < 10) {
+    while ((m = re.exec(html)) !== null && i < 15) {
       const txt = stripHtml(m[1])
       // 先丢字典/歌词/百科卡片类噪声片段（「某」→拼音、由…演唱 等）
-      if (txt && txt.length > 15 && !isBingNoise(txt)) snippets.push('- ' + txt.slice(0, 200))
+      if (txt && txt.length > 15 && !isBingNoise(txt)) snippets.push('- ' + txt.slice(0, 500))
       i++
     }
     // 结果链接：b_algo 块内第一个 h2>a 的 href 即真实地址
     const reA = /<li class="b_algo"[\s\S]*?<h2><a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g
     let ma: RegExpExecArray | null
-    while ((ma = reA.exec(html)) !== null && links.length < 6) {
+    while ((ma = reA.exec(html)) !== null && links.length < 8) {
       const href = ma[1]
       if (/^https?:\/\//.test(href)) links.push({ title: stripHtml(ma[2]) || href, url: href, source: 'bing' })
     }
@@ -837,7 +837,7 @@ async function searchBing(q: string, siteScope?: string): Promise<{ items: strin
     const soft = snippets.filter((s) => bingGramHits(q, s) >= 2)
     // 两层都空则不硬塞原始噪声，让 Bing 退化成空（模型 + gnews/wiki 自有兜底）
     const finalItems = strict.length ? strict : soft
-    return { items: finalItems.slice(0, 6), ok: finalItems.length > 0, links }
+    return { items: finalItems.slice(0, 10), ok: finalItems.length > 0, links }
   } catch {
     return { items: [], ok: false, links: [] }
   }
@@ -860,9 +860,9 @@ async function searchBaidu(q: string): Promise<{ items: string[]; ok: boolean }>
     // 兼容桌面端 + 移动端百度 HTML 结构
     const re = /<div class="(?:c-abstract|cos-space-mb-sm)[^"]*"[^>]*>([\s\S]*?)<\/div>|<span class="(?:content-right|cos-text-hide)[^"]*"[^>]*>([\s\S]*?)<\/span>|<div class="c-span-last"[^>]*>([\s\S]*?)<\/div>/g
     let m: RegExpExecArray | null
-    while ((m = re.exec(html)) !== null && snippets.length < 6) {
+    while ((m = re.exec(html)) !== null && snippets.length < 10) {
       const txt = stripHtml(m[1] || m[2] || m[3] || '')
-      if (txt && txt.length > 15) snippets.push('- ' + txt.slice(0, 200))
+      if (txt && txt.length > 15) snippets.push('- ' + txt.slice(0, 500))
     }
     return { items: snippets, ok: snippets.length > 0 }
   } catch {
@@ -873,13 +873,13 @@ async function searchBaidu(q: string): Promise<{ items: string[]; ok: boolean }>
 // Reddit 社区讨论：真实用户观点，对「体验」「口碑」「避雷」类问题有价值。
 async function searchReddit(q: string): Promise<{ items: string[]; ok: boolean }> {
   try {
-    const url = 'https://www.reddit.com/search.json?q=' + encodeURIComponent(q) + '&limit=5&sort=relevance'
+    const url = 'https://www.reddit.com/search.json?q=' + encodeURIComponent(q) + '&limit=8&sort=relevance'
     const r = await fetchWithTimeout(url, { headers: { ...BROWSER_HEADERS } })
     const j = await r.json()
-    const children = (j.data?.children || []).slice(0, 5)
+    const children = (j.data?.children || []).slice(0, 8)
     const items = children.map((c: any) => {
       const d = c.data || {}
-      const txt = String(d.selftext || d.title || '').slice(0, 180)
+      const txt = String(d.selftext || d.title || '').slice(0, 500)
       return `- 【社区】r/${d.subreddit || '?'}：${stripHtml(txt)}`
     })
     const links: LinkInfo[] = children
@@ -959,9 +959,9 @@ async function searchMulti(query: string): Promise<SearchResult> {
         : dyn
       for (const raw of s.items) {
         if (raw.includes('\uFFFD')) continue // 丢弃乱码片段，避免污染生成模型
-        // 单条截断上限 320→480：给生成模型更完整的原始事实（分数线/薪资/地址等常超 320 字被腰斩），
+        // 单条截断上限 480→1200：给生成模型更完整的原始事实（分数线/薪资/地址等常超 480 字被腰斩），
         // 正文才能写得有细节、有数据，而非泛泛而谈。
-        const it = raw.length > 480 ? raw.slice(0, 480) + '…' : raw
+        const it = raw.length > 1200 ? raw.slice(0, 1200) + '…' : raw
         if (!isRelevant(it, rt, !!s.relaxed)) continue // 社媒域作用域结果已按 query 过滤，跳过通用相关性门禁
         if (!seen.has(it)) { seen.add(it); bucket.push(it); sourceRelevantCount++ }
       }
@@ -977,9 +977,9 @@ async function searchMulti(query: string): Promise<SearchResult> {
       links.push(lk)
     }
   }
-  // 通用动态源（最多 16）+ 社媒/UGC 专项（固定 8 条配额）+ 维基兜底（最多 10），合计 34 条上限。
+  // 通用动态源（最多 20）+ 社媒/UGC 专项（固定 10 条配额）+ 维基兜底（最多 14），合计 44 条上限。
   // 适度放宽：给生成模型更多事实底座，正文才能写得更详实（之前 28 条上限偏低，常导致「暂无法确认」偏多）。
-  let merged: string[] = [...dyn.slice(0, 16), ...social.slice(0, 8), ...wiki.slice(0, 10)]
+  let merged: string[] = [...dyn.slice(0, 20), ...social.slice(0, 10), ...wiki.slice(0, 14)]
   // 最终兜底：再滤一次含 U+FFFD 的片段（上游网页偶发编码损坏，单点过滤可能漏网，防止污染模型上下文导致回答出乱码方块）
   merged = merged.filter((r) => !r.includes('\uFFFD'))
   // 安全网：若相关性过滤后结果过少（易致「查不到」），放宽门禁，避免空答
@@ -990,15 +990,15 @@ async function searchMulti(query: string): Promise<SearchResult> {
       if (!s.ok) continue
       for (const raw of s.items) {
         if (raw.includes('\uFFFD')) continue
-        const it = raw.length > 480 ? raw.slice(0, 480) + '…' : raw
+        const it = raw.length > 1200 ? raw.slice(0, 1200) + '…' : raw
         if (!seenR.has(it)) { seenR.add(it); relaxed.push(it) }
       }
     }
-    if (relaxed.length) merged = [...merged, ...relaxed].slice(0, 32)
+    if (relaxed.length) merged = [...merged, ...relaxed].slice(0, 48)
   }
   // 参考链接：相关性去噪（query 主体 token 必须命中；维基条目也走相关性；机构权威域名天然保留）→ 按权威度排序 → 上限 6 条
 // 不设安全网：宁可链接为 0 让前端不渲染卡片，也绝不展示不沾边的乱数据（Tavily 共享 key 偶发返回无关 cache 内容时尤其重要，安全网会把它们原样复活，污染用户体验）
-const linksFinal = sortLinks(links.filter((lk) => isLinkRelevant(lk, rt))).slice(0, 6)
+const linksFinal = sortLinks(links.filter((lk) => isLinkRelevant(lk, rt))).slice(0, 8)
   // 严格判定 ok：至少 3 条长度 ≥ 50 字符的实质片段 才算检索成功。
   // 原 `merged.length > 0` 太松，5 条 < 10 字符的 gnews 短标题噪声也会被算成功，引发 model 误判"资料齐全"→ 信心满满地"自查 + 编"。
   // 注意：链接不再作为硬门槛——`isLinkRelevant` 对热门实体偶尔会过严（如电子科大维基条目被滤），
@@ -1020,6 +1020,57 @@ const linksFinal = sortLinks(links.filter((lk) => isLinkRelevant(lk, rt))).slice
 
 function s2(p: Promise<{ items: string[]; ok: boolean; links?: LinkInfo[] }>, src: string, relaxed = false) {
   return p.then((r) => ({ ...r, src, relaxed, links: r.links || [] }))
+}
+
+// —— 浏览器级全文抓取 ——
+// 像浏览器一样：不只看搜索摘要，还打开排名靠前的页面抓取全文内容。
+// 这样模型能拿到足够详实的素材，回答才能「像浏览器查到的一样详细」。
+async function fetchPageContent(url: string, maxChars = 3500): Promise<string> {
+  try {
+    const r = await fetchWithTimeout(url, {
+      headers: {
+        ...BROWSER_HEADERS,
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+      }
+    }, 8000)
+    if (!r.ok) return ''
+    const ct = r.headers.get('content-type') || ''
+    if (!ct.includes('text/html') && !ct.includes('text/plain') && !ct.includes('application/xhtml')) return ''
+    const buf = await r.arrayBuffer()
+    let html = new TextDecoder('utf-8').decode(buf)
+    if (html.includes('�')) { try { html = new TextDecoder('gbk').decode(buf) } catch {} }
+    // 剥离脚本/样式/导航/页脚/广告等非正文元素
+    html = html
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<nav[\s\S]*?<\/nav>/gi, ' ')
+      .replace(/<footer[\s\S]*?<\/footer>/gi, ' ')
+      .replace(/<header[\s\S]*?<\/header>/gi, ' ')
+      .replace(/<aside[\s\S]*?<\/aside>/gi, ' ')
+      .replace(/<iframe[\s\S]*?<\/iframe>/gi, ' ')
+      .replace(/<svg[\s\S]*?<\/svg>/gi, ' ')
+      .replace(/<!--[\s\S]*?-->/g, ' ')
+    const text = stripHtml(html).replace(/\s+/g, ' ').trim()
+    return text.length > maxChars ? text.slice(0, maxChars) + '…' : text
+  } catch {
+    return ''
+  }
+}
+
+// 对排名靠前的检索结果做「浏览器级」全文抓取，返回可直接注入 <search> 的文本片段。
+// 最多抓 maxPages 个页面，每页限 maxChars 字；整体硬截止 maxMs 毫秒，超时则返回已抓到的部分。
+async function deepFetchLinks(links: LinkInfo[], maxPages = 3, maxChars = 3500, maxMs = 6000): Promise<string[]> {
+  const top = links.filter(lk => /^https?:\/\//.test(lk.url)).slice(0, maxPages)
+  if (top.length === 0) return []
+  const results = await Promise.race([
+    Promise.all(top.map(async (lk) => {
+      const content = await fetchPageContent(lk.url, maxChars)
+      if (!content || content.length < 200) return null
+      return `- 【网页全文·${lk.title || new URL(lk.url).host}】${content}`
+    })),
+    new Promise<null[]>(r => setTimeout(() => r([]), maxMs))
+  ])
+  return results.filter((r): r is string => r !== null)
 }
 
 // 给单个检索任务独立超时预算：超时则返回 {_timeout:true}，不拖垮整段检索。
@@ -1250,6 +1301,12 @@ Deno.serve(async (req: Request) => {
     // 清洗无效 Unicode（lone surrogates 等）：TextEncoder round-trip 模拟 UTF-8 传输，
     // 让无法编码的字符现形为 U+FFFD 再删除——否则 Deno 编码响应体时它们会变成 U+FFFD 乱码方块到达客户端
     rawResults = ctx.results.map(r => { try { return new TextDecoder().decode(new TextEncoder().encode(r)).replace(/\uFFFD/g, '') } catch { return r } }).filter(r => r.trim().length > 10)
+    // 浏览器级全文抓取：对排名靠前的参考链接打开页面抓全文，像浏览器一样拿到详细正文。
+    // 检索成功且有链接时触发，与图片抓取并行、硬截止 6s，不拖慢主路径。
+    let deepPromise: Promise<string[]> = Promise.resolve([])
+    if (ctx.ok && ctx.links.length > 0 && !searchOnly) {
+      deepPromise = deepFetchLinks(ctx.links, 3, 3500, 6000)
+    }
     // 资料不足分支：检索跑过但没拿到有效资料（连 2 条 ≥50 字的实质片段都凑不齐）。
     // 原代码不分这种情况，都走"资料齐全"分支并允许 AI 用知识补 → 大量幻觉（用户截图：
     // "内江医科学校"根本不存在，模型自信满满编"中等职业学校，培养护理药剂检验"）。
@@ -1258,7 +1315,7 @@ Deno.serve(async (req: Request) => {
       const sourcesTxt = ctx.sources.length ? ctx.sources.join('、') : '全部内置源'
       const rawLen = rawResults.length
       const linksTxt = ctx.links.length
-        ? `\n下面列出已抓到的链接（供用户点击备查）：\n${ctx.links.slice(0, 5).map((l, i) => `${i + 1}. ${l.title} — ${l.url}`).join('\n')}`
+        ? `\n下面列出已抓到的链接（供用户点击备查）：\n${ctx.links.slice(0, 8).map((l, i) => `${i + 1}. ${l.title} — ${l.url}`).join('\n')}`
         : ''
       sysMessages.push({
         role: 'system',
@@ -1275,9 +1332,13 @@ Deno.serve(async (req: Request) => {
           `⑥ 严禁调用任何搜索工具或函数，直接基于本提示与 <search> 作答。`
       })
     } else if (ctx.ok && !searchOnly) {
+      // 浏览器级全文抓取：await 已并行启动的 deepPromise，合并到 <search> 中。
+      // 全文片段带「网页全文」前缀，与检索摘要区分，让模型优先引用全文内容。
+      const deepResults = await deepPromise
+      const mergedForSearch = deepResults.length ? [...ctx.results, ...deepResults] : ctx.results
       const linkBlock = ctx.links.length
         ? '\n【检索到的参考链接（请在回答末尾「相关链接与地点」板块中如实引用，标注来源；不要编造未列出的链接）：】\n' +
-          ctx.links.slice(0, 10).map((l, i) => `${i + 1}. （${l.source}）${l.title} ${l.url}`).join('\n') + '\n'
+          ctx.links.slice(0, 14).map((l, i) => `${i + 1}. （${l.source}）${l.title} ${l.url}`).join('\n') + '\n'
         : ''
       sysMessages.push({
         role: 'system',
@@ -1285,8 +1346,9 @@ Deno.serve(async (req: Request) => {
           '你具备查阅最新公开资料的能力。\n' +
           `【用户原话】${rawUser}\n` +
           '以下是针对用户原话检索到的资料（来自网络，可能不保证 100% 最新，请批判性采用，优先采信可交叉验证的事实）：\n' +
+          '（注：前缀「网页全文」的片段是打开对应网页抓取的完整正文，内容远比普通检索摘要详细，请优先基于它们作答。）\n' +
           '<search>\n' +
-          ctx.results.join('\n') +
+          mergedForSearch.join('\n') +
           '\n</search>\n' +
           linkBlock +
           '要求：① 优先依据上述资料作答；' +

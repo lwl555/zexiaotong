@@ -39,6 +39,8 @@ interface State {
   logout: () => void
   switchRole: () => void
   getUser: (id: string) => Profile | undefined
+  // 紧急兜底：网络长时间卡住时，用户手动把 me 切成本地游客，避免「加载中...」无限转
+  setMeFallback: () => void
 
   // 任务
   publishTask: (input: { title: string; category: any; amount: number; deadline: string; description: string; images: string[] }) => Promise<{ ok: boolean; msg: string }>
@@ -97,13 +99,35 @@ export const useStore = create<State>((set, get) => ({
 
   // ─── 初始化：从 Supabase 拉取所有数据 ───
   init: async () => {
+    if (get().loading) return // 已经在拉，避免重复触发（HMR / StrictMode 双调）
     set({ loading: true, error: '' })
+
+    // 总兜底：即便 supabase 全部卡死，12 秒后也强制进入 App（用本地游客兜底）
+    // 这样 MobileLayout 的「加载中...」最多转 12 秒，不会无限卡死。
+    const hardStop = setTimeout(() => {
+      const s = get()
+      if (s.loading) {
+        const guestId = (typeof localStorage !== 'undefined' && (localStorage.getItem('zex:user_id') || 'guest')) || 'guest'
+        const fallback: any = {
+          id: guestId, phone: '', nickname: '游客' + String(guestId).slice(-4),
+          avatar: '', role: 'user', balance: 0, frozen: 0, status: 'active',
+          created_at: new Date().toISOString()
+        }
+        set({
+          me: s.me || fallback,
+          loading: false,
+          error: s.error || '网络较慢，已进入访客模式（部分功能可能暂不可用）'
+        })
+      }
+    }, 12000)
+
     try {
-      // 先拿用户，再拿用户相关数据
+      // 先拿用户（getCurrentUser 自身已带 6 秒超时 + 失败回退本地，不会死锁）
       const me = await db.getCurrentUser()
       set({ me })
 
-      const [tasks, goods, posts, txns, withdrawals, arbitrations, notifications, categories, banners, config] = await Promise.all([
+      // 数据列表也限时：最多 9 秒。拉不到就保留空数组，让 UI 至少能进
+      const fetchAll = Promise.all([
         db.fetchTasks(),
         db.fetchGoods(),
         db.fetchPosts(),
@@ -115,9 +139,22 @@ export const useStore = create<State>((set, get) => ({
         db.fetchBanners(),
         db.fetchPlatformConfig()
       ])
+      let bundle: any = null
+      try {
+        bundle = await Promise.race([
+          fetchAll,
+          new Promise((_, rej) => setTimeout(() => rej(new Error('fetchData timeout')), 9000))
+        ])
+      } catch {
+        bundle = null
+      }
+      const [tasks, goods, posts, txns, withdrawals, arbitrations, notifications, categories, banners, config] =
+        bundle || Array(10).fill([])
       set({ tasks, goods, posts, txns, withdrawals, arbitrations, notifications, categories, banners, config, loading: false })
     } catch (e: any) {
       set({ error: e?.message || '加载失败', loading: false })
+    } finally {
+      clearTimeout(hardStop)
     }
   },
 
@@ -130,6 +167,21 @@ export const useStore = create<State>((set, get) => ({
   logout: () => {
     db.logoutUser()
     set({ me: null })
+  },
+
+  // 网络长时间卡住 / Supabase 故障时，让用户手动跳出"加载中..."
+  setMeFallback: () => {
+    const s = get()
+    if (s.me) return
+    let id = ''
+    try { id = localStorage.getItem('zex:user_id') || '' } catch {}
+    if (!id) id = `guest-${Date.now().toString(36)}`
+    const fallback: any = {
+      id, phone: '', nickname: '游客' + id.slice(-4),
+      avatar: '', role: 'user', balance: 0, frozen: 0, status: 'active',
+      created_at: new Date().toISOString()
+    }
+    set({ me: fallback, loading: false, error: '已进入访客模式（部分功能可能暂不可用）' })
   },
 
   switchRole: () => {
