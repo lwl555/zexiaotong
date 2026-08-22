@@ -4,6 +4,7 @@ import { SYSTEM_IDENTITY } from '../lib/prompts'
 import { renderReport, ThemeKey } from '../components/Report'
 import { exportDocx } from '../lib/docx'
 import { addQuery, newId } from '../lib/history'
+import { Building2, Briefcase, Megaphone, AlertTriangle } from 'lucide-react'
 
 // 实时资讯台：把「文档工坊」改为「实时信息查询」。
 // 每个视角（学校/就业/生活学习/各省通知）实时检索最新公开资料，再由 AI 整理成清晰中文输出
@@ -11,7 +12,7 @@ import { addQuery, newId } from '../lib/history'
 const TABS = [
   {
     key: 'school',
-    label: '🏫 学校信息',
+    label: '学校信息',
     theme: 'school' as ThemeKey,
     prompt: '请侧重「院校/专业」视角：办学层次、排名、招生与录取、保研就业、食宿生活等关键信息。',
     placeholder: '输入学校或专业，如：清华大学 / 计算机',
@@ -19,7 +20,7 @@ const TABS = [
   },
   {
     key: 'job',
-    label: '💼 就业信息',
+    label: '就业信息',
     theme: 'by-city' as ThemeKey,
     prompt: '请侧重「就业/求职」视角：行业前景、薪资行情、招聘规模、代表企业、入行门槛与避雷点。',
     placeholder: '输入行业或岗位，如：人工智能 / 程序员',
@@ -35,7 +36,7 @@ const TABS = [
   },
   {
     key: 'notice',
-    label: '📢 各省通知',
+    label: '各省通知',
     theme: 'school' as ThemeKey,
     prompt: '请侧重「各省招生/政策通知」视角：高考安排、志愿填报时间、招生计划、分数线公布、政策变动等，并标注发布时间与来源。',
     placeholder: '输入省份+年份，如：广东省2026高考',
@@ -171,11 +172,11 @@ export default function DocWorkshop() {
           <span className="who">实时信息</span>
           {loading && <span className="meta">· 正在检索最新公开资料并整理…</span>}
           {!loading && searchMeta?.ok && (
-            <span className="meta ok">
-              🌐 已参考 {searchMeta.count} 条公开资料（{searchMeta.sources.map(srcLabel).join(' · ')}）
-            </span>
-          )}
-          {!loading && searchMeta && !searchMeta.ok && <span className="meta warn">⚠️ 暂未检索到相关公开资料，已按已有知识作答</span>}
+              <span className="meta ok">
+                已参考 {searchMeta.count} 条公开资料（{searchMeta.sources.map(srcLabel).join(' · ')}）
+              </span>
+            )}
+          {!loading && searchMeta && !searchMeta.ok && <span className="meta warn">暂未检索到相关公开资料，已按已有知识作答</span>}
         </div>
         <div className="panel-body">
           {!searched && !loading && (

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Bell, Pin, Clock, ChevronRight } from 'lucide-react'
+import { Search, Bell, Pin, Clock, ChevronRight, Heart, Star, MessageSquare } from 'lucide-react'
 import { useStore } from '../../store/store'
 
 const TABS = ['全部', '悬赏', '跑腿', '文档设计', '问卷', '二手', '论坛']
@@ -77,7 +77,7 @@ export default function Home() {
                 <div className="font-medium">{x.title}</div>
                 <div className="text-sm text-gray-500 mt-1 line-clamp-2">{x.content}</div>
                 <div className="flex items-center gap-4 text-xs text-gray-400 mt-2">
-                  <span>{x.author_name}</span><span>❤ {x.likes}</span><span>⭐ {x.collects}</span><span>💬 {x.comments}</span>
+                  <span>{x.author_name}</span><span className="flex items-center gap-0.5"><Heart size={12} /> {x.likes}</span><span className="flex items-center gap-0.5"><Star size={12} /> {x.collects}</span><span className="flex items-center gap-0.5"><MessageSquare size={12} /> {x.comments}</span>
                 </div>
               </div>
             )

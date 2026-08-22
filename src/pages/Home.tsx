@@ -1,14 +1,15 @@
 import { Link } from 'react-router-dom'
+import { Search, Building2, MapPin, Radio, FileText, AlertTriangle, Coins, Info, BookOpen, Compass } from 'lucide-react'
 
 const toolCards = [
-  { to: '/ai-search?tab=school', ic: '🔍', title: '查院校', desc: '多维度拆解：数据、食堂、住宿、就业、优缺点 全摊开。' },
-  { to: '/ai-search?tab=by-company', ic: '🏢', title: '查公司', desc: '薪资结构、加班、福利、坑点 直接说不编。' },
-  { to: '/ai-search?tab=by-city', ic: '🌆', title: '按城市找工作', desc: '产业 / 薪资 / 房价 / 机会 一站说清。' },
-  { to: '/ai-tutor', ic: '', title: '实时资讯台', desc: '填分数和位次，AI 按冲稳保三档给具体推荐。' },
-  { to: '/document-workshop', ic: '', title: '文档工坊', desc: 'AI 一键生成报告 / 简历 / 避雷清单，导出 Word。' },
-  { to: '/warnings', ic: '⚠️', title: '避雷清单', desc: '记下学校 / 公司的真实缺点，公共看板，人人可加。' },
-  { to: '/money', ic: '💰', title: '搞钱项目', desc: '兼职 / 副业 / 创业 项目聚合，发现身边真实机会。' },
-  { to: '/about', ic: 'ℹ️', title: '关于我们', desc: '原则、数据来源、决策边界，一次说清。' }
+  { to: '/ai-search?tab=school', ic: Search, title: '查院校', desc: '多维度拆解：数据、食堂、住宿、就业、优缺点 全摊开。' },
+  { to: '/ai-search?tab=by-company', ic: Building2, title: '查公司', desc: '薪资结构、加班、福利、坑点 直接说不编。' },
+  { to: '/ai-search?tab=by-city', ic: MapPin, title: '按城市找工作', desc: '产业 / 薪资 / 房价 / 机会 一站说清。' },
+  { to: '/ai-tutor', ic: Radio, title: '实时资讯台', desc: '填分数和位次，AI 按冲稳保三档给具体推荐。' },
+  { to: '/document-workshop', ic: FileText, title: '文档工坊', desc: 'AI 一键生成报告 / 简历 / 避雷清单，导出 Word。' },
+  { to: '/warnings', ic: AlertTriangle, title: '避雷清单', desc: '记下学校 / 公司的真实缺点，公共看板，人人可加。' },
+  { to: '/money', ic: Coins, title: '搞钱项目', desc: '兼职 / 副业 / 创业 项目聚合，发现身边真实机会。' },
+  { to: '/about', ic: Info, title: '关于我们', desc: '原则、数据来源、决策边界，一次说清。' }
 ]
 
 const marqueeItems = [
@@ -28,12 +29,12 @@ const features = [
 ]
 
 const scenes = [
-  { ic: '', t: '高考家庭', d: '分数、位次、兴趣、城市——填进来，AI 按冲稳保给出可比较的院校清单，每条都说为什么。' },
-  { ic: '🏢', t: '即将入职 / 跳槽', d: '查公司值不值得去：薪资结构、五险一金、加班、部门差异，一次说清而不是套话。' },
-  { ic: '🌆', t: '换城市找工作', d: '看一个城市的产业、薪资、生活成本、机会点，并和 2-3 个对标城市横向比。' },
-  { ic: '📚', t: '在校生选课 / 转专业', d: '了解学校的真实口碑、食宿、保研与就业去向——哪些数字是注水、哪些是含金量。' },
-  { ic: '', t: '做报告 / 写文档', d: '把零散的 AI 输出和联网事实直接生成一份可下载 Word 的报告或简历。' },
-  { ic: '⚠️', t: '记录避雷', d: '把自己的踩坑 / 同学的吐槽一条条加到避雷清单，公共看板累积价值。' }
+  { ic: null, t: '高考家庭', d: '分数、位次、兴趣、城市——填进来，AI 按冲稳保给出可比较的院校清单，每条都说为什么。' },
+  { ic: Building2, t: '即将入职 / 跳槽', d: '查公司值不值得去：薪资结构、五险一金、加班、部门差异，一次说清而不是套话。' },
+  { ic: MapPin, t: '换城市找工作', d: '看一个城市的产业、薪资、生活成本、机会点，并和 2-3 个对标城市横向比。' },
+  { ic: BookOpen, t: '在校生选课 / 转专业', d: '了解学校的真实口碑、食宿、保研与就业去向——哪些数字是注水、哪些是含金量。' },
+  { ic: null, t: '做报告 / 写文档', d: '把零散的 AI 输出和联网事实直接生成一份可下载 Word 的报告或简历。' },
+  { ic: AlertTriangle, t: '记录避雷', d: '把自己的踩坑 / 同学的吐槽一条条加到避雷清单，公共看板累积价值。' }
 ]
 
 export default function Home() {
@@ -49,7 +50,7 @@ export default function Home() {
             一半来自联网检索的真实资料，一半来自 AI 的整理与对比——每条都标明白，哪句是事实、哪句是判断。
           </p>
           <div className="hero-cta">
-            <Link to="/ai-search?tab=school" className="cta primary">🧭 开始一次查询</Link>
+            <Link to="/ai-search?tab=school" className="cta primary"><Compass size={16} strokeWidth={2} /> 开始一次查询</Link>
             <Link to="/ai-tutor" className="cta ghost">试试实时资讯台</Link>
           </div>
         </div>
@@ -152,6 +153,7 @@ export default function Home() {
         {toolCards.map((c, i) => (
           <Link key={c.title} to={c.to} className="tool-row">
             <span className="num">{String(i + 1).padStart(2, '0')}</span>
+            <div className="tool-ico">{c.ic ? <c.ic size={20} strokeWidth={1.9} /> : null}</div>
             <div>
               <h3>{c.title}</h3>
               <p className="desc">{c.desc}</p>
@@ -208,7 +210,7 @@ export default function Home() {
       <div className="scene-grid">
         {scenes.map((s) => (
           <div className="scene" key={s.t}>
-            <h4>{s.ic} {s.t}</h4>
+            <h4>{s.ic ? <s.ic size={16} strokeWidth={1.9} style={{ marginRight: 6, verticalAlign: 'middle' }} /> : null} {s.t}</h4>
             <p>{s.d}</p>
           </div>
         ))}

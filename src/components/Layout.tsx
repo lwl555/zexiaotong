@@ -2,6 +2,7 @@ import { ReactNode, useState, useEffect, useRef } from 'react'
 import { NavLink, useNavigate, Outlet, useLocation } from 'react-router-dom'
 import HistoryDrawer from './HistoryDrawer'
 import { primaryNav, moreNav, type NavDef } from '../lib/nav'
+import { Clock } from 'lucide-react'
 
 export default function Layout() {
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -53,7 +54,7 @@ export default function Layout() {
                 end={n.end}
                 className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}
               >
-                <span className="nav-link-ico">{n.icon}</span>
+                {n.icon && <span className="nav-link-ico"><n.icon size={18} strokeWidth={1.9} /></span>}
                 <span className="nav-link-lbl">{n.label}</span>
                 {n.live && <span className="live-dot" title="AI 实时联网" />}
               </NavLink>
@@ -78,7 +79,7 @@ export default function Layout() {
                       onClick={() => setMoreOpen(false)}
                       className={({ isActive }) => 'nav-more-item' + (isActive ? ' active' : '')}
                     >
-                      <span className="ic">{n.icon}</span>
+                      {n.icon && <span className="ic"><n.icon size={18} strokeWidth={1.9} /></span>}
                       <span>{n.label}</span>
                     </NavLink>
                   ))}
@@ -94,7 +95,7 @@ export default function Layout() {
               onClick={() => setDrawerOpen(true)}
               title="历史对话与查询记录"
             >
-              <span className="ico">🕘</span>历史
+              <span className="ico"><Clock size={16} strokeWidth={1.9} /></span>历史
             </button>
             <div className="avatar" onClick={() => nav('/about')} title="关于本站">
               兄
@@ -123,7 +124,7 @@ export default function Layout() {
                 className={({ isActive }) => 'mobile-menu-item' + (isActive ? ' active' : '')}
                 onClick={() => setMenuOpen(false)}
               >
-                {n.icon && <span className="ic">{n.icon}</span>}
+                {n.icon && <span className="ic"><n.icon size={18} strokeWidth={1.9} /></span>}
                 <span className="lbl">{n.label}</span>
                 {n.live && <span className="live-dot" />}
               </NavLink>

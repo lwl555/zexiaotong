@@ -2,6 +2,7 @@ import { useEffect, useReducer, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Conversation, QueryRecord, getConversations, getQueries, deleteConversation, deleteQuery, setPendingChannel } from '../lib/history'
 import { renderReport, ThemeKey } from './Report'
+import { X } from 'lucide-react'
 
 const PAGE_LABEL: Record<string, string> = {
   'ai-search': 'AI百事通',
@@ -60,7 +61,7 @@ export default function HistoryDrawer({ open, onClose }: Props) {
         <div className="drawer-head">
           <span>历史记录</span>
           <button className="drawer-x" onClick={onClose} aria-label="关闭">
-            ✕
+            <X size={16} strokeWidth={2} />
           </button>
         </div>
         <div className="drawer-tabs">
@@ -132,7 +133,7 @@ export default function HistoryDrawer({ open, onClose }: Props) {
             <div className="drawer-head">
               <span>查询详情</span>
               <button className="drawer-x" onClick={() => setDetail(null)} aria-label="关闭">
-                ✕
+                <X size={16} strokeWidth={2} />
               </button>
             </div>
             <div className="qd-meta">

@@ -2,32 +2,38 @@
 // 关键：所有功能都在同一套 URL 下，不再有 /m 这种独立命名空间。
 // 设备自适应由 App 里的 ResponsiveShell 决定用手机壳还是桌面壳。
 
+import type { ComponentType } from 'react'
+import {
+  Home, Compass, Sparkles, Radio, FileText, ShoppingBag, MessageSquare,
+  Wallet, AlertTriangle, Coins, Shield, Info
+} from 'lucide-react'
+
 export interface NavDef {
   to: string
   label: string
-  icon: string
+  icon: ComponentType<{ size?: number; strokeWidth?: number }> | null
   live?: boolean
   end?: boolean
 }
 
 // 桌面顶部主导航（克制：核心入口）
 export const primaryNav: NavDef[] = [
-  { to: '/', label: '首页', icon: '', end: true },
-  { to: '/ai-search', label: 'AI百事通', icon: '🧭', live: true },
-  { to: '/ai-tangdou', label: '糖豆', icon: '🍬', live: true },
-  { to: '/ai-tutor', label: '实时资讯台', icon: '', live: true },
-  { to: '/document-workshop', label: '文档工坊', icon: '', live: true }
+  { to: '/', label: '首页', icon: Home, end: true },
+  { to: '/ai-search', label: 'AI百事通', icon: Compass, live: true },
+  { to: '/ai-tangdou', label: '糖豆', icon: Sparkles, live: true },
+  { to: '/ai-tutor', label: '实时资讯台', icon: Radio, live: true },
+  { to: '/document-workshop', label: '文档工坊', icon: FileText, live: true }
 ]
 
 // 「更多」里的次要工具 + 新模块入口 + 后台（两端都能点到）
 export const moreNav: NavDef[] = [
-  { to: '/goods', label: '二手集市', icon: '🛍️' },
-  { to: '/community', label: '校园社区', icon: '💬' },
-  { to: '/wallet', label: '我的钱包', icon: '👛' },
-  { to: '/warnings', label: '避雷清单', icon: '⚠️' },
-  { to: '/money', label: '搞钱项目', icon: '💰' },
-  { to: '/admin', label: '管理后台', icon: '🛡️' },
-  { to: '/about', label: '关于我们', icon: 'ℹ️' }
+  { to: '/goods', label: '二手集市', icon: ShoppingBag },
+  { to: '/community', label: '校园社区', icon: MessageSquare },
+  { to: '/wallet', label: '我的钱包', icon: Wallet },
+  { to: '/warnings', label: '避雷清单', icon: AlertTriangle },
+  { to: '/money', label: '搞钱项目', icon: Coins },
+  { to: '/admin', label: '管理后台', icon: Shield },
+  { to: '/about', label: '关于我们', icon: Info }
 ]
 
 // 各路由对应的浏览器标签标题

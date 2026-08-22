@@ -85,16 +85,17 @@ function downloadImage(proxiedUrl: string) {
 
 import { renderReport, ThemeKey } from './Report'
 import { exportDocx } from '../lib/docx'
+import { Download, X } from 'lucide-react'
 import { PROMPT_EMPHASIS, SYSTEM_IDENTITY, BLUNT_RULE, FRESHNESS_RULE, LINKS_LOCATION_RULE, DETAIL_RULE } from '../lib/prompts'
 
 // 联网 / 思考阶段的提示文案（按已等待时长切换，纯前端 heuristics，仅用于安抚"没卡住"）
 function phaseOf(ms: number): string {
-  if (ms < 4000) return '🌐 正在联网检索真实资料…'
-  if (ms < 16000) return '🤔 AI 正在分析、对比、提炼优缺点…'
-  if (ms < 40000) return '✍️ 正在生成直白结论…'
+  if (ms < 4000) return '正在联网检索真实资料…'
+  if (ms < 16000) return '正在分析、对比、提炼优缺点…'
+  if (ms < 40000) return '正在生成直白结论…'
   // 等待超过 40s：v9 是外部推理模型，冷启动 + 复杂问题会有 30–40s 的生成延迟，
   // 提前给预期，避免用户以为卡死。后端 v9 单次超时已是 40s，会再自动重试一次。
-  return '⏳ AI 生成较慢（外部推理模型，深度检索+思考需 30–40 秒，属正常现象），请稍候…'
+  return '生成较慢（外部推理模型，深度检索+思考需 30–40 秒，属正常现象），请稍候…'
 }
 
 interface Props {
@@ -281,11 +282,10 @@ export default function AIChat({
       setNoResult(!!search && search.ok === false)
       lastReply.current = content
       // 兜底：服务端返回的 content 为空时，给用户明确说明 + 建议下一步，而不是显示空白气泡
-      const safeContent = content?.trim()
-        ? content
-        : '⚠️ 这一轮没拿到正文（推理模型偶发输出截断，已自动重试）。建议你：\n' +
-          '1. 点一下下方的「实时资讯」按钮切换模式，直接看检索到的原始资料；\n' +
-          '2. 或换个更具体的问题（例如「内江医科学校 宿舍 几人间」「食堂 几楼 哪个窗口」）。'
+      const safeContent = content?.trim() || '这一轮没拿到正文（推理模型偶发输出截断，已自动重试）。建议你：\n' +
+        '1. 点一下下方的「实时资讯」按钮切换模式，直接看检索到的原始资料；\n' +
+        '2. 或换个更具体的问题（例如「内江医科学校 宿舍 几人间」「食堂 几楼 哪个窗口」。'
+
       const aiMsg: Msg = {
         role: 'ai' as const,
         content: safeContent,
@@ -395,18 +395,18 @@ export default function AIChat({
           新建对话
         </button>
         {(webSearch || autoSearch) && searchMeta?.ok && (
-          <span className="meta ok">🌐 已参考 {searchMeta.count} 条公开资料（{searchMeta.sources.map(srcLabel).join(' · ')}）</span>
+          <span className="meta ok">已参考 {searchMeta.count} 条公开资料（{searchMeta.sources.map(srcLabel).join(' · ')}）</span>
         )}
         {(webSearch || autoSearch) && searchMeta && !searchMeta.ok && (
-          <span className="meta warn">⚠️ 公开资料暂时无法获取，已按已有知识作答</span>
+          <span className="meta warn">公开资料暂时无法获取，已按已有知识作答</span>
         )}
         {(webSearch || autoSearch) && !searchMeta && !loading && (
           <span className="meta">· {autoSearch ? 'AI 将自动判断是否联网检索' : '待检索'}</span>
         )}
         {loading && (
-          <span className="meta">
-            🌐 {(webSearch || autoSearch) ? '正在联网检索并分析最新资料…' : '生成中…'}
-          </span>
+            <span className="meta">
+              {(webSearch || autoSearch) ? '正在联网检索并分析最新资料…' : '生成中…'}
+            </span>
         )}
       </div>
 
@@ -415,7 +415,7 @@ export default function AIChat({
           <div className="note">
             在下方输入，AI 会<b>先联网检索真实资料</b>，再结合多维度分析给出带颜色标记的结论（优点 / 缺点 / 亮点 / 重点 一目了然），关键事实会标注来源，<b>重要信息自动加粗标红</b>。
             <br />
-            <span className="note-sub">提示：检索来自公开网络，可能不保证 100% 最新；重大决策请以官方最新信息为准。若检索服务暂不可用，会自动降级为模型自身知识作答。对话会自动保存，可在右上角「🕘 历史」里接着聊。</span>
+            <span className="note-sub">提示：检索来自公开网络，可能不保证 100% 最新；重大决策请以官方最新信息为准。若检索服务暂不可用，会自动降级为模型自身知识作答。对话会自动保存，可在右上角「历史」里接着聊。</span>
           </div>
         )}
         {messages.length === 0 && !loading && examples && examples.length > 0 && (
@@ -449,14 +449,14 @@ export default function AIChat({
                   )}
                   {m.reasoning ? (
                     <details className="reasoning">
-                      <summary>🤔 AI 思考过程（内部推理，仅供参考）</summary>
+                      <summary>AI 思考过程（内部推理，仅供参考）</summary>
                       <div className="reasoning-body">{m.reasoning}</div>
                     </details>
                   ) : null}
                   {m.links && m.links.length > 0 && (
                     <div className="links-card">
                       <div className="links-head">
-                        🔗 相关链接与地点（点击打开 · 可复制）
+                        相关链接与地点（点击打开 · 可复制）
                         <span className="links-count">{m.links.length} 条</span>
                       </div>
                       <ul className="links-list">
@@ -508,7 +508,7 @@ export default function AIChat({
                     <span className="ts-spinner" />
                     {webSearch || autoSearch ? phaseOf(elapsedMs) : `正在${messages.some((m) => m.role === 'user') ? '拆解分析' : '准备'}…`}
                   </span>
-                  <span className="ts-time">⏱ 已等待 {(elapsedMs / 1000).toFixed(1)}s</span>
+                  <span className="ts-time">已等待 {(elapsedMs / 1000).toFixed(1)}s</span>
                 </div>
                 <div className="ts-eta">
                   首次或复杂问题，AI 生成可能需 30–40 秒（外部推理模型深度检索+思考），属正常现象 · 没卡住，正在为你查证
@@ -523,14 +523,14 @@ export default function AIChat({
         {error && <div className="err">出错了：{error}</div>}
         {degraded && (
           <div className="err degraded">
-            ⏳ AI 生成超时（网络偶发卡顿），但已为你检索到公开资料（见上方链接），可点「重新生成」再试一次。
+            AI 生成超时（网络偶发卡顿），但已为你检索到公开资料（见上方链接），可点「重新生成」再试一次。
             <button className="retry-btn" onClick={() => resend()}>重新生成回答</button>
           </div>
         )}
 
         {noResult && !degraded && (
           <div className="err no-result">
-            🔍 本次未检索到相关公开资料。建议换用更口语或常用名（如学校全称、所在地+「大学/学院/学校」、招生年份+校名），
+            本次未检索到相关公开资料。建议换用更口语或常用名（如学校全称、所在地+「大学/学院/学校」、招生年份+校名），
             或直接访问该校官网 / 官方公众号 / 招生办电话获取准确信息。
           </div>
         )}
@@ -587,8 +587,8 @@ export default function AIChat({
             <div className="lb-bar">
               <span className="lb-title">{lightbox.title}</span>
               <div className="lb-actions">
-                <button onClick={() => downloadImage(lightbox.url)}>⬇ 下载</button>
-                <button onClick={() => setLightbox(null)}>✕ 关闭</button>
+                <button onClick={() => downloadImage(lightbox.url)}><Download size={15} strokeWidth={1.9} /> 下载</button>
+                <button onClick={() => setLightbox(null)}><X size={15} strokeWidth={1.9} /> 关闭</button>
               </div>
             </div>
             <img src={lightbox.url} alt={lightbox.title} referrerPolicy="no-referrer" />

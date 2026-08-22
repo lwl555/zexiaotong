@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Pin, Clock, MessageSquare, Flag, Share2, ChevronRight } from 'lucide-react'
+import { Pin, Clock, MessageSquare, Flag, Share2, ChevronRight, CheckCircle2, Scale } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { useMe } from '../../store/useMe'
 
@@ -33,7 +33,7 @@ export default function TaskDetail() {
     }
     if (task.status === 'accepted') {
       return isPoster
-        ? <div className="text-sm text-blue-600">✅ {task.accepted_name} 已接单，等待其交付成果</div>
+        ? <div className="text-sm text-blue-600 flex items-center gap-1"><CheckCircle2 size={14} /> {task.accepted_name} 已接单，等待其交付成果</div>
         : <button className="btn-primary w-full" onClick={() => setShowDeliver(true)}>去交付成果</button>
     }
     if (task.status === 'doing') {
@@ -50,9 +50,9 @@ export default function TaskDetail() {
         : <div className="text-sm text-purple-600">已交付，等待雇主验收</div>
     }
     if (task.status === 'arbitration') {
-      return <div className="text-sm text-red-600">⚖ 仲裁处理中，等待管理员判定资金归属</div>
+      return <div className="text-sm text-red-600 flex items-center gap-1"><Scale size={14} /> 仲裁处理中，等待管理员判定资金归属</div>
     }
-    if (task.status === 'done') return <div className="text-sm text-green-600">✅ 任务已完成并结算</div>
+    if (task.status === 'done') return <div className="text-sm text-green-600 flex items-center gap-1"><CheckCircle2 size={14} /> 任务已完成并结算</div>
     return <div className="text-sm text-gray-500">任务已关闭</div>
   }
 
