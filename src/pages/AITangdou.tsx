@@ -550,21 +550,7 @@ export default function AITangdou() {
       width: 260, flexShrink: 0, background: '#fafafa', borderRight: '1px solid #f0f0f0',
       display: 'flex', flexDirection: 'column', height: '100%'
     }}>
-      {/* 顶部：糖豆 logo + 新对话 */}
-      <div style={{ padding: '16px 14px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{
-            width: 28, height: 28, borderRadius: 7, background: '#1c1814',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}><Sparkles size={16} color="#fff" strokeWidth={2} /></span>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#1c1814' }}>糖豆</span>
-        </div>
-        <button onClick={startNewChat} title="新对话" style={{
-          width: 30, height: 30, borderRadius: 8, border: '1px solid #e5e5e5',
-          background: '#fff', cursor: 'pointer', color: '#444',
-          display: 'flex', alignItems: 'center', justifyContent: 'center'
-        }}><Plus size={16} strokeWidth={2} /></button>
-      </div>
+      {/* 顶部：糖豆 logo + 新对话 — 已删除（"糖豆"文字 + 整块状态栏）*/}
 
       {/* 导航项（几何线性图标 + 文字，黑色 currentColor） */}
       <div style={{ padding: '4px 8px', display: 'flex', flexDirection: 'column', gap: 2 }}>
