@@ -78,6 +78,10 @@ interface State {
   approveWithdrawal: (id: string) => Promise<void>
   rejectWithdrawal: (id: string, reason: string) => Promise<void>
   setConfig: (c: PlatformConfig) => Promise<void>
+
+  // 移动端底部导航栏是否被用户收起（让 AITangdou 等 fixed 容器能感知，回收空位）
+  navCollapsed: boolean
+  setNavCollapsed: (v: boolean) => void
 }
 
 export const useStore = create<State>((set, get) => ({
@@ -96,6 +100,8 @@ export const useStore = create<State>((set, get) => ({
   categories: [],
   banners: [],
   config: null,
+  navCollapsed: false,
+  setNavCollapsed: (v) => set({ navCollapsed: v }),
 
   // ─── 初始化：从 Supabase 拉取所有数据 ───
   init: async () => {

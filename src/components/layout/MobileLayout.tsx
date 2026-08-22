@@ -37,8 +37,9 @@ export default function MobileLayout() {
   const init = useStore(s => s.init)
   const unread = useStore(s => me ? s.notifications.filter(n => n.user_id === me.id && !n.read).length : 0)
   const [showSkip, setShowSkip] = useState(false)
-  // 底部导航栏可随时收纳（收起后内容区占满全屏，点展开按钮恢复）
-  const [navCollapsed, setNavCollapsed] = useState(false)
+  // 底部导航栏可随时收纳（状态提到全局 store，让 AITangdou 等 fixed 容器回收空位）
+  const navCollapsed = useStore(s => s.navCollapsed)
+  const setNavCollapsed = useStore(s => s.setNavCollapsed)
 
   useEffect(() => {
     if (loading) {

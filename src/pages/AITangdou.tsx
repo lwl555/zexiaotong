@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { agnesChatStream, ChatMsg, LinkInfo } from '../lib/agnes'
 import { useIsMobile } from '../lib/useIsMobile'
+import { useStore } from '../store/store'
 import {
   MessageSquare, Search, PenLine, Table2, Globe, Image as ImageIcon,
   Clapperboard, Plus, User, Sparkles, Wand, Code2, Calculator,
@@ -386,6 +387,8 @@ export default function AITangdou() {
   const startRef = useRef<number>(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const isMobile = useIsMobile()
+  // 移动端底部导航被收起时，糖豆 fixed 容器把底部 64px 回收掉，避免底部留空
+  const navCollapsed = useStore(s => s.navCollapsed)
 
   // 启动时尝试恢复最近一条对话
   useEffect(() => {
@@ -1160,7 +1163,7 @@ export default function AITangdou() {
       top: isMobile ? 0 : 60,
       left: 0,
       right: 0,
-      bottom: isMobile ? 64 : 0,
+      bottom: isMobile ? (navCollapsed ? 12 : 64) : 0,
       display: 'flex',
       flexDirection: isMobile ? 'column' : 'row',
       background: '#fff',
