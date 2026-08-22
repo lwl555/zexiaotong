@@ -965,16 +965,23 @@ export default function AITangdou() {
     </div>
   )
 
-  // 用 position: fixed 把糖豆容器从正常文档流抽离
+  // 用 position: fixed 把糖豆容器从正常文档流抽离（仅桌面端）：
   // 这样 .container 的 padding-bottom:80px + footer 不会撑大整页
-  // 桌面端 top:60 给顶部导航栏留偏移；手机端无顶栏，top:0
+  // 桌面端 top:60 给顶部导航栏留偏移。
+  // 手机端走 normal flow 让 MobileLayout 底栏正常露出（fixed z-100 会挡住 z-30 的底栏）。
   return (
     <div style={{
-      position: 'fixed',
-      top: isMobile ? 0 : 60, left: 0, right: 0, bottom: 0,
+      position: isMobile ? 'static' : 'fixed',
+      top: isMobile ? undefined : 60,
+      left: isMobile ? undefined : 0,
+      right: isMobile ? undefined : 0,
+      bottom: isMobile ? undefined : 0,
       display: 'flex',
+      flexDirection: isMobile ? 'column' : 'row',
+      width: isMobile ? '100%' : undefined,
+      height: isMobile ? '100%' : undefined,
       background: '#fff',
-      zIndex: 100,
+      zIndex: isMobile ? undefined : 100,
       overflow: 'hidden'
     }}>
       {sidebar}
