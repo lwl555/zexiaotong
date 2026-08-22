@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
 import { agnesChat, ChatMsg, LinkInfo } from '../lib/agnes'
-import { useIsMobile } from '../lib/useIsMobile'
 import {
   MessageSquare, Search, PenLine, Table2, Globe, Image as ImageIcon,
   Clapperboard, Plus, User, Sparkles, Wand, Code2, Calculator,
@@ -67,7 +66,7 @@ function compressImage(file: File, maxW = 1024, quality = 0.7): Promise<string> 
       img.src = reader.result as string
     }
     reader.onerror = reject
-    reader.readAsDataURL(reader.result as string)
+    reader.readAsDataURL(file) // 修复：传 file 而非 reader.result（当时 reader.result 还是 null）
   })
 }
 
@@ -369,8 +368,6 @@ export default function AITangdou() {
   const fileRef = useRef<HTMLInputElement>(null)
   const startRef = useRef<number>(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const isMobile = useIsMobile()
-
   // 启动时尝试恢复最近一条对话
   useEffect(() => {
     const convs = getConversations().filter(c => c.pageKey === PAGE_KEY)
@@ -510,9 +507,19 @@ export default function AITangdou() {
   function removePendingImage() { setPendingImage(null) }
 
   function useTag(tag: { icon?: any; label: string }) {
-    setInput(tag.label + '：')
+    // 快捷功能：直接发送一条带提示词的消息，让 AI 按该模式回答
+    const prompts: Record<string, string> = {
+      '帮我写作': '【写作模式】请帮我写一篇关于以下主题的内容。先告诉我你想写什么主题、什么体裁（议论文/记叙文/说明文等）、大概多少字？',
+      '翻译': '【翻译模式】请把以下内容翻译成目标语言。请先告诉我：要翻成什么语言？',
+      '写代码': '【代码模式】请用代码实现以下功能。先告诉我：要实现什么功能？用什么编程语言？',
+      '算题': '【解题模式】请解答以下题目。先告诉我：具体题目是什么？',
+      '头脑风暴': '【头脑风暴】请帮我想一些创意。先告诉我：要 brainstorm 什么主题？',
+      '做表格': '【表格模式】请把以下内容整理成 markdown 表格。先告诉我：要整理什么数据？',
+      '联网搜索': '【搜索模式】请联网搜索最新信息。先告诉我：要搜索什么？',
+    }
+    const text = prompts[tag.label] || tag.label + '：'
     setShowTags(false)
-    inputRef.current?.focus()
+    send(text) // 直接触发 AI 回答，而非只在输入框填字
   }
 
   function renameConv(id: string, title: string) {
@@ -535,17 +542,15 @@ export default function AITangdou() {
   }
 
   function autoResize(el: HTMLTextAreaElement) {
-    // 固定初始高度（mobile 36 / PC 40），只在内容溢出时生长，最大 120
-    const base = isMobile ? 36 : 40
-    el.style.height = base + 'px'
+    el.style.height = '40px'
     const next = Math.min(el.scrollHeight, 120)
-    if (next > base) el.style.height = next + 'px'
+    if (next > 40) el.style.height = next + 'px'
   }
 
   const hasMessages = messages.length > 0
 
-  // ─── PC 端左侧栏 ───────────────────────────────────────────
-  const sidebar = !isMobile && (
+  // ─── 左侧栏（统一：不再按设备区分）────────────────────────
+  const sidebar = (
     <aside style={{
       width: 260, flexShrink: 0, background: '#fafafa', borderRight: '1px solid #f0f0f0',
       display: 'flex', flexDirection: 'column', height: '100%'
@@ -627,84 +632,51 @@ export default function AITangdou() {
   const messageArea = (
     <div style={{
       flex: 1, overflowY: 'auto',
-      // 不论有无消息，都保留上下 padding，让内容居中 / 第一个消息有安全距离
-      padding: isMobile ? '16px' : '32px 48px'
+      padding: '32px 48px'
     }}>
       {!hasMessages && !loading && (
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          minHeight: '100%', padding: isMobile ? '40px 20px' : '40px 20px'
+          minHeight: '100%', padding: '40px 20px'
         }}>
-          {!isMobile ? (
-            /* PC端：豆包风 —— 大标题 + 双 tab + 推荐气泡 */
-            <>
-              <div style={{ fontSize: 26, fontWeight: 700, color: '#1c1814', marginBottom: 24 }}>
-                有什么我能帮你的吗？
-              </div>
-              {/* 对话 / 工作 模式切换（豆包风） */}
-              <div style={{
-                display: 'inline-flex', background: '#f5f5f5', borderRadius: 24, padding: 4, marginBottom: 32
-              }}>
-                <button onClick={() => setMode('chat')} style={{
-                  padding: '8px 28px', borderRadius: 20, border: 'none',
-                  background: mode === 'chat' ? '#fff' : 'transparent',
-                  color: '#1c1814', fontSize: 14, cursor: 'pointer',
-                  fontWeight: mode === 'chat' ? 600 : 400,
-                  boxShadow: mode === 'chat' ? '0 1px 3px rgba(0,0,0,.08)' : 'none'
-                }}>对话</button>
-                <button onClick={() => setMode('work')} style={{
-                  padding: '8px 28px', borderRadius: 20, border: 'none',
-                  background: mode === 'work' ? '#fff' : 'transparent',
-                  color: '#1c1814', fontSize: 14, cursor: 'pointer',
-                  fontWeight: mode === 'work' ? 600 : 400,
-                  boxShadow: mode === 'work' ? '0 1px 3px rgba(0,0,0,.08)' : 'none'
-                }}>工作</button>
-              </div>
-              {/* 推荐气泡列 */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', maxWidth: 560 }}>
-                <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>为你推荐</div>
-                {WELCOME_EXAMPLES.map(ex => (
-                  <button key={ex} onClick={() => send(ex)} style={{
-                    padding: '12px 16px', borderRadius: 10, border: '1px solid #e8e8e8',
-                    background: '#fff', cursor: 'pointer', fontSize: 14, color: '#333',
-                    textAlign: 'left', transition: 'all .15s'
-                  }}
-                    onMouseEnter={e => { e.currentTarget.style.background = '#fafafa'; e.currentTarget.style.borderColor = '#c2410c' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = '#e8e8e8' }}>
-                    {ex}
-                  </button>
-                ))}
-              </div>
-            </>
-          ) : (
-            /* Mobile端：圆形头像 + 标题 */
-            <>
-              <div style={{
-                width: 64, height: 64, borderRadius: '50%',
-                background: '#1c1814', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                marginBottom: 14
-              }}><Sparkles size={30} color="#fff" strokeWidth={1.8} /></div>
-              <div style={{ fontSize: 20, fontWeight: 600, color: '#1c1814', marginBottom: 6 }}>
-                你好，我是糖豆
-              </div>
-              <div style={{ fontSize: 13, color: '#888', marginBottom: 24, textAlign: 'center' }}>
-                可以帮你写作、翻译、算题、写代码、识图分析，或者随便聊聊天
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', maxWidth: 380 }}>
-                {WELCOME_EXAMPLES.map(ex => (
-                  <button key={ex} onClick={() => send(ex)} style={{
-                    padding: '12px 16px', borderRadius: 12, border: '1px solid #e8e8e8',
-                    background: '#fff', cursor: 'pointer', fontSize: 14, color: '#555',
-                    textAlign: 'left', transition: 'all .15s'
-                  }}
-                    onMouseEnter={e => { e.currentTarget.style.background = '#fafafa'; e.currentTarget.style.borderColor = '#c2410c' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = '#e8e8e8' }}>
-                    {ex}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
+          {/* 统一欢迎页：大标题 + 双 tab + 推荐气泡 */}
+          <div style={{ fontSize: 26, fontWeight: 700, color: '#1c1814', marginBottom: 24 }}>
+            有什么我能帮你的吗？
+          </div>
+          {/* 对话 / 工作 模式切换 */}
+          <div style={{
+            display: 'inline-flex', background: '#f5f5f5', borderRadius: 24, padding: 4, marginBottom: 32
+          }}>
+            <button onClick={() => setMode('chat')} style={{
+              padding: '8px 28px', borderRadius: 20, border: 'none',
+              background: mode === 'chat' ? '#fff' : 'transparent',
+              color: '#1c1814', fontSize: 14, cursor: 'pointer',
+              fontWeight: mode === 'chat' ? 600 : 400,
+              boxShadow: mode === 'chat' ? '0 1px 3px rgba(0,0,0,.08)' : 'none'
+            }}>对话</button>
+            <button onClick={() => setMode('work')} style={{
+              padding: '8px 28px', borderRadius: 20, border: 'none',
+              background: mode === 'work' ? '#fff' : 'transparent',
+              color: '#1c1814', fontSize: 14, cursor: 'pointer',
+              fontWeight: mode === 'work' ? 600 : 400,
+              boxShadow: mode === 'work' ? '0 1px 3px rgba(0,0,0,.08)' : 'none'
+            }}>工作</button>
+          </div>
+          {/* 推荐气泡列 */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', maxWidth: 560 }}>
+            <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>为你推荐</div>
+            {WELCOME_EXAMPLES.map(ex => (
+              <button key={ex} onClick={() => send(ex)} style={{
+                padding: '12px 16px', borderRadius: 10, border: '1px solid #e8e8e8',
+                background: '#fff', cursor: 'pointer', fontSize: 14, color: '#333',
+                textAlign: 'left', transition: 'all .15s'
+              }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#fafafa'; e.currentTarget.style.borderColor = '#c2410c' }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = '#e8e8e8' }}>
+                {ex}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -718,7 +690,7 @@ export default function AITangdou() {
             }}><Sparkles size={16} color="#fff" strokeWidth={2} /></div>
           )}
           <div style={{
-            maxWidth: isMobile ? '78%' : '70%', padding: m.image ? 0 : '10px 14px', borderRadius: 14,
+            maxWidth: '70%', padding: m.image ? 0 : '10px 14px', borderRadius: 14,
             background: m.role === 'user' ? '#c2410c' : '#f5f5f5',
             color: m.role === 'user' ? '#fff' : '#1c1814',
             fontSize: 14, lineHeight: 1.7,
@@ -796,8 +768,8 @@ export default function AITangdou() {
         </div>
       )}
 
-      {/* Mobile 端：一行横排快捷功能（默认折叠，点 + 展开） */}
-      {showTags && isMobile && (
+      {/* 快捷功能（默认折叠，点 + 展开） */}
+      {showTags && (
         <div style={{
           display: 'flex', gap: 8, overflowX: 'auto', padding: '8px 16px',
           borderTop: '1px solid #f5f5f5', background: '#fafafa'
@@ -820,11 +792,11 @@ export default function AITangdou() {
       {/* 细长输入条 */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8,
-        padding: isMobile ? '8px 12px' : '10px 20px', borderTop: '1px solid #f0f0f0'
+        padding: '10px 20px', borderTop: '1px solid #f0f0f0'
       }}>
         <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
         <button onClick={() => fileRef.current?.click()} title="图片" style={{
-          width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius: '50%', border: 'none', cursor: 'pointer',
+          width: 36, height: 36, borderRadius: '50%', border: 'none', cursor: 'pointer',
           background: pendingImage ? '#c2410c' : '#f5f5f5',
           color: pendingImage ? '#fff' : '#666',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -833,15 +805,15 @@ export default function AITangdou() {
 
         <div style={{
           flex: 1, display: 'flex', alignItems: 'center',
-          background: '#f5f5f5', borderRadius: isMobile ? 18 : 22,
-          padding: '0 14px', height: isMobile ? 36 : 40,
-          minHeight: isMobile ? 36 : 40, maxHeight: isMobile ? 36 : 40,
+          background: '#f5f5f5', borderRadius: 22,
+          padding: '0 14px', height: 40,
+          minHeight: 40, maxHeight: 40,
           overflow: 'hidden', boxSizing: 'border-box'
         }}>
           <textarea
             ref={inputRef}
             value={input}
-            placeholder={isMobile ? '发消息或按住说话…' : '发消息或按住空格说话…'}
+            placeholder="发消息或按住空格说话…"
             onChange={(e) => { setInput(e.target.value); autoResize(e.target) }}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !loading) { e.preventDefault(); send() } }}
             rows={1}
@@ -849,34 +821,31 @@ export default function AITangdou() {
               flex: 1, border: 'none', outline: 'none', background: 'transparent',
               fontSize: 14, lineHeight: 1.4, resize: 'none',
               fontFamily: 'inherit', padding: 0,
-              height: isMobile ? 36 : 40,
+              height: 40,
               boxSizing: 'border-box',
-              minHeight: isMobile ? 36 : 40, maxHeight: 120,
+              minHeight: 40, maxHeight: 120,
               overflow: 'auto'
             }}
           />
         </div>
 
-        {/* Mobile 端保留 + 按钮（快捷功能） */}
-        {isMobile && (
-          <button onClick={() => setShowTags(v => !v)} title="快捷功能" style={{
-            width: 32, height: 32, borderRadius: '50%', border: 'none', cursor: 'pointer',
-            background: showTags ? '#c2410c' : '#f5f5f5',
-            color: showTags ? '#fff' : '#666',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0, fontSize: 14, transition: 'all .15s'
-          }}>＋</button>
-        )}
+        <button onClick={() => setShowTags(v => !v)} title="快捷功能" style={{
+          width: 36, height: 36, borderRadius: '50%', border: 'none', cursor: 'pointer',
+          background: showTags ? '#c2410c' : '#f5f5f5',
+          color: showTags ? '#fff' : '#666',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0, fontSize: 14, transition: 'all .15s'
+        }}>＋</button>
 
         {loading ? (
           <button onClick={stop} style={{
-            width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius: '50%', border: 'none', cursor: 'pointer',
+            width: 36, height: 36, borderRadius: '50%', border: 'none', cursor: 'pointer',
             background: '#f5f5f5', color: '#666', flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center'
           }}><Square size={14} strokeWidth={2.4} fill="#666" /></button>
         ) : (input.trim() || pendingImage) ? (
           <button onClick={() => send()} style={{
-            width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius: '50%', border: 'none', cursor: 'pointer',
+            width: 36, height: 36, borderRadius: '50%', border: 'none', cursor: 'pointer',
             background: '#c2410c', color: '#fff',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             flexShrink: 0, fontSize: 14
@@ -884,28 +853,26 @@ export default function AITangdou() {
         ) : null}
       </div>
 
-      {/* PC 端：输入条下方常驻一排小功能标签（豆包风） */}
-      {!isMobile && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 14, padding: '8px 24px 4px',
-          fontSize: 12, color: '#888'
-        }}>
-          {QUICK_TAGS.slice(0, 6).map(t => {
-            const Icon = t.icon
-            return (
-              <button key={t.label} onClick={() => useTag(t)} style={{
-                border: 'none', background: 'transparent', color: '#666',
-                fontSize: 12, cursor: 'pointer', padding: 0,
-                display: 'flex', alignItems: 'center', gap: 4
-              }}
-                onMouseEnter={e => e.currentTarget.style.color = '#c2410c'}
-                onMouseLeave={e => e.currentTarget.style.color = '#666'}>
-                <Icon size={13} strokeWidth={1.9} /><span>{t.label}</span>
-              </button>
-            )
-          })}
-        </div>
-      )}
+      {/* 输入条下方常驻一排小功能标签 */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 14, padding: '8px 24px 4px',
+        fontSize: 12, color: '#888'
+      }}>
+        {QUICK_TAGS.slice(0, 6).map(t => {
+          const Icon = t.icon
+          return (
+            <button key={t.label} onClick={() => useTag(t)} style={{
+              border: 'none', background: 'transparent', color: '#666',
+              fontSize: 12, cursor: 'pointer', padding: 0,
+              display: 'flex', alignItems: 'center', gap: 4
+            }}
+              onMouseEnter={e => e.currentTarget.style.color = '#c2410c'}
+              onMouseLeave={e => e.currentTarget.style.color = '#666'}>
+              <Icon size={13} strokeWidth={1.9} /><span>{t.label}</span>
+            </button>
+          )
+        })}
+      </div>
 
       <div style={{ textAlign: 'center', fontSize: 11, color: '#bbb', paddingBottom: 4 }}>
         糖豆 由择校通平台提供 · 内容仅供参考
@@ -919,43 +886,33 @@ export default function AITangdou() {
       flex: 1, display: 'flex', flexDirection: 'column',
       minWidth: 0, height: '100%', background: '#fff'
     }}>
-      {/* 顶部条：mobile 三件套，PC 极简只显示中间标题 */}
+      {/* 顶部条 */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: isMobile ? '10px 16px' : '14px 32px',
-        borderBottom: '1px solid #f0f0f0',   // PC 端也加细线分隔，避免顶栏颜色混在一起
+        padding: '14px 32px',
+        borderBottom: '1px solid #f0f0f0',
         background: '#fff', flexShrink: 0,
-        minHeight: 48                       // 固定最小高度，避免被压缩
+        minHeight: 48
       }}>
-        {isMobile ? (
-          <>
-            <button onClick={() => setHistoryOpen(true)} title="历史对话" style={{
-              border: 'none', background: 'transparent', cursor: 'pointer',
-              width: 36, height: 36, borderRadius: 8, color: '#333',
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}><Menu size={20} strokeWidth={2} /></button>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              fontSize: 16, fontWeight: 600, color: '#1c1814'
-            }}>
-              <Sparkles size={18} color="#1c1814" strokeWidth={2} />
-              <span>{currentTitle || '糖豆'}</span>
-            </div>
-            <button onClick={startNewChat} title="新对话" style={{
-              border: 'none', background: 'transparent', cursor: 'pointer',
-              width: 36, height: 36, borderRadius: 8, fontSize: 18, color: '#666',
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>＋</button>
-          </>
-        ) : (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            fontSize: 15, fontWeight: 600, color: '#1c1814'
-          }}>
-            <Sparkles size={17} color="#1c1814" strokeWidth={2} />
-            <span>{currentTitle || '糖豆'}</span>
-          </div>
-        )}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          fontSize: 15, fontWeight: 600, color: '#1c1814'
+        }}>
+          <Sparkles size={17} color="#1c1814" strokeWidth={2} />
+          <span>{currentTitle || '糖豆'}</span>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setHistoryOpen(true)} title="历史对话" style={{
+            border: 'none', background: 'transparent', cursor: 'pointer',
+            width: 36, height: 36, borderRadius: 8, color: '#333',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}><Menu size={20} strokeWidth={2} /></button>
+          <button onClick={startNewChat} title="新对话" style={{
+            border: 'none', background: 'transparent', cursor: 'pointer',
+            width: 36, height: 36, borderRadius: 8, fontSize: 18, color: '#666',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>＋</button>
+        </div>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
@@ -965,23 +922,13 @@ export default function AITangdou() {
     </div>
   )
 
-  // 用 position: fixed 把糖豆容器从正常文档流抽离（仅桌面端）：
-  // 这样 .container 的 padding-bottom:80px + footer 不会撑大整页
-  // 桌面端 top:60 给顶部导航栏留偏移。
-  // 手机端走 normal flow 让 MobileLayout 底栏正常露出（fixed z-100 会挡住 z-30 的底栏）。
   return (
     <div style={{
-      position: isMobile ? 'static' : 'fixed',
-      top: isMobile ? undefined : 60,
-      left: isMobile ? undefined : 0,
-      right: isMobile ? undefined : 0,
-      bottom: isMobile ? undefined : 0,
+      position: 'fixed',
+      top: 60, left: 0, right: 0, bottom: 0,
       display: 'flex',
-      flexDirection: isMobile ? 'column' : 'row',
-      width: isMobile ? '100%' : undefined,
-      height: isMobile ? '100%' : undefined,
       background: '#fff',
-      zIndex: isMobile ? undefined : 100,
+      zIndex: 100,
       overflow: 'hidden'
     }}>
       {sidebar}
