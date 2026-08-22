@@ -1053,28 +1053,13 @@ export default function AITangdou() {
               width: 36, height: 36, borderRadius: 8, color: '#333',
               display: 'flex', alignItems: 'center', justifyContent: 'center'
             }}><Menu size={20} strokeWidth={2} /></button>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              fontSize: 16, fontWeight: 600, color: '#1c1814'
-            }}>
-              <Sparkles size={18} color="#1c1814" strokeWidth={2} />
-              <span>{currentTitle || '糖豆'}</span>
-            </div>
             <button onClick={startNewChat} title="新对话" style={{
               border: 'none', background: 'transparent', cursor: 'pointer',
               width: 36, height: 36, borderRadius: 8, fontSize: 18, color: '#666',
               display: 'flex', alignItems: 'center', justifyContent: 'center'
             }}>＋</button>
           </>
-        ) : (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            fontSize: 15, fontWeight: 600, color: '#1c1814'
-          }}>
-            <Sparkles size={17} color="#1c1814" strokeWidth={2} />
-            <span>{currentTitle || '糖豆'}</span>
-          </div>
-        )}
+        ) : null}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
