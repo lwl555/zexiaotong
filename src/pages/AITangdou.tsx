@@ -967,10 +967,11 @@ export default function AITangdou() {
 
   // 用 position: fixed 把糖豆容器从正常文档流抽离
   // 这样 .container 的 padding-bottom:80px + footer 不会撑大整页
+  // 桌面端 top:60 给顶部导航栏留偏移；手机端无顶栏，top:0
   return (
     <div style={{
       position: 'fixed',
-      top: 60, left: 0, right: 0, bottom: 0,
+      top: isMobile ? 0 : 60, left: 0, right: 0, bottom: 0,
       display: 'flex',
       background: '#fff',
       zIndex: 100,
