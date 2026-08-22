@@ -635,19 +635,7 @@ export default function AITangdou() {
         })}
       </div>
 
-      {/* 底部用户区 */}
-      <div style={{
-        padding: '12px 14px', borderTop: '1px solid #f0f0f0',
-        display: 'flex', alignItems: 'center', gap: 8
-      }}>
-        <div style={{
-          width: 28, height: 28, borderRadius: '50%', background: '#1c1814',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fff'
-        }}><User size={16} strokeWidth={2} /></div>
-        <span style={{ fontSize: 13, color: '#333' }}>我的</span>
-      </div>
-    </aside>
+      </aside>
   )
 
   // ─── 主区消息气泡 ─────────────────────────────────────────
