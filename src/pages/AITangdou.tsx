@@ -5,7 +5,7 @@ import {
   MessageSquare, Search, PenLine, Table2, Globe, Image as ImageIcon,
   Clapperboard, Plus, User, Sparkles, Wand, Code2, Calculator,
   Lightbulb, Languages, Home, Bot, SquarePen, Square, X, Trash2,
-  Link2, Menu
+  Link2, Menu, ChevronDown
 } from 'lucide-react'
 import {
   Conversation, StoredMsg, getConversations, upsertConversation, deleteConversation, newId
