@@ -1175,32 +1175,30 @@ export default function AITangdou() {
       background: isMobile ? '#f6f6f7' : '#fff',
       position: 'relative'  // 给 mobile 浮顶按钮条做定位锚
     }}>
-      {/* mobile：浮在最顶部的两个大按钮（绝对定位，不占布局，聊天区最大化） */}
+      {/* mobile：两个大按钮独立浮在最顶部左右角（不再左右通栏占布局，中间完全无空白） */}
       {isMobile && (
-        <div style={{
-          position: 'absolute', top: 2, left: 0, right: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '0 12px',
-          zIndex: 5
-        }}>
+        <>
           <button onClick={() => setHistoryOpen(true)} title="历史对话" style={{
+            position: 'absolute', top: 6, left: 6, zIndex: 5,
             border: 'none', background: 'rgba(0,0,0,.06)', cursor: 'pointer',
             width: 44, height: 44, borderRadius: 12, color: '#333',
             display: 'flex', alignItems: 'center', justifyContent: 'center'
           }}><Menu size={22} strokeWidth={2} /></button>
           <button onClick={startNewChat} title="新对话" style={{
+            position: 'absolute', top: 6, right: 6, zIndex: 5,
             border: 'none', background: 'rgba(0,0,0,.06)', cursor: 'pointer',
             width: 44, height: 44, borderRadius: 12, color: '#333',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 22, lineHeight: 1
           }}>＋</button>
-        </div>
+        </>
       )}
 
       <div style={{
         display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0,
-        // mobile 留 40px 给浮顶大按钮（聊天区最大化）；PC 不留
-        paddingTop: isMobile ? 40 : 0
+        // mobile paddingTop 0：彻底去掉中间留白（之前 40 撑出"假状态栏"），
+        // 按钮独立浮在内容上，聊天区从顶部 0 开始铺满最大化
+        paddingTop: 0
       }}>
         {messageArea}
         {bottomBar}
