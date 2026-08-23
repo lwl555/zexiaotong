@@ -96,15 +96,21 @@ Deno.serve(async (req: Request) => {
     try { body = await req.json() } catch { return json({ error: 'invalid json' }, 400) }
     if (!UPSTREAM_KEY) return json({ error: 'UPSTREAM_KEY 未配置' }, 500)
 
+    const reqBody: Record<string, any> = {
+      model: body.model || 'agnes-image-2.1-flash',
+      prompt: body.prompt || '',
+      n: body.n || 1,
+      size: body.size || '1024x1024'
+    }
+    // 图生图：透传输入图片 + 变化强度
+    if (body.image) {
+      reqBody.image = body.image
+      if (body.strength !== undefined) reqBody.strength = body.strength
+    }
     const upstream = await fetch(`${UPSTREAM_BASE}/images/generations`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${UPSTREAM_KEY}` },
-      body: JSON.stringify({
-        model: body.model || 'agnes-image-2.1-flash',
-        prompt: body.prompt || '',
-        n: body.n || 1,
-        size: body.size || '1024x1024'
-      })
+      body: JSON.stringify(reqBody)
     })
     const data = await upstream.json().catch(() => ({}))
     return json(data, upstream.status)
@@ -116,17 +122,22 @@ Deno.serve(async (req: Request) => {
     try { body = await req.json() } catch { return json({ error: 'invalid json' }, 400) }
     if (!UPSTREAM_KEY) return json({ error: 'UPSTREAM_KEY 未配置' }, 500)
 
+    const reqBody: Record<string, any> = {
+      model: body.model || 'agnes-video-v2.0',
+      prompt: body.prompt || '',
+      height: body.height || 768,
+      width: body.width || 1152,
+      num_frames: body.num_frames || 121,
+      frame_rate: body.frame_rate || 24
+    }
+    // 图生视频：透传输入图片（作为首帧）
+    if (body.image) {
+      reqBody.image = body.image
+    }
     const upstream = await fetch(`${UPSTREAM_BASE}/videos`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${UPSTREAM_KEY}` },
-      body: JSON.stringify({
-        model: body.model || 'agnes-video-v2.0',
-        prompt: body.prompt || '',
-        height: body.height || 768,
-        width: body.width || 1152,
-        num_frames: body.num_frames || 121,
-        frame_rate: body.frame_rate || 24
-      })
+      body: JSON.stringify(reqBody)
     })
     const data = await upstream.json().catch(() => ({}))
     return json(data, upstream.status)

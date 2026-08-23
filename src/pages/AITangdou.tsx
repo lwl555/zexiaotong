@@ -422,10 +422,15 @@ export default function AITangdou() {
   const [genDialog, setGenDialog] = useState<'idle' | 'image' | 'video' | 'generating'>('idle')
   const [genPrompt, setGenPrompt] = useState('')
   const [genError, setGenError] = useState('')
+  const [genMode, setGenMode] = useState<'text' | 'image'>('text')  // 文生图 / 图生图
+  const [genVideoMode, setGenVideoMode] = useState<'text' | 'image'>('text')  // 文生视频 / 图生视频
+  const [genImage, setGenImage] = useState<string | null>(null)  // 图生图/图生视频的输入图片
+  const [genDuration, setGenDuration] = useState(121)  // 视频帧数：81=3s, 121=5s, 241=10s, 441=18s
   const abortRef = useRef<AbortController | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const genFileRef = useRef<HTMLInputElement>(null)
   const startRef = useRef<number>(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const isMobile = useIsMobile()
@@ -604,6 +609,16 @@ export default function AITangdou() {
 
   function removePendingImage() { setPendingImage(null) }
 
+  async function handleGenFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const compressed = await compressImage(file, 1024, 0.7)
+      setGenImage(compressed)
+    } catch { /* ignore */ }
+    e.target.value = ''
+  }
+
   function useTag(tag: { icon?: any; label: string }) {
     const label = tag.label
     setShowTags(false)
@@ -646,10 +661,15 @@ export default function AITangdou() {
     try {
       if (genDialog === 'image') {
         // 图片：同步等待结果
-        const res = await agnesImageGen({ prompt })
+        const res = await agnesImageGen({
+          prompt,
+          image: genMode === 'image' ? genImage || undefined : undefined,
+          strength: genMode === 'image' ? 0.7 : undefined
+        })
         if (res.ok && res.url) {
           setGenDialog('idle')
           setGenPrompt('')
+          setGenImage(null)
           // 在聊天区显示生成的图片
           const aiMsg: Msg = {
             role: 'ai',
@@ -664,7 +684,11 @@ export default function AITangdou() {
         }
       } else if (genDialog === 'video') {
         // 视频：异步提交
-        const res = await agnesVideoSubmit({ prompt })
+        const res = await agnesVideoSubmit({
+          prompt,
+          num_frames: genDuration,
+          image: genVideoMode === 'image' ? genImage || undefined : undefined
+        })
         if (res.ok && res.video_id) {
           // 轮询等待完成
           const videoId = res.video_id
@@ -676,6 +700,7 @@ export default function AITangdou() {
             if (pollRes.ok && pollRes.status === 'completed' && pollRes.url) {
               setGenDialog('idle')
               setGenPrompt('')
+              setGenImage(null)
               const aiMsg: Msg = {
                 role: 'ai',
                 content: `🎬 AI 生视频：${prompt}`,
@@ -1518,7 +1543,7 @@ export default function AITangdou() {
 
       {/* 图片/视频生成对话框 */}
       {genDialog !== 'idle' && (
-        <div onClick={() => { setGenDialog('idle'); setGenError('') }} style={{
+        <div onClick={() => { setGenDialog('idle'); setGenError(''); setGenImage(null); setGenMode('text'); setGenVideoMode('text'); setGenDuration(121) }} style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 200,
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
         }}>
@@ -1532,18 +1557,100 @@ export default function AITangdou() {
               <div style={{ fontSize: 16, fontWeight: 600, color: '#1c1814' }}>
                 {genDialog === 'image' ? '🖼️ AI 生图' : genDialog === 'video' ? '🎬 AI 生视频' : genDialog === 'generating' ? '⏳ 生成中…' : ''}
               </div>
-              <button onClick={() => { setGenDialog('idle'); setGenError('') }} style={{
+              <button onClick={() => { setGenDialog('idle'); setGenError(''); setGenImage(null); setGenMode('text'); setGenVideoMode('text'); setGenDuration(121) }} style={{
                 border: 'none', background: 'transparent', cursor: 'pointer', color: '#999', fontSize: 18
               }}>×</button>
             </div>
 
             {genDialog !== 'generating' ? (
               <>
+                {/* 模式切换：文生图 / 图生图 或 文生视频 / 图生视频 */}
+                <div style={{
+                  display: 'inline-flex', borderRadius: 8, overflow: 'hidden',
+                  border: '1px solid #e5e5e5', marginBottom: 12
+                }}>
+                  <button
+                    onClick={() => genDialog === 'image' ? setGenMode('text') : setGenVideoMode('text')}
+                    style={{
+                      padding: '6px 16px', fontSize: 13, border: 'none', cursor: 'pointer',
+                      background: (genDialog === 'image' ? genMode : genVideoMode) === 'text' ? '#1c1814' : '#fff',
+                      color: (genDialog === 'image' ? genMode : genVideoMode) === 'text' ? '#fff' : '#666',
+                      transition: 'all .15s'
+                    }}>
+                    {genDialog === 'image' ? '文生图' : '文生视频'}
+                  </button>
+                  <button
+                    onClick={() => genDialog === 'image' ? setGenMode('image') : setGenVideoMode('image')}
+                    style={{
+                      padding: '6px 16px', fontSize: 13, border: 'none', cursor: 'pointer',
+                      background: (genDialog === 'image' ? genMode : genVideoMode) === 'image' ? '#1c1814' : '#fff',
+                      color: (genDialog === 'image' ? genMode : genVideoMode) === 'image' ? '#fff' : '#666',
+                      transition: 'all .15s'
+                    }}>
+                    {genDialog === 'image' ? '图生图' : '图生视频'}
+                  </button>
+                </div>
+
+                {/* 图生图/图生视频：图片上传区 */}
+                {(genDialog === 'image' && genMode === 'image') || (genDialog === 'video' && genVideoMode === 'image') ? (
+                  <div style={{ marginBottom: 12 }}>
+                    <input ref={genFileRef} type="file" accept="image/*" onChange={handleGenFile} style={{ display: 'none' }} />
+                    {genImage ? (
+                      <div style={{ position: 'relative', display: 'inline-block' }}>
+                        <img src={genImage} alt="输入图" style={{ maxWidth: 120, maxHeight: 120, borderRadius: 8, border: '1px solid #e5e5e5' }} />
+                        <button onClick={() => setGenImage(null)} style={{
+                          position: 'absolute', top: -6, right: -6, width: 20, height: 20,
+                          borderRadius: '50%', border: 'none', background: '#999', color: '#fff',
+                          fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        }}>×</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => genFileRef.current?.click()} style={{
+                        width: '100%', padding: '16px 12px', borderRadius: 10,
+                        border: '2px dashed #d4d4d4', background: '#fafafa', cursor: 'pointer',
+                        color: '#888', fontSize: 13, transition: 'all .15s'
+                      }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = '#c2410c'; e.currentTarget.style.background = '#fff7ed' }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = '#d4d4d4'; e.currentTarget.style.background = '#fafafa' }}>
+                        📷 上传参考图片
+                        <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>作为生成基础（支持 JPG/PNG）</div>
+                      </button>
+                    )}
+                  </div>
+                ) : null}
+
+                {/* 视频时长选择 */}
+                {genDialog === 'video' && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 12, color: '#888', marginBottom: 6 }}>视频时长</div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {[
+                        { frames: 81, label: '3秒' },
+                        { frames: 121, label: '5秒' },
+                        { frames: 241, label: '10秒' },
+                        { frames: 441, label: '18秒' }
+                      ].map(opt => (
+                        <button key={opt.frames} onClick={() => setGenDuration(opt.frames)} style={{
+                          flex: 1, padding: '6px 4px', borderRadius: 8, border: '1px solid',
+                          borderColor: genDuration === opt.frames ? '#c2410c' : '#e5e5e5',
+                          background: genDuration === opt.frames ? '#fff7ed' : '#fff',
+                          color: genDuration === opt.frames ? '#c2410c' : '#666',
+                          fontSize: 12, cursor: 'pointer', transition: 'all .15s'
+                        }}>
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <textarea
                   autoFocus
                   value={genPrompt}
                   onChange={e => setGenPrompt(e.target.value)}
-                  placeholder={genDialog === 'image' ? '描述你想生成的图片内容，例如：一只在月光下奔跑的白狐，电影级光影' : '描述你想生成的视频内容，例如：海边日落，浪花轻拍沙滩，电影感'}
+                  placeholder={genDialog === 'image'
+                    ? (genMode === 'image' ? '描述你想要的修改，例如：把背景换成星空，保留人物' : '描述你想生成的图片内容，例如：一只在月光下奔跑的白狐，电影级光影')
+                    : (genVideoMode === 'image' ? '描述你想要的视频效果，例如：镜头缓慢推进，花瓣飘落' : '描述你想生成的视频内容，例如：海边日落，浪花轻拍沙滩，电影感')}
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && genPrompt.trim()) { e.preventDefault(); handleGen() } }}
                   rows={3}
                   style={{
@@ -1553,7 +1660,7 @@ export default function AITangdou() {
                   }} />
                 {genError && <div style={{ color: '#b42318', fontSize: 12, marginTop: 6 }}>{genError}</div>}
                 <div style={{ display: 'flex', gap: 8, marginTop: 14, justifyContent: 'flex-end' }}>
-                  <button onClick={() => { setGenDialog('idle'); setGenError('') }} style={{
+                  <button onClick={() => { setGenDialog('idle'); setGenError(''); setGenImage(null); setGenMode('text'); setGenVideoMode('text'); setGenDuration(121) }} style={{
                     border: '1px solid #e5e5e5', background: '#fff', borderRadius: 8,
                     padding: '8px 16px', fontSize: 13, cursor: 'pointer', color: '#666'
                   }}>取消</button>
@@ -1577,7 +1684,7 @@ export default function AITangdou() {
                   {genDialog === 'generating' ? '正在生成，请稍候…' : ''}
                 </div>
                 <div style={{ fontSize: 11, color: '#bbb', marginTop: 4 }}>
-                  图片约 10-30 秒 · 视频约 2-3 分钟
+                  {genDialog === 'generating' ? (genMode === 'image' || genVideoMode === 'image' ? '图生图/视频约 30-60 秒' : '图片约 10-30 秒 · 视频约 2-3 分钟') : ''}
                 </div>
               </div>
             )}

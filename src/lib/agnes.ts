@@ -153,6 +153,10 @@ export interface ImageGenOptions {
   model?: string
   n?: number
   size?: string
+  /** 图生图：输入图片 URL 或 base64 data URI */
+  image?: string
+  /** 图生图：变化强度 0-1，越高变化越大 */
+  strength?: number
   signal?: AbortSignal
 }
 
@@ -171,6 +175,8 @@ export interface VideoGenOptions {
   width?: number
   num_frames?: number
   frame_rate?: number
+  /** 图生视频：输入图片 URL 或 base64 data URI */
+  image?: string
   signal?: AbortSignal
 }
 
@@ -332,13 +338,19 @@ export async function agnesImageGen(
   opts: ImageGenOptions
 ): Promise<ImageGenResult> {
   try {
+    const body: Record<string, any> = {
+      model: opts.model || 'agnes-image-2.1-flash',
+      prompt: opts.prompt,
+      n: opts.n || 1,
+      size: opts.size || '1024x1024'
+    }
+    // 图生图：传递 image + strength
+    if (opts.image) {
+      body.image = opts.image
+      if (opts.strength !== undefined) body.strength = opts.strength
+    }
     const data = await call('/v1/images/generations', {
-      body: {
-        model: opts.model || 'agnes-image-2.1-flash',
-        prompt: opts.prompt,
-        n: opts.n || 1,
-        size: opts.size || '1024x1024'
-      },
+      body,
       signal: opts.signal
     })
     const url = (data as any)?.data?.[0]?.url
@@ -354,15 +366,20 @@ export async function agnesVideoSubmit(
   opts: VideoGenOptions
 ): Promise<VideoSubmitResult> {
   try {
+    const body: Record<string, any> = {
+      model: opts.model || 'agnes-video-v2.0',
+      prompt: opts.prompt,
+      height: opts.height || 768,
+      width: opts.width || 1152,
+      num_frames: opts.num_frames || 121,
+      frame_rate: opts.frame_rate || 24
+    }
+    // 图生视频：传递 image
+    if (opts.image) {
+      body.image = opts.image
+    }
     const data = await call('/v1/videos', {
-      body: {
-        model: opts.model || 'agnes-video-v2.0',
-        prompt: opts.prompt,
-        height: opts.height || 768,
-        width: opts.width || 1152,
-        num_frames: opts.num_frames || 121,
-        frame_rate: opts.frame_rate || 24
-      },
+      body,
       signal: opts.signal
     })
     const vid = (data as any)?.video_id
