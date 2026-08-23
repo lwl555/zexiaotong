@@ -244,9 +244,23 @@ function HistoryPanel({
   const [convs, setConvs] = useState<Conversation[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
+  // 退出动画状态：open→false 时先设 closing=true，等动画结束后再卸载
+  const [closing, setClosing] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    if (open) setConvs(getConversations().filter(c => c.pageKey === PAGE_KEY))
+    if (open) {
+      setMounted(true)
+      setClosing(false)
+      setConvs(getConversations().filter(c => c.pageKey === PAGE_KEY))
+    } else if (mounted) {
+      setClosing(true)
+      const timer = setTimeout(() => {
+        setClosing(false)
+        setMounted(false)
+      }, 280)
+      return () => clearTimeout(timer)
+    }
   }, [open])
 
   function refresh() { setConvs(getConversations().filter(c => c.pageKey === PAGE_KEY)) }
@@ -258,15 +272,26 @@ function HistoryPanel({
     refresh()
   }
 
-  if (!open) return null
+  if (!mounted && !closing) return null
+
+  // 动画变量：面板 translateX、背景 opacity
+  const panelX = open && !closing ? '0' : '-100%'
+  const backdropAlpha = open && !closing ? 0.4 : 0
 
   return (
     <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 100 }} />
+      <div onClick={onClose} style={{
+        position: 'fixed', inset: 0, background: `rgba(0,0,0,${backdropAlpha})`, zIndex: 100,
+        transition: 'background .28s cubic-bezier(.4,0,.2,1)',
+        pointerEvents: open ? 'auto' : 'none'
+      }} />
       <aside style={{
         position: 'fixed', top: 0, left: 0, bottom: 0, width: 'min(320px, 86vw)',
         background: '#fff', zIndex: 101, display: 'flex', flexDirection: 'column',
-        boxShadow: '2px 0 12px rgba(0,0,0,.08)'
+        boxShadow: '2px 0 12px rgba(0,0,0,.08)',
+        transform: `translateX(${panelX})`,
+        transition: 'transform .28s cubic-bezier(.4,0,.2,1)',
+        willChange: 'transform'
       }}>
         <div style={{
           padding: '14px 16px', borderBottom: '1px solid #f0f0f0',
@@ -276,12 +301,14 @@ function HistoryPanel({
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => { onNew(); onClose() }} style={{
               border: 'none', background: '#c2410c', color: '#fff',
-              borderRadius: 8, padding: '5px 12px', fontSize: 13, cursor: 'pointer'
-            }}>＋ 新对话</button>
+              borderRadius: 8, padding: '5px 12px', fontSize: 13, cursor: 'pointer',
+              transition: 'transform .1s cubic-bezier(.4,0,.2,1)'
+            }} onMouseDown={e => e.currentTarget.style.transform = 'scale(.94)'} onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>＋ 新对话</button>
             <button onClick={onClose} style={{
               border: 'none', background: '#f5f5f5', color: '#666',
-              borderRadius: 8, width: 28, height: 28, fontSize: 14, cursor: 'pointer'
-            }}><X size={14} strokeWidth={2} /></button>
+              borderRadius: 8, width: 28, height: 28, fontSize: 14, cursor: 'pointer',
+              transition: 'transform .1s cubic-bezier(.4,0,.2,1), background .15s'
+            }} onMouseDown={e => e.currentTarget.style.transform = 'scale(.9)'} onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}><X size={14} strokeWidth={2} /></button>
           </div>
         </div>
 
@@ -299,7 +326,8 @@ function HistoryPanel({
                 padding: '10px 16px', cursor: editing ? 'default' : 'pointer',
                 background: active ? '#fef3c7' : 'transparent',
                 borderLeft: active ? '3px solid #c2410c' : '3px solid transparent',
-                borderBottom: '1px solid #f8f8f8'
+                borderBottom: '1px solid #f8f8f8',
+                transition: 'background .15s cubic-bezier(.4,0,.2,1)'
               }} onClick={() => !editing && onSelect(c)}>
                 {editing ? (
                   <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: 6 }}>
@@ -317,8 +345,9 @@ function HistoryPanel({
                     />
                     <button onClick={() => commitRename(c.id)} style={{
                       border: 'none', background: '#c2410c', color: '#fff',
-                      borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer'
-                    }}>保存</button>
+                      borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer',
+                      transition: 'transform .1s cubic-bezier(.4,0,.2,1)'
+                    }} onMouseDown={e => e.currentTarget.style.transform = 'scale(.94)'} onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>保存</button>
                   </div>
                 ) : (
                   <>
@@ -852,7 +881,9 @@ export default function AITangdou() {
       {messages.map((m, i) => (
         <div key={i} style={{
           display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start',
-          marginBottom: isMobile ? 8 : 14
+          marginBottom: isMobile ? 8 : 14,
+          animation: 'fadeInUp .3s cubic-bezier(.4,0,.2,1) backwards',
+          animationDelay: `${i * 50}ms`
         }}>
           {m.role === 'ai' && (
             <div style={{
@@ -909,7 +940,8 @@ export default function AITangdou() {
                       color: '#666',
                       whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                       maxHeight: isMobile ? 180 : 320,
-                      overflowY: 'auto'
+                      overflowY: 'auto',
+                      animation: 'slideDown .2s cubic-bezier(.4,0,.2,1)'
                     }}>
                       {m.reasoning}
                     </div>
@@ -1033,8 +1065,27 @@ export default function AITangdou() {
       {showTags && isMobile && (
         <div style={{
           background: '#fafafa', borderTop: '1px solid #f5f5f5',
-          padding: '10px 12px 8px'
+          padding: '10px 12px 8px',
+          animation: 'tagsSlideUp .2s cubic-bezier(.4,0,.2,1)'
         }}>
+          <style>{`
+            @keyframes tagsSlideUp {
+              from { transform: translateY(100%); opacity: 0; }
+              to { transform: translateY(0); opacity: 1; }
+            }
+            @keyframes popIn {
+              from { opacity: 0; transform: scale(.92); }
+              to { opacity: 1; transform: scale(1); }
+            }
+            @keyframes fadeInUp {
+              from { opacity: 0; transform: translateY(8px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+            @keyframes slideDown {
+              from { opacity: 0; max-height: 0; }
+              to { opacity: 1; max-height: 300px; }
+            }
+          `}</style>
           {/* 联网搜索模式切换 */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10
@@ -1193,16 +1244,19 @@ export default function AITangdou() {
             background: showTags ? '#c2410c' : '#f5f5f5',
             color: showTags ? '#fff' : '#666',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0, fontSize: 14, transition: 'all .15s'
-          }}>＋</button>
+            flexShrink: 0, fontSize: 14, transition: 'all .15s',
+            transform: showTags ? 'scale(.92)' : 'scale(1)'
+          }} onMouseDown={e => e.currentTarget.style.transform = 'scale(.85)'} onMouseUp={e => e.currentTarget.style.transform = showTags ? 'scale(.92)' : 'scale(1)'} onMouseLeave={e => e.currentTarget.style.transform = showTags ? 'scale(.92)' : 'scale(1)'}>＋</button>
         )}
 
         {loading ? (
           <button onClick={stop} title="停止" style={{
             width: isMobile ? 30 : 36, height: isMobile ? 30 : 36, borderRadius: '50%', border: 'none', cursor: 'pointer',
             background: '#f5f5f5', color: '#666', flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}><Square size={12} strokeWidth={2.4} fill="#666" /></button>
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'transform .1s cubic-bezier(.4,0,.2,1)',
+            transform: 'scale(1)'
+          }} onMouseDown={e => e.currentTarget.style.transform = 'scale(.85)'} onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}><Square size={12} strokeWidth={2.4} fill="#666" /></button>
         ) : (
           // 发送按钮：永远显示，避免用户在空状态下找不到「↑」而误以为功能缺失
           // 空状态置灰禁用，有内容/有图时高亮可点（与主流 AI 聊天 app 一致）
@@ -1218,8 +1272,9 @@ export default function AITangdou() {
               color: (input.trim() || pendingImage) ? '#fff' : '#bbb',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               flexShrink: 0, fontSize: 14,
-              transition: 'all .15s'
-            }}>↑</button>
+              transition: 'all .15s cubic-bezier(.4,0,.2,1)',
+              transform: 'scale(1)'
+            }} onMouseDown={e => { if (input.trim() || pendingImage) e.currentTarget.style.transform = 'scale(.88)' }} onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>↑</button>
         )}
       </div>
 
@@ -1272,8 +1327,10 @@ export default function AITangdou() {
           <button onClick={() => setHistoryOpen(true)} title="历史对话" style={{
             border: 'none', background: 'transparent', cursor: 'pointer',
             width: 44, height: 44, color: '#1c1814',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}><Menu size={22} strokeWidth={2} /></button>
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'transform .1s cubic-bezier(.4,0,.2,1)',
+            transform: 'scale(1)'
+          }} onMouseDown={e => e.currentTarget.style.transform = 'scale(.9)'} onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}><Menu size={22} strokeWidth={2} /></button>
           <div style={{
             flex: 1, minWidth: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center'
