@@ -1164,36 +1164,35 @@ export default function AITangdou() {
   const mainArea = (
     <div style={{
       flex: 1, display: 'flex', flexDirection: 'column',
-      minWidth: 0, height: '100%', background: '#fff'
+      minWidth: 0, height: '100%', background: '#fff',
+      position: 'relative'  // 给 mobile 浮顶按钮条做定位锚
     }}>
-      {/* 顶部条：mobile 三件套裸贴边缘，PC 极简只显示中间标题 */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        // mobile：去掉背景/边框/minHeight，按钮只占 36px，padding 缩到 4/10（裸贴边缘）
-        // PC 端（因 isMobile=false）保持 14/32 padding 给标题留位
-        padding: isMobile ? '4px 10px' : '14px 32px',
-        // borderBottom: 1px solid #f0f0f0,   // PC 端也加细线分隔，避免顶栏颜色混在一起
-        // background: '#fff',                // mobile 透明，让按钮浮在最顶部
-        flexShrink: 0,
-        // minHeight: 48                      // 不再固定高度
-      }}>
-        {isMobile ? (
-          <>
-            <button onClick={() => setHistoryOpen(true)} title="历史对话" style={{
-              border: 'none', background: 'transparent', cursor: 'pointer',
-              width: 36, height: 36, borderRadius: 8, color: '#333',
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}><Menu size={20} strokeWidth={2} /></button>
-            <button onClick={startNewChat} title="新对话" style={{
-              border: 'none', background: 'transparent', cursor: 'pointer',
-              width: 36, height: 36, borderRadius: 8, fontSize: 18, color: '#666',
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>＋</button>
-          </>
-        ) : null}
-      </div>
+      {/* mobile：浮在最顶部的按钮条（绝对定位、不占布局、不形成"白色一排"） */}
+      {isMobile && (
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '4px 10px',
+          zIndex: 5
+        }}>
+          <button onClick={() => setHistoryOpen(true)} title="历史对话" style={{
+            border: 'none', background: 'transparent', cursor: 'pointer',
+            width: 36, height: 36, borderRadius: 8, color: '#333',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}><Menu size={20} strokeWidth={2} /></button>
+          <button onClick={startNewChat} title="新对话" style={{
+            border: 'none', background: 'transparent', cursor: 'pointer',
+            width: 36, height: 36, borderRadius: 8, fontSize: 18, color: '#666',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>＋</button>
+        </div>
+      )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      <div style={{
+        display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0,
+        // mobile 留 44px 给浮顶按钮（不挡首条消息）
+        paddingTop: isMobile ? 44 : 0
+      }}>
         {messageArea}
         {bottomBar}
       </div>
