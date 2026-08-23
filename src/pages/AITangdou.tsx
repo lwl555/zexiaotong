@@ -374,6 +374,12 @@ export default function AITangdou() {
   const [historyOpen, setHistoryOpen] = useState(false)
   const [currentConvId, setCurrentConvId] = useState<string>('')
   const [currentTitle, setCurrentTitle] = useState<string>('')
+  // PC 侧边栏历史对话的 inline 编辑态（修 PC 改对话名 bug）
+  const [sidebarEditingId, setSidebarEditingId] = useState<string | null>(null)
+  const [sidebarEditingTitle, setSidebarEditingTitle] = useState('')
+  // Mobile 顶部状态栏 中间标题的 inline 编辑态
+  const [mobileTitleEditing, setMobileTitleEditing] = useState(false)
+  const [mobileTitleDraft, setMobileTitleDraft] = useState('')
   const [mode, setMode] = useState<'chat' | 'work'>('chat')  // 对话 / 工作模式（PC端 tab）
   const [sidebarConvs, setSidebarConvs] = useState<Conversation[]>([])
   const [activeMode, setActiveMode] = useState<string | null>(null)  // 快捷模式：选中后持续注入系统提示词
@@ -676,21 +682,76 @@ export default function AITangdou() {
         )}
         {sidebarConvs.map(c => {
           const active = c.id === currentConvId
+          const isEditing = sidebarEditingId === c.id
           return (
-            <div key={c.id} onClick={() => loadConv(c)} style={{
+            <div key={c.id} style={{
               padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
               background: active ? '#fef3c7' : 'transparent',
               marginBottom: 2
             }}
+              onClick={() => { setSidebarEditingId(null); loadConv(c) }}
               onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#f0f0f0' }}
               onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}>
-              <div style={{
-                fontSize: 13, color: '#1c1814', fontWeight: active ? 600 : 400,
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-              }}>{c.title || '未命名对话'}</div>
-              <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
-                {c.messages.length} 条
-              </div>
+              {isEditing ? (
+                <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <input
+                    autoFocus value={sidebarEditingTitle}
+                    onChange={e => setSidebarEditingTitle(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        const t = sidebarEditingTitle.trim()
+                        if (t) renameConv(c.id, t)
+                        setSidebarEditingId(null)
+                      }
+                      if (e.key === 'Escape') setSidebarEditingId(null)
+                    }}
+                    style={{
+                      flex: 1, border: '1px solid #c2410c', borderRadius: 6,
+                      padding: '3px 7px', fontSize: 13, outline: 'none',
+                      background: '#fff', color: '#1c1814'
+                    }} />
+                  <button onClick={() => {
+                    const t = sidebarEditingTitle.trim()
+                    if (t) renameConv(c.id, t)
+                    setSidebarEditingId(null)
+                  }} style={{
+                    border: 'none', background: '#c2410c', color: '#fff',
+                    borderRadius: 6, padding: '3px 10px', fontSize: 12, cursor: 'pointer'
+                  }}>保存</button>
+                </div>
+              ) : (
+                <>
+                  <div style={{
+                    fontSize: 13, color: '#1c1814', fontWeight: active ? 600 : 400,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                  }}>{c.title || '未命名对话'}</div>
+                  <div style={{ fontSize: 11, color: '#999', marginTop: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>{c.messages.length} 条</span>
+                    <span onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={e => {
+                        e.stopPropagation()
+                        setSidebarEditingId(c.id)
+                        setSidebarEditingTitle(c.title)
+                      }} style={{
+                        border: 'none', background: 'transparent', color: '#666',
+                        fontSize: 11, padding: 0, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: 2
+                      }}><SquarePen size={11} strokeWidth={1.9} /> 重命名</button>
+                      <button onClick={e => {
+                        e.stopPropagation()
+                        if (confirm(`删除对话「${c.title || '未命名'}」？`)) {
+                          deleteConv(c.id)
+                          setSidebarEditingId(null)
+                        }
+                      }} style={{
+                        border: 'none', background: 'transparent', color: '#c2410c',
+                        fontSize: 11, padding: 0, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: 2
+                      }}><Trash2 size={11} strokeWidth={1.9} /> 删除</button>
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
           )
         })}
@@ -1200,22 +1261,80 @@ export default function AITangdou() {
       background: isMobile ? '#f6f6f7' : '#fff',
       position: 'relative'  // 给 mobile 浮顶按钮条做定位锚
     }}>
-      {/* mobile：仅保留底部左侧 ☰ 历史对话 FAB（按用户要求删除右下 ✎ 新对话按钮，最大简化） */}
+      {/* mobile：顶部状态栏 — 左 ☰ 历史 / 中 当前对话名（可点编辑）/ 右 留空 */}
       {isMobile && (
-        <button onClick={() => setHistoryOpen(true)} title="历史对话" style={{
-          position: 'absolute', bottom: 92, left: 14, zIndex: 6,
-          border: 'none', background: '#fff', cursor: 'pointer',
-          width: 46, height: 46, borderRadius: 23, color: '#333',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 2px 10px rgba(0,0,0,.14)'
-        }}><Menu size={22} strokeWidth={2} /></button>
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0, height: 44,
+          display: 'flex', alignItems: 'center',
+          background: '#fff', borderBottom: '1px solid #f0f0f0',
+          zIndex: 8, paddingLeft: 4, paddingRight: 4
+        }}>
+          <button onClick={() => setHistoryOpen(true)} title="历史对话" style={{
+            border: 'none', background: 'transparent', cursor: 'pointer',
+            width: 44, height: 44, color: '#1c1814',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}><Menu size={22} strokeWidth={2} /></button>
+          <div style={{
+            flex: 1, minWidth: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            {mobileTitleEditing ? (
+              <input
+                autoFocus value={mobileTitleDraft}
+                onChange={e => setMobileTitleDraft(e.target.value)}
+                onBlur={() => {
+                  const t = mobileTitleDraft.trim()
+                  if (t && currentConvId) renameConv(currentConvId, t)
+                  setMobileTitleEditing(false)
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    const t = mobileTitleDraft.trim()
+                    if (t && currentConvId) renameConv(currentConvId, t)
+                    setMobileTitleEditing(false)
+                  }
+                  if (e.key === 'Escape') setMobileTitleEditing(false)
+                }}
+                placeholder="新对话"
+                style={{
+                  width: '100%', maxWidth: 220, border: '1px solid #c2410c',
+                  borderRadius: 6, padding: '4px 10px', fontSize: 14,
+                  outline: 'none', textAlign: 'center',
+                  background: '#fff', color: '#1c1814'
+                }} />
+            ) : (
+              <div
+                onClick={() => {
+                  if (!currentConvId) return  // 没创建对话不能改
+                  setMobileTitleDraft(currentTitle)
+                  setMobileTitleEditing(true)
+                }}
+                title={currentConvId ? '点击修改对话名' : '请先发起一次对话'}
+                style={{
+                  maxWidth: 240, fontSize: 14, fontWeight: 600, color: '#1c1814',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  cursor: currentConvId ? 'pointer' : 'default',
+                  padding: '4px 12px', borderRadius: 6,
+                  border: '1px solid transparent',
+                  transition: 'border-color .15s, background .15s'
+                }}
+                onMouseEnter={e => { if (currentConvId) { e.currentTarget.style.background = '#f8f8f8'; e.currentTarget.style.borderColor = '#e8e8e8' } }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent' }}>
+                {currentTitle || '新对话'}
+              </div>
+            )}
+          </div>
+          {/* 右侧 44px 占位（保持状态栏对称，符合 iOS/Android 原生导航栏） */}
+          <div style={{ width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {/* 暂不放任何按钮（避免重蹈"上方什么都不要有"的反复） */}
+          </div>
+        </div>
       )}
 
       <div style={{
         display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0,
-        // mobile paddingTop 0：彻底去掉中间留白（之前 40 撑出"假状态栏"），
-        // 按钮独立浮在内容上，聊天区从顶部 0 开始铺满最大化
-        paddingTop: 0
+        // mobile paddingTop 44：留出位置给顶部状态栏；PC 不留
+        paddingTop: isMobile ? 44 : 0
       }}>
         {messageArea}
         {bottomBar}
