@@ -1175,31 +1175,32 @@ export default function AITangdou() {
       background: isMobile ? '#f6f6f7' : '#fff',
       position: 'relative'  // 给 mobile 浮顶按钮条做定位锚
     }}>
-      {/* mobile：浮在最顶部的按钮条（绝对定位、不占布局、不形成"白色一排"） */}
+      {/* mobile：浮在最顶部的两个大按钮（绝对定位，不占布局，聊天区最大化） */}
       {isMobile && (
         <div style={{
-          position: 'absolute', top: 0, left: 0, right: 0,
+          position: 'absolute', top: 2, left: 0, right: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '4px 10px',
+          padding: '0 12px',
           zIndex: 5
         }}>
           <button onClick={() => setHistoryOpen(true)} title="历史对话" style={{
-            border: 'none', background: 'transparent', cursor: 'pointer',
-            width: 36, height: 36, borderRadius: 8, color: '#333',
+            border: 'none', background: 'rgba(0,0,0,.06)', cursor: 'pointer',
+            width: 44, height: 44, borderRadius: 12, color: '#333',
             display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}><Menu size={20} strokeWidth={2} /></button>
+          }}><Menu size={22} strokeWidth={2} /></button>
           <button onClick={startNewChat} title="新对话" style={{
-            border: 'none', background: 'transparent', cursor: 'pointer',
-            width: 36, height: 36, borderRadius: 8, fontSize: 18, color: '#666',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
+            border: 'none', background: 'rgba(0,0,0,.06)', cursor: 'pointer',
+            width: 44, height: 44, borderRadius: 12, color: '#333',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 22, lineHeight: 1
           }}>＋</button>
         </div>
       )}
 
       <div style={{
         display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0,
-        // mobile 留 44px 给浮顶按钮（不挡首条消息）
-        paddingTop: isMobile ? 44 : 0
+        // mobile 留 40px 给浮顶大按钮（聊天区最大化）；PC 不留
+        paddingTop: isMobile ? 40 : 0
       }}>
         {messageArea}
         {bottomBar}
