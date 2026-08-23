@@ -1217,11 +1217,11 @@ export default function AITangdou() {
       top: isMobile ? 0 : 60,
       left: 0,
       right: 0,
-      // mobile 56：让输入条底端紧贴底部导航栏（56 = 64 导航高 - 8 上拱），更"碍拢"
-      bottom: isMobile ? 56 : 0,
+      // mobile 40：让输入条底端紧贴底部导航栏（40 = 48 导航高 - 8 上拱），更"碍拢"
+      bottom: isMobile ? 40 : 0,
       display: 'flex',
       flexDirection: isMobile ? 'column' : 'row',
-      background: '#fff',
+      background: isMobile ? '#f6f6f7' : '#fff',
       zIndex: isMobile ? 50 : 100,
       overflow: 'hidden'
     }}>

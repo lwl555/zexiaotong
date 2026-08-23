@@ -71,25 +71,25 @@ export default function MobileLayout() {
 
   return (
     <div className="app-shell flex flex-col" style={{ minHeight: '100vh' }}>
-      <div className="flex-1 overflow-y-auto no-scrollbar" style={{ paddingBottom: 64 }}>
+      <div className="flex-1 overflow-y-auto no-scrollbar" style={{ paddingBottom: 48 }}>
         <Outlet />
       </div>
-      {/* 底部固定导航（永远展开，不再提供▼ 折叠按钮） */}
+      {/* 底部固定导航（永远展开，不再提供▼ 折叠按钮；栏高 48 + 图标 18 + 文字 10px，更贴底） */}
       <nav
-        className="fixed bottom-0 inset-x-0 mx-auto w-full max-w-[480px] h-16 bg-white border-t border-gray-100 flex items-center px-2 z-30"
+        className="fixed bottom-0 inset-x-0 mx-auto w-full max-w-[480px] h-12 bg-white border-t border-gray-100 flex items-center px-2 z-30"
         style={{ transform: 'translateY(0)' }}>
         {tabs.map(t => (
           <NavLink key={t.to} to={t.to} end={t.end}
-            className={({ isActive }) => 'flex-1 flex flex-col items-center gap-1 py-1 ' + (isActive ? 'text-brand-600' : 'text-gray-400')}>
-            <t.icon size={22} />
-            <span className="text-[11px]">{t.label}</span>
+            className={({ isActive }) => 'flex-1 flex flex-col items-center gap-0 py-1 ' + (isActive ? 'text-brand-600' : 'text-gray-400')}>
+            <t.icon size={18} strokeWidth={1.9} />
+            <span className="text-[10px] leading-none mt-0.5">{t.label}</span>
           </NavLink>
         ))}
       </nav>
       {/* 浮动通知入口（贴着底部导航栏之上） */}
-      <button onClick={() => nav('/notifications')} className="fixed z-30 w-11 h-11 rounded-full bg-white shadow-card flex items-center justify-center text-brand-600"
-        style={{ bottom: 72, left: 12 }}>
-        <Bell size={20} />
+      <button onClick={() => nav('/notifications')} className="fixed z-30 w-10 h-10 rounded-full bg-white shadow-card flex items-center justify-center text-brand-600"
+        style={{ bottom: 56, left: 12 }}>
+        <Bell size={18} strokeWidth={1.9} />
         {unread > 0 && <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">{unread}</span>}
       </button>
     </div>
