@@ -1175,22 +1175,23 @@ export default function AITangdou() {
       background: isMobile ? '#f6f6f7' : '#fff',
       position: 'relative'  // 给 mobile 浮顶按钮条做定位锚
     }}>
-      {/* mobile：两个大按钮独立浮在最顶部左右角（不再左右通栏占布局，中间完全无空白） */}
+      {/* mobile：历史/新对话 两个按钮移到屏幕底部左右角做浮动 FAB，顶部彻底清空 */}
       {isMobile && (
         <>
           <button onClick={() => setHistoryOpen(true)} title="历史对话" style={{
-            position: 'absolute', top: 6, left: 6, zIndex: 5,
-            border: 'none', background: 'rgba(0,0,0,.06)', cursor: 'pointer',
-            width: 44, height: 44, borderRadius: 12, color: '#333',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
+            position: 'absolute', bottom: 92, left: 14, zIndex: 6,
+            border: 'none', background: '#fff', cursor: 'pointer',
+            width: 46, height: 46, borderRadius: 23, color: '#333',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 2px 10px rgba(0,0,0,.14)'
           }}><Menu size={22} strokeWidth={2} /></button>
           <button onClick={startNewChat} title="新对话" style={{
-            position: 'absolute', top: 6, right: 6, zIndex: 5,
-            border: 'none', background: 'rgba(0,0,0,.06)', cursor: 'pointer',
-            width: 44, height: 44, borderRadius: 12, color: '#333',
+            position: 'absolute', bottom: 92, right: 14, zIndex: 6,
+            border: 'none', background: '#fff', cursor: 'pointer',
+            width: 46, height: 46, borderRadius: 23, color: '#c2410c',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 22, lineHeight: 1
-          }}>＋</button>
+            boxShadow: '0 2px 10px rgba(0,0,0,.14)'
+          }}><SquarePen size={21} strokeWidth={2} /></button>
         </>
       )}
 
