@@ -1016,6 +1016,31 @@ export default function AITangdou() {
               </button>
             ))}
           </div>
+          {/* 媒体入口：图像生成 / 视频生成（对齐 PC 端左侧栏行为，点击打开文件选择） */}
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, marginTop: 6
+          }}>
+            <button onClick={() => { setShowTags(false); fileRef.current?.click() }} style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
+              padding: '8px 4px', borderRadius: 8, border: '1px solid #e5e5e5',
+              background: '#fff', cursor: 'pointer', color: '#555', transition: 'all .15s'
+            }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = '#c2410c'}
+              onMouseLeave={e => e.currentTarget.style.borderColor = '#e5e5e5'}>
+              <span style={{ display: 'inline-flex', alignItems: 'center' }}><ImageIcon size={16} strokeWidth={1.9} /></span>
+              <span style={{ fontSize: 11, color: '#666' }}>图像生成</span>
+            </button>
+            <button onClick={() => { setShowTags(false); fileRef.current?.click() }} style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
+              padding: '8px 4px', borderRadius: 8, border: '1px solid #e5e5e5',
+              background: '#fff', cursor: 'pointer', color: '#555', transition: 'all .15s'
+            }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = '#c2410c'}
+              onMouseLeave={e => e.currentTarget.style.borderColor = '#e5e5e5'}>
+              <span style={{ display: 'inline-flex', alignItems: 'center' }}><Clapperboard size={16} strokeWidth={1.9} /></span>
+              <span style={{ fontSize: 11, color: '#666' }}>视频生成</span>
+            </button>
+          </div>
           {/* 关于说明（从底部输入区搬来） */}
           <div style={{ textAlign: 'center', fontSize: 10, color: '#bbb', marginTop: 8, lineHeight: 1.4 }}>
             糖豆 由择校通平台提供 · 内容仅供参考
