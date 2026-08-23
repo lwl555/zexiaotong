@@ -147,6 +147,48 @@ export interface ChatResult {
   degraded?: boolean
 }
 
+/** 图片生成请求 */
+export interface ImageGenOptions {
+  prompt: string
+  model?: string
+  n?: number
+  size?: string
+  signal?: AbortSignal
+}
+
+/** 图片生成响应 */
+export interface ImageGenResult {
+  ok: boolean
+  url?: string
+  error?: string
+}
+
+/** 视频生成请求 */
+export interface VideoGenOptions {
+  prompt: string
+  model?: string
+  height?: number
+  width?: number
+  num_frames?: number
+  frame_rate?: number
+  signal?: AbortSignal
+}
+
+/** 视频生成提交响应 */
+export interface VideoSubmitResult {
+  ok: boolean
+  video_id?: string
+  error?: string
+}
+
+/** 视频轮询响应 */
+export interface VideoPollResult {
+  ok: boolean
+  status?: string  // 'processing' | 'completed' | 'failed'
+  url?: string
+  error?: string
+}
+
 /** OpenAI 兼容 chat/completions，返回正文与检索元数据。 */
 export async function agnesChat(
   messages: ChatMsg[],
@@ -283,6 +325,78 @@ export async function agnesChatStream(
     }
   }
   opts.onDone?.({ content, reasoning, search, degraded })
+}
+
+/** 文生图：调用 Agnes agnes-image-2.1-flash（同步，~10s） */
+export async function agnesImageGen(
+  opts: ImageGenOptions
+): Promise<ImageGenResult> {
+  try {
+    const data = await call('/v1/images/generations', {
+      body: {
+        model: opts.model || 'agnes-image-2.1-flash',
+        prompt: opts.prompt,
+        n: opts.n || 1,
+        size: opts.size || '1024x1024'
+      },
+      signal: opts.signal
+    })
+    const url = (data as any)?.data?.[0]?.url
+    if (!url) return { ok: false, error: (data as any)?.error?.message || '生成失败，请重试' }
+    return { ok: true, url }
+  } catch (e: any) {
+    return { ok: false, error: e?.message || '生成失败' }
+  }
+}
+
+/** 提交视频生成任务（异步）：返回 video_id */
+export async function agnesVideoSubmit(
+  opts: VideoGenOptions
+): Promise<VideoSubmitResult> {
+  try {
+    const data = await call('/v1/videos', {
+      body: {
+        model: opts.model || 'agnes-video-v2.0',
+        prompt: opts.prompt,
+        height: opts.height || 768,
+        width: opts.width || 1152,
+        num_frames: opts.num_frames || 121,
+        frame_rate: opts.frame_rate || 24
+      },
+      signal: opts.signal
+    })
+    const vid = (data as any)?.video_id
+    if (!vid) return { ok: false, error: (data as any)?.error?.message || '提交失败，请重试' }
+    return { ok: true, video_id: vid }
+  } catch (e: any) {
+    return { ok: false, error: e?.message || '提交失败' }
+  }
+}
+
+/** 轮询视频生成结果 */
+export async function agnesVideoPoll(
+  videoId: string,
+  signal?: AbortSignal
+): Promise<VideoPollResult> {
+  try {
+    const base = resolveBase()
+    const url = `${base}/agnesapi?video_id=${encodeURIComponent(videoId)}`
+    const headers: Record<string, string> = {
+      ...resolveAuthHeaders()
+    }
+    const res = await fetch(url, { headers, signal })
+    if (!res.ok) return { ok: false, error: `HTTP ${res.status}` }
+    const data = await res.json()
+    const status = (data as any)?.status || 'processing'
+    if (status === 'completed' || status === 'succeeded') {
+      const videoUrl = (data as any)?.url || (data as any)?.video_url
+      return { ok: true, status: 'completed', url: videoUrl }
+    }
+    if (status === 'failed') return { ok: false, status: 'failed', error: (data as any)?.error || '生成失败' }
+    return { ok: true, status: 'processing' }
+  } catch (e: any) {
+    return { ok: false, error: e?.message || '轮询失败' }
+  }
 }
 
 // —— 预热：页面加载 / 窗口聚焦时后台暖热 agnes-search 与 v9(agnes-proxy) 两个 Edge Function ——

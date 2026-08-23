@@ -6,6 +6,7 @@ export interface StoredMsg {
   role: 'user' | 'ai'
   content: string
   image?: { url: string; title: string } | null
+  videoUrl?: string | null
   /** 模型内部思考过程（仅供参考），可空 */
   reasoning?: string | null
   /** 真实场景图（最多 4 张），可空 */

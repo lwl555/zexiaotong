@@ -1,5 +1,6 @@
 // agnes-proxy — Supabase Edge Function (Deno)
 // 转发 chat/completions 到上游 Agnes 平台（agnes-2.0-flash），并支持「流式透传」（用于深度思考实时流出）。
+// 同时转发图片生成（/v1/images/generations）和视频生成（/v1/videos + /agnesapi 轮询）到上游 Agnes 平台。
 //
 // 部署：
 //   supabase functions deploy agnes-proxy --project-ref wcnssyiqitugqfmcbdhe
@@ -8,8 +9,11 @@
 //   UPSTREAM_BASE               可选，默认 https://api.agnes-ai.cn/v1
 //   SERPER_API_KEY              可选，配置了就用 Serper 做真·搜索；没配则 DuckDuckGo HTML 兜底
 //
-// 前端调用：POST {VITE_AGNES_BASE}/v1/chat/completions
-//   请求体：{ model, messages, max_tokens, stream?, web_search? }
+// 前端调用：
+//   POST {VITE_AGNES_BASE}/v1/chat/completions   → 文本/流式对话
+//   POST {VITE_AGNES_BASE}/v1/images/generations → 文生图（同步，~10s，返回图片 URL）
+//   POST {VITE_AGNES_BASE}/v1/videos             → 文生视频（异步，返回 video_id）
+//   GET  {VITE_AGNES_BASE}/agnesapi?video_id=xxx → 轮询视频生成结果
 //   鉴权：Supabase 匿名 key（Authorization: Bearer <anon>）—— 仅用于鉴权「能否调用本函数」
 
 const UPSTREAM_BASE = Deno.env.get('UPSTREAM_BASE') || 'https://api.agnes-ai.cn/v1'
@@ -82,7 +86,69 @@ async function search(query: string): Promise<string> {
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
-  if (req.method !== 'POST') return json({ error: 'method not allowed' }, 405)
+
+  const url = new URL(req.url)
+  const path = url.pathname
+
+  // ─── 图片生成：/v1/images/generations ───
+  if (path.endsWith('/v1/images/generations') && req.method === 'POST') {
+    let body: any
+    try { body = await req.json() } catch { return json({ error: 'invalid json' }, 400) }
+    if (!UPSTREAM_KEY) return json({ error: 'UPSTREAM_KEY 未配置' }, 500)
+
+    const upstream = await fetch(`${UPSTREAM_BASE}/images/generations`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${UPSTREAM_KEY}` },
+      body: JSON.stringify({
+        model: body.model || 'agnes-image-2.1-flash',
+        prompt: body.prompt || '',
+        n: body.n || 1,
+        size: body.size || '1024x1024'
+      })
+    })
+    const data = await upstream.json().catch(() => ({}))
+    return json(data, upstream.status)
+  }
+
+  // ─── 视频生成（异步提交）：/v1/videos ───
+  if (path.endsWith('/v1/videos') && req.method === 'POST') {
+    let body: any
+    try { body = await req.json() } catch { return json({ error: 'invalid json' }, 400) }
+    if (!UPSTREAM_KEY) return json({ error: 'UPSTREAM_KEY 未配置' }, 500)
+
+    const upstream = await fetch(`${UPSTREAM_BASE}/videos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${UPSTREAM_KEY}` },
+      body: JSON.stringify({
+        model: body.model || 'agnes-video-v2.0',
+        prompt: body.prompt || '',
+        height: body.height || 768,
+        width: body.width || 1152,
+        num_frames: body.num_frames || 121,
+        frame_rate: body.frame_rate || 24
+      })
+    })
+    const data = await upstream.json().catch(() => ({}))
+    return json(data, upstream.status)
+  }
+
+  // ─── 视频轮询：/agnesapi?video_id=xxx ───
+  if (path.endsWith('/agnesapi') && req.method === 'GET') {
+    if (!UPSTREAM_KEY) return json({ error: 'UPSTREAM_KEY 未配置' }, 500)
+    const videoId = url.searchParams.get('video_id') || ''
+    if (!videoId) return json({ error: 'video_id required' }, 400)
+
+    const upstream = await fetch(`${UPSTREAM_BASE}/agnesapi?video_id=${encodeURIComponent(videoId)}`, {
+      headers: { Authorization: `Bearer ${UPSTREAM_KEY}` }
+    })
+    const data = await upstream.json().catch(() => ({}))
+    return json(data, upstream.status)
+  }
+
+  // ─── 文本对话：/v1/chat/completions ───
+  if (!path.endsWith('/v1/chat/completions') || req.method !== 'POST') {
+    return json({ error: 'method not allowed' }, 405)
+  }
 
   let body: any
   try {

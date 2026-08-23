@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { agnesChatStream, ChatMsg, LinkInfo } from '../lib/agnes'
+import { agnesChatStream, agnesImageGen, agnesVideoSubmit, agnesVideoPoll, ChatMsg, LinkInfo } from '../lib/agnes'
 import { useIsMobile } from '../lib/useIsMobile'
 import { useStore } from '../store/store'
 import {
@@ -204,6 +204,7 @@ interface Msg {
   reasoning?: string | null
   links?: LinkInfo[] | null
   image?: string | null
+  videoUrl?: string | null
 }
 
 const PAGE_KEY = 'ai-tangdou'
@@ -214,6 +215,7 @@ function msgToStored(m: Msg): StoredMsg {
     role: m.role,
     content: m.content,
     image: m.image ? { url: m.image, title: '用户图片' } : null,
+    videoUrl: m.videoUrl ?? null,
     reasoning: m.reasoning ?? null,
     links: m.links ?? null
   }
@@ -416,6 +418,10 @@ export default function AITangdou() {
   const [deepThink, setDeepThink] = useState(false)  // 深度思考常驻开关（千问式，输入框附近一行）
   const [reasoningExpanded, setReasoningExpanded] = useState<Record<number, boolean>>({})  // 每条AI消息的思考过程展开状态
   const [liveReasoning, setLiveReasoning] = useState('')  // 流式：AI 思考过程中的实时增量，loading 气泡里实时展示
+  // 图片/视频生成对话框：'idle' | 'image' | 'video' | 'generating'
+  const [genDialog, setGenDialog] = useState<'idle' | 'image' | 'video' | 'generating'>('idle')
+  const [genPrompt, setGenPrompt] = useState('')
+  const [genError, setGenError] = useState('')
   const abortRef = useRef<AbortController | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -631,6 +637,75 @@ export default function AITangdou() {
     refreshSidebar()
   }
 
+  // 图片/视频生成处理
+  async function handleGen() {
+    const prompt = genPrompt.trim()
+    if (!prompt) return
+    setGenDialog('generating')
+    setGenError('')
+    try {
+      if (genDialog === 'image') {
+        // 图片：同步等待结果
+        const res = await agnesImageGen({ prompt })
+        if (res.ok && res.url) {
+          setGenDialog('idle')
+          setGenPrompt('')
+          // 在聊天区显示生成的图片
+          const aiMsg: Msg = {
+            role: 'ai',
+            content: `🖼️ AI 生图：${prompt}`,
+            image: res.url
+          }
+          const allMsgs = [...messages, aiMsg]
+          setMessages(allMsgs)
+        } else {
+          setGenDialog('image')
+          setGenError(res.error || '生成失败，请重试')
+        }
+      } else if (genDialog === 'video') {
+        // 视频：异步提交
+        const res = await agnesVideoSubmit({ prompt })
+        if (res.ok && res.video_id) {
+          // 轮询等待完成
+          const videoId = res.video_id
+          let pollCount = 0
+          const maxPolls = 60 // 最多等 3 分钟
+          const poll = async (): Promise<void> => {
+            pollCount++
+            const pollRes = await agnesVideoPoll(videoId)
+            if (pollRes.ok && pollRes.status === 'completed' && pollRes.url) {
+              setGenDialog('idle')
+              setGenPrompt('')
+              const aiMsg: Msg = {
+                role: 'ai',
+                content: `🎬 AI 生视频：${prompt}`,
+                videoUrl: pollRes.url
+              }
+              const allMsgs = [...messages, aiMsg]
+              setMessages(allMsgs)
+            } else if (pollRes.status === 'failed') {
+              setGenDialog('video')
+              setGenError('视频生成失败，请重试')
+            } else if (pollCount >= maxPolls) {
+              setGenDialog('video')
+              setGenError('生成超时，请稍后在历史对话中查看')
+            } else {
+              await new Promise(r => setTimeout(r, 3000))
+              return poll()
+            }
+          }
+          await poll()
+        } else {
+          setGenDialog('video')
+          setGenError(res.error || '提交失败，请重试')
+        }
+      }
+    } catch (e: any) {
+      setGenDialog(genDialog === 'generating' ? 'idle' : genDialog)
+      setGenError(e?.message || '请求失败')
+    }
+  }
+
   function autoResize(el: HTMLTextAreaElement) {
     // 固定初始高度（mobile 36 / PC 40），只在内容溢出时生长，最大 120
     const base = isMobile ? 36 : 40
@@ -656,8 +731,8 @@ export default function AITangdou() {
           { icon: PenLine, label: '帮我写作', onClick: () => useTag({ icon: SquarePen, label: '帮我写作' }) },
           { icon: Table2, label: '做表格', onClick: () => useTag({ icon: Table2, label: '做表格' }) },
           { icon: Languages, label: '翻译', onClick: () => useTag({ icon: Languages, label: '翻译' }) },
-          { icon: ImageIcon, label: '图像生成', onClick: () => fileRef.current?.click() },
-          { icon: Clapperboard, label: '视频生成', onClick: () => fileRef.current?.click() }
+          { icon: ImageIcon, label: '图像生成', onClick: () => setGenDialog('image') },
+          { icon: Clapperboard, label: '视频生成', onClick: () => setGenDialog('video') }
         ].map(item => {
           const Icon = item.icon
           return (
@@ -906,12 +981,22 @@ export default function AITangdou() {
           }}>
             {m.image && (
               <div style={{ padding: '8px 8px 0' }}>
-                <img src={m.image} alt="用户发送的图片" style={{ maxWidth: 180, maxHeight: 160, borderRadius: 8, display: 'block' }} />
+                <img src={m.image} alt="AI 生成的图片" style={{ maxWidth: 180, maxHeight: 160, borderRadius: 8, display: 'block' }} />
+              </div>
+            )}
+            {m.videoUrl && (
+              <div style={{ padding: '8px 8px 0' }}>
+                <video
+                  src={m.videoUrl}
+                  controls
+                  style={{ maxWidth: 240, maxHeight: 200, borderRadius: 8, display: 'block' }}
+                />
               </div>
             )}
             {m.image && m.content && <div style={{ padding: '6px 12px' }}>{m.content}</div>}
-            {!m.image && m.role === 'ai' && renderMarkdown(m.content)}
-            {!m.image && m.role === 'user' && <span style={{ whiteSpace: 'pre-wrap' }}>{m.content}</span>}
+            {m.videoUrl && m.content && <div style={{ padding: '6px 12px' }}>{m.content}</div>}
+            {!m.image && !m.videoUrl && m.role === 'ai' && renderMarkdown(m.content)}
+            {!m.image && !m.videoUrl && m.role === 'user' && <span style={{ whiteSpace: 'pre-wrap' }}>{m.content}</span>}
             {/* 深度思考过程：最后一条 AI 消息默认展开（刚才已实时看过），其余可手动展开 */}
             {m.role === 'ai' && m.reasoning && (() => {
               const expanded = reasoningExpanded[i] ?? (i === messages.length - 1)
@@ -1128,11 +1213,11 @@ export default function AITangdou() {
               </button>
             ))}
           </div>
-          {/* 媒体入口：图像生成 / 视频生成（对齐 PC 端左侧栏行为，点击打开文件选择） */}
+          {/* 媒体入口：图像生成 / 视频生成（点击打开生成对话框，而非文件上传） */}
           <div style={{
             display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, marginTop: 6
           }}>
-            <button onClick={() => { setShowTags(false); fileRef.current?.click() }} style={{
+            <button onClick={() => { setShowTags(false); setGenDialog('image') }} style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
               padding: '8px 4px', borderRadius: 8, border: '1px solid #e5e5e5',
               background: '#fff', cursor: 'pointer', color: '#555', transition: 'all .15s'
@@ -1142,7 +1227,7 @@ export default function AITangdou() {
               <span style={{ display: 'inline-flex', alignItems: 'center' }}><ImageIcon size={16} strokeWidth={1.9} /></span>
               <span style={{ fontSize: 11, color: '#666' }}>图像生成</span>
             </button>
-            <button onClick={() => { setShowTags(false); fileRef.current?.click() }} style={{
+            <button onClick={() => { setShowTags(false); setGenDialog('video') }} style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
               padding: '8px 4px', borderRadius: 8, border: '1px solid #e5e5e5',
               background: '#fff', cursor: 'pointer', color: '#555', transition: 'all .15s'
@@ -1430,6 +1515,75 @@ export default function AITangdou() {
         onDelete={deleteConv}
         onNew={startNewChat}
       />
+
+      {/* 图片/视频生成对话框 */}
+      {genDialog !== 'idle' && (
+        <div onClick={() => { setGenDialog('idle'); setGenError('') }} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 200,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: '#fff', borderRadius: 16, padding: '20px 24px', width: '100%', maxWidth: 420,
+            boxShadow: '0 8px 32px rgba(0,0,0,.18)', animation: 'popIn .2s cubic-bezier(.4,0,.2,1)'
+          }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14
+            }}>
+              <div style={{ fontSize: 16, fontWeight: 600, color: '#1c1814' }}>
+                {genDialog === 'image' ? '🖼️ AI 生图' : genDialog === 'video' ? '🎬 AI 生视频' : genDialog === 'generating' ? '⏳ 生成中…' : ''}
+              </div>
+              <button onClick={() => { setGenDialog('idle'); setGenError('') }} style={{
+                border: 'none', background: 'transparent', cursor: 'pointer', color: '#999', fontSize: 18
+              }}>×</button>
+            </div>
+
+            {genDialog !== 'generating' ? (
+              <>
+                <textarea
+                  autoFocus
+                  value={genPrompt}
+                  onChange={e => setGenPrompt(e.target.value)}
+                  placeholder={genDialog === 'image' ? '描述你想生成的图片内容，例如：一只在月光下奔跑的白狐，电影级光影' : '描述你想生成的视频内容，例如：海边日落，浪花轻拍沙滩，电影感'}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && genPrompt.trim()) { e.preventDefault(); handleGen() } }}
+                  rows={3}
+                  style={{
+                    width: '100%', border: '1px solid #e5e5e5', borderRadius: 10,
+                    padding: '10px 12px', fontSize: 14, outline: 'none', resize: 'none',
+                    boxSizing: 'border-box', color: '#333'
+                  }} />
+                {genError && <div style={{ color: '#b42318', fontSize: 12, marginTop: 6 }}>{genError}</div>}
+                <div style={{ display: 'flex', gap: 8, marginTop: 14, justifyContent: 'flex-end' }}>
+                  <button onClick={() => { setGenDialog('idle'); setGenError('') }} style={{
+                    border: '1px solid #e5e5e5', background: '#fff', borderRadius: 8,
+                    padding: '8px 16px', fontSize: 13, cursor: 'pointer', color: '#666'
+                  }}>取消</button>
+                  <button onClick={handleGen} disabled={!genPrompt.trim()} style={{
+                    border: 'none', background: genPrompt.trim() ? '#c2410c' : '#e5e5e5',
+                    color: genPrompt.trim() ? '#fff' : '#999',
+                    borderRadius: 8, padding: '8px 20px', fontSize: 13, cursor: genPrompt.trim() ? 'pointer' : 'not-allowed',
+                    transition: 'all .15s'
+                  }}>生成</button>
+                </div>
+              </>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '30px 0' }}>
+                <div style={{
+                  width: 40, height: 40, borderRadius: '50%', border: '3px solid #e5e5e5',
+                  borderTopColor: '#c2410c', margin: '0 auto 14px',
+                  animation: 'spin 1s linear infinite'
+                }} />
+                <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+                <div style={{ fontSize: 13, color: '#666' }}>
+                  {genDialog === 'generating' ? '正在生成，请稍候…' : ''}
+                </div>
+                <div style={{ fontSize: 11, color: '#bbb', marginTop: 4 }}>
+                  图片约 10-30 秒 · 视频约 2-3 分钟
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
