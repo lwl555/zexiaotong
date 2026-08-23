@@ -1166,13 +1166,16 @@ export default function AITangdou() {
       flex: 1, display: 'flex', flexDirection: 'column',
       minWidth: 0, height: '100%', background: '#fff'
     }}>
-      {/* 顶部条：mobile 三件套，PC 极简只显示中间标题 */}
+      {/* 顶部条：mobile 三件套裸贴边缘，PC 极简只显示中间标题 */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: isMobile ? '10px 16px' : '14px 32px',
-        borderBottom: '1px solid #f0f0f0',   // PC 端也加细线分隔，避免顶栏颜色混在一起
-        background: '#fff', flexShrink: 0,
-        minHeight: 48                       // 固定最小高度，避免被压缩
+        // mobile：去掉背景/边框/minHeight，按钮只占 36px，padding 缩到 4/10（裸贴边缘）
+        // PC 端（因 isMobile=false）保持 14/32 padding 给标题留位
+        padding: isMobile ? '4px 10px' : '14px 32px',
+        // borderBottom: 1px solid #f0f0f0,   // PC 端也加细线分隔，避免顶栏颜色混在一起
+        // background: '#fff',                // mobile 透明，让按钮浮在最顶部
+        flexShrink: 0,
+        // minHeight: 48                      // 不再固定高度
       }}>
         {isMobile ? (
           <>
