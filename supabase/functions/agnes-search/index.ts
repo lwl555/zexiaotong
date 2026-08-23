@@ -78,10 +78,10 @@ function lastUserText(messages: any[]): string {
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i]
     if (m.role === 'user') {
-      if (typeof m.content === 'string') return m.content
+      if (typeof m.content === 'string' && m.content.trim()) return m.content
       if (Array.isArray(m.content)) {
         const t = m.content.find((p: any) => p.type === 'text')
-        if (t) return t.text
+        if (t && t.text?.trim()) return t.text
       }
     }
   }
@@ -1351,7 +1351,19 @@ Deno.serve(async (req: Request) => {
 
   // 把 system / 非 system 分开，避免污染
   const sysMessages = messages.filter((m) => m.role === 'system')
-  const otherMessages = messages.filter((m) => m.role !== 'system')
+  // 过滤掉 content 为空的用户消息（历史脏数据 / 带图无文本等场景），避免上游收到空消息报 400
+  const otherMessages = messages.filter((m) => m.role !== 'system' && !isEmptyUserMsg(m))
+
+  function isEmptyUserMsg(m: any): boolean {
+    if (m.role !== 'user') return false
+    if (typeof m.content === 'string') return !m.content.trim()
+    if (Array.isArray(m.content)) {
+      const textPart = m.content.find((p: any) => p.type === 'text')
+      // 仅有 image_url 而无 text 时视为空（上游无法接受纯图片无文本的用户消息）
+      return !textPart?.text?.trim() && !m.content.some((p: any) => p.type === 'image_url')
+    }
+    return false
+  }
 
   const rawUser = lastUserText(otherMessages)
   const query = extractQuery(rawUser)

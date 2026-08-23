@@ -13,6 +13,8 @@ export interface StoredMsg {
   images?: { url: string; title: string }[] | null
   /** 检索到的真实参考链接（可点击打开 / 复制），可空 */
   links?: LinkInfo[] | null
+  /** 错误标记：true 时为错误气泡 */
+  error?: boolean | null
 }
 
 export interface Conversation {

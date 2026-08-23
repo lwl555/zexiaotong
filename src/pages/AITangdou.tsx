@@ -205,6 +205,7 @@ interface Msg {
   links?: LinkInfo[] | null
   image?: string | null
   videoUrl?: string | null
+  error?: boolean  // 错误气泡：true 时渲染为红色错误样式
 }
 
 const PAGE_KEY = 'ai-tangdou'
@@ -217,7 +218,8 @@ function msgToStored(m: Msg): StoredMsg {
     image: m.image ? { url: m.image, title: '用户图片' } : null,
     videoUrl: m.videoUrl ?? null,
     reasoning: m.reasoning ?? null,
-    links: m.links ?? null
+    links: m.links ?? null,
+    error: m.error ?? null
   }
 }
 function storedToMsg(s: StoredMsg): Msg {
@@ -226,7 +228,9 @@ function storedToMsg(s: StoredMsg): Msg {
     content: s.content,
     reasoning: s.reasoning ?? null,
     links: s.links ?? null,
-    image: s.image?.url || null
+    image: s.image?.url || null,
+    videoUrl: s.videoUrl ?? null,
+    error: s.error ?? null
   }
 }
 
@@ -564,7 +568,15 @@ export default function AITangdou() {
       })
       if (!settled) throw new Error('未收到完成信号')
     } catch (e: any) {
-      if (e?.name !== 'AbortError') setError(e?.message || '请求失败')
+      if (e?.name !== 'AbortError') {
+        // 错误信息以 AI 气泡样式显示在聊天框中，与正常 AI 回复风格一致
+        const aiMsg: Msg = {
+          role: 'ai',
+          content: `❌ 请求出错：${e?.message || '请检查网络后重试'}\n\n💡 可以尝试：\n- 点击下方「重新生成」按钮\n- 换个问题再试试\n- 检查网络连接`,
+          error: true
+        }
+        setMessages(prev => [...prev, aiMsg])
+      }
     } finally {
       if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
       setLoading(false)
@@ -996,8 +1008,9 @@ export default function AITangdou() {
             maxWidth: isMobile ? '82%' : '70%',
             padding: m.image ? 0 : (isMobile ? '8px 11px' : '10px 14px'),
             borderRadius: 14,
-            background: m.role === 'user' ? '#c2410c' : '#f5f5f5',
-            color: m.role === 'user' ? '#fff' : '#1c1814',
+            background: m.role === 'user' ? '#c2410c' : (m.error ? '#fef2f2' : '#f5f5f5'),
+            border: m.error ? '1px solid #fecaca' : undefined,
+            color: m.role === 'user' ? '#fff' : (m.error ? '#b42318' : '#1c1814'),
             fontSize: isMobile ? 13.5 : 14,
             lineHeight: isMobile ? 1.55 : 1.7,
             borderTopRightRadius: m.role === 'user' ? 4 : 14,
@@ -1128,7 +1141,6 @@ export default function AITangdou() {
         </div>
       )}
 
-      {error && <div style={{ color: '#b42318', fontSize: 13, textAlign: 'center', margin: '10px 0' }}>出错了：{error}</div>}
       <div ref={endRef} />
     </div>
   )
