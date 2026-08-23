@@ -1027,7 +1027,10 @@ export default function AITangdou() {
       {isMobile && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8,
-          padding: '6px 12px', background: '#fff', borderTop: '1px solid #f5f5f5'
+          // mobile：透明（贴浅灰底，不再形成白排）；PC 维持白底
+          padding: '6px 12px',
+          background: isMobile ? 'transparent' : '#fff',
+          borderTop: isMobile ? 'none' : '1px solid #f5f5f5'
         }}>
           <button onClick={() => setDeepThink(v => !v)} style={{
             display: 'inline-flex', alignItems: 'center', gap: 5,
@@ -1057,7 +1060,10 @@ export default function AITangdou() {
       {/* 细长输入条（手机端进一步收紧：按钮 30×30，胶囊 32 高） */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 6,
-        padding: isMobile ? '6px 10px' : '10px 20px', borderTop: '1px solid #f0f0f0'
+        // mobile：浅灰底无缝融入页面（无 borderTop 白线）；PC 维持白底细线
+        padding: isMobile ? '6px 10px' : '10px 20px',
+        background: isMobile ? '#f0f0f1' : '#fff',
+        borderTop: isMobile ? 'none' : '1px solid #f0f0f0'
       }}>
         <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
         <button onClick={() => fileRef.current?.click()} title="图片" style={{
@@ -1164,7 +1170,9 @@ export default function AITangdou() {
   const mainArea = (
     <div style={{
       flex: 1, display: 'flex', flexDirection: 'column',
-      minWidth: 0, height: '100%', background: '#fff',
+      minWidth: 0, height: '100%',
+      // mobile：整页浅灰底（对齐豆包/元宝空状态），彻底去掉"顶部一排白"；PC 维持白底
+      background: isMobile ? '#f6f6f7' : '#fff',
       position: 'relative'  // 给 mobile 浮顶按钮条做定位锚
     }}>
       {/* mobile：浮在最顶部的按钮条（绝对定位、不占布局、不形成"白色一排"） */}
