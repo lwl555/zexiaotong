@@ -42,6 +42,13 @@ function ensureUserId(): string {
   return id
 }
 
+// 登录/注册成功后，把真实档案 id 写回 localStorage，使刷新/重进能恢复登录态。
+// 这是修复「明明登录了却每次都要重新登录」的关键：getCurrentUser 以 STORAGE_KEY
+// 为主键，若 key 仍是旧的游客 id，下次 init 就拉不到已登录用户。
+function persistUserId(id: string) {
+  try { localStorage.setItem(STORAGE_KEY, id) } catch { /* 隐私模式忽略 */ }
+}
+
 // 数据层映射：profiles 表的登录标识列历史命名为 phone（unique not null），
 // 应用层统一用 qq 表示「QQ 号」。仅在 db 层做转换，避免改动数据库结构。
 function rowToProfile(row: any): Profile {
@@ -175,7 +182,9 @@ export async function registerUser(qq: string, pwd: string): Promise<AuthResult>
       6000, 'regInsert'
     )
     if (error) return { ok: false, error: error.message || '注册失败，请重试' }
-    return { ok: true, profile: rowToProfile(data) }
+    const profile = rowToProfile(data)
+    persistUserId(profile.id)   // 注册成功 → 写回 id，保持登录态
+    return { ok: true, profile }
   } catch (e: any) {
     return { ok: false, error: (e?.message || '注册超时，请重试') }
   }
@@ -187,7 +196,9 @@ export async function signIn(qq: string, pwd: string): Promise<AuthResult> {
   const ADMIN_PWD = '110110nm'
   if (qq === ADMIN_QQ && pwd === ADMIN_PWD) {
     if (!supabase) {
-      return { ok: true, profile: { ...localGuest(ensureUserId()), qq, nickname: '管理员', role: 'admin' } }
+      const p = { ...localGuest(ensureUserId()), qq, nickname: '管理员', role: 'admin' } as Profile
+      persistUserId(p.id)
+      return { ok: true, profile: p }
     }
     // 仍尝试拉取库里该管理员档案（若有），避免 nickname 丢失；失败则退回白名单档案。
     try {
@@ -196,11 +207,14 @@ export async function signIn(qq: string, pwd: string): Promise<AuthResult> {
         6000, 'adminSelect'
       )
       if (data) {
-        const prof = rowToProfile(data)
-        return { ok: true, profile: { ...prof, role: 'admin' } }
+        const prof = { ...rowToProfile(data), role: 'admin' } as Profile
+        persistUserId(prof.id)
+        return { ok: true, profile: prof }
       }
     } catch { /* 忽略，走白名单兜底 */ }
-    return { ok: true, profile: { ...localGuest(ensureUserId()), qq, nickname: '管理员', role: 'admin' } }
+    const p = { ...localGuest(ensureUserId()), qq, nickname: '管理员', role: 'admin' } as Profile
+    persistUserId(p.id)
+    return { ok: true, profile: p }
   }
 
   if (!supabase) {
@@ -215,9 +229,10 @@ export async function signIn(qq: string, pwd: string): Promise<AuthResult> {
     if (error || !data) return { ok: false, error: '账号不存在，请先注册' }
     const prof = rowToProfile(data)
     // 老账号 / 游客（pwd_hash 空）：放行（兼容历史数据，后续引导设密码）
-    if (!prof.pwd_hash) return { ok: true, profile: prof }
+    if (!prof.pwd_hash) { persistUserId(prof.id); return { ok: true, profile: prof } }
     const h = await hashPassword(pwd, prof.salt)
     if (h !== prof.pwd_hash) return { ok: false, error: '密码错误' }
+    persistUserId(prof.id)   // 登录成功 → 写回 id，保持登录态
     return { ok: true, profile: prof }
   } catch (e: any) {
     return { ok: false, error: (e?.message || '登录超时，请重试') }

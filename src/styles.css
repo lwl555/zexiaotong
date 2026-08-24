@@ -1223,11 +1223,11 @@ textarea { resize: vertical; min-height: 88px; }
 /* ===================== 微信式聊天详情页 ===================== */
 .wx-chat {
   display: flex; flex-direction: column;
-  min-height: 100vh; padding-bottom: 56px;
+  min-height: 100vh; padding-bottom: 110px;
   background: #ededed;
 }
 .wx-chat-header {
-  position: sticky; top: 0; z-index: 10;
+  position: sticky; top: 0; z-index: 12;
   display: flex; align-items: center; gap: 8px;
   height: 44px; padding: 0 6px;
   background: #ededed; border-bottom: 1px solid #d8d8d8;
@@ -1241,7 +1241,7 @@ textarea { resize: vertical; min-height: 88px; }
 .wx-chat-status { font-size: 11px; color: #888; margin-top: 2px; }
 
 .wx-chat-body {
-  flex: 1; padding: 12px 12px 80px; overflow-y: auto;
+  flex: 1; padding: 12px 12px 90px; overflow-y: auto;
   display: flex; flex-direction: column; gap: 6px;
 }
 .wx-chat-time {
@@ -1278,7 +1278,7 @@ textarea { resize: vertical; min-height: 88px; }
 .wx-msg-card-btn { font-size: 13px; color: #576b95; margin-top: 6px; }
 
 .wx-chat-input {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  position: fixed; left: 0; right: 0; bottom: 56px; z-index: 40;
   display: flex; align-items: center; gap: 8px;
   padding: 8px 10px; max-width: 480px; margin: 0 auto;
   background: #f7f7f7; border-top: 1px solid #e5e5e5;
@@ -1317,7 +1317,7 @@ textarea { resize: vertical; min-height: 88px; }
 
 /* ===================== 聊天内糖豆模式栏 / 欢迎态 / Markdown 渲染 ===================== */
 .wx-ai-mode-bar {
-  position: sticky; top: 0; z-index: 9;
+  position: relative; z-index: 11;
   display: flex; align-items: center; gap: 6px;
   padding: 8px 10px;
   background: #f6f6f6; border-bottom: 1px solid #e8e8e8;

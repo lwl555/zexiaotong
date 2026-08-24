@@ -625,39 +625,39 @@ function AIChatView({ chat, nav, me }: { chat: ChatDef; nav: ReturnType<typeof u
     <div className="wx-chat" style={chat.accent ? { background: '#f6f6f6' } : undefined}>
       <ChatHeader chat={chat} nav={nav} />
 
-      <div className="wx-chat-body" ref={scrollRef}>
-        {/* 快捷模式条(粘在 body 顶部,正文滚动时仍可见) */}
-        <div className="wx-ai-mode-bar">
+      {/* 快捷模式条：放在 header 之下、正文滚动区之外，避免嵌套 sticky 与 fixed 输入栏冲突 */}
+      <div className="wx-ai-mode-bar">
+        <button
+          className={'wx-ai-mode-chip ' + (mode === null && !webSearch ? 'on' : '')}
+          onClick={() => { setMode(null); setWebSearch(false) }}
+          title="默认对话"
+        >
+          <Sparkles size={12} /> 默认
+        </button>
+        {QUICK_MODES.map(m => (
           <button
-            className={'wx-ai-mode-chip ' + (mode === null && !webSearch ? 'on' : '')}
-            onClick={() => { setMode(null); setWebSearch(false) }}
-            title="默认对话"
+            key={m.id}
+            className={'wx-ai-mode-chip ' + (mode === m.id ? 'on' : '')}
+            onClick={() => setMode(mode === m.id ? null : m.id)}
           >
-            <Sparkles size={12} /> 默认
+            <m.icon size={12} /> {m.label}
           </button>
-          {QUICK_MODES.map(m => (
-            <button
-              key={m.id}
-              className={'wx-ai-mode-chip ' + (mode === m.id ? 'on' : '')}
-              onClick={() => setMode(mode === m.id ? null : m.id)}
-            >
-              <m.icon size={12} /> {m.label}
-            </button>
-          ))}
-          <button
-            className={'wx-ai-mode-chip ' + (webSearch ? 'on web' : '')}
-            onClick={() => setWebSearch(v => !v)}
-            title="联网搜索"
-          >
-            <Globe size={12} /> 联网
+        ))}
+        <button
+          className={'wx-ai-mode-chip ' + (webSearch ? 'on web' : '')}
+          onClick={() => setWebSearch(v => !v)}
+          title="联网搜索"
+        >
+          <Globe size={12} /> 联网
+        </button>
+        {(mode || webSearch) && (
+          <button className="wx-ai-mode-clear" onClick={() => { setMode(null); setWebSearch(false) }} aria-label="清除">
+            <X size={11} />
           </button>
-          {(mode || webSearch) && (
-            <button className="wx-ai-mode-clear" onClick={() => { setMode(null); setWebSearch(false) }} aria-label="清除">
-              <X size={11} />
-            </button>
-          )}
-        </div>
+        )}
+      </div>
 
+      <div className="wx-chat-body" ref={scrollRef}>
         <div className="wx-chat-time">{topTime}</div>
 
         {/* 欢迎态:快捷提问 + 模式标签 */}
