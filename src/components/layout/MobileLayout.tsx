@@ -39,6 +39,11 @@ export default function MobileLayout() {
   const [showSkip, setShowSkip] = useState(false)
   // 底部导航栏固定常驻（用户反馈：去掉 ▼ 折叠按钮，纯展示 5 个 tab 更稳）
 
+  // 启动数据拉取（profiles / tasks / goods / posts / config 等）
+  useEffect(() => {
+    init()
+  }, [init])
+
   useEffect(() => {
     if (loading) {
       const t = setTimeout(() => setShowSkip(true), 6000)
