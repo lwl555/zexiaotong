@@ -5,7 +5,7 @@ export type UserStatus = 'active' | 'banned'
 
 export interface Profile {
   id: string
-  phone: string
+  qq: string  // 登录标识：QQ 号（profiles 表存储列历史为 phone，由 db.ts 映射）
   nickname: string
   avatar: string
   role: Role

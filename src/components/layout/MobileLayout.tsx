@@ -52,16 +52,16 @@ export default function MobileLayout() {
     setShowSkip(false)
   }, [loading])
 
-  // 游客（phone 为空）首次进入引导到登录页；点过「先逛逛」则记到 localStorage 不再强制
-  const isGuest = !!me && !me.phone
+  // 登录/启动页不需要 me 守卫，直接渲染（用户要能看到登录入口）
+  const isPublicPage = loc.pathname === '/login' || loc.pathname === '/splash'
+
+  // 游客（qq 为空）首次进入引导到登录页；点过「先逛逛」则记到 localStorage 不再强制
+  const isGuest = !!me && !me.qq
   const skipSplash = typeof localStorage !== 'undefined' && localStorage.getItem('zex:skipSplash') === '1'
   const needSplash = isGuest && !skipSplash && !isPublicPage
   useEffect(() => {
     if (needSplash) nav('/splash')
   }, [needSplash, nav])
-
-  // 登录/启动页不需要 me 守卫，直接渲染（用户要能看到登录入口）
-  const isPublicPage = loc.pathname === '/login' || loc.pathname === '/splash'
 
   // 数据未加载完前显示 loading。store.init 有 12 秒总兜底，
   // 这里再暴露手动跳过按钮，最大可能性保证用户能进界面。

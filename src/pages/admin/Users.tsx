@@ -10,11 +10,11 @@ export default function Users() {
   const [kw, setKw] = useState('')
 
   let list = users
-  if (kw) list = users.filter(u => u.nickname.includes(kw) || u.phone.includes(kw))
+  if (kw) list = users.filter(u => u.nickname.includes(kw) || u.qq.includes(kw))
 
   const exportCsv = () => {
-    const head = 'id,昵称,手机号,余额,冻结,状态,注册时间\n'
-    const rows = users.map(u => `${u.id},${u.nickname},${u.phone},${u.balance},${u.frozen},${u.status},${u.created_at}`).join('\n')
+    const head = 'id,昵称,QQ号,余额,冻结,状态,注册时间\n'
+    const rows = users.map(u => `${u.id},${u.nickname},${u.qq},${u.balance},${u.frozen},${u.status},${u.created_at}`).join('\n')
     const blob = new Blob(['\ufeff' + head + rows], { type: 'text/csv;charset=utf-8' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
@@ -30,7 +30,7 @@ export default function Users() {
 
       <div className="flex items-center gap-2 bg-gray-100 rounded-xl px-3 py-2.5 mb-4 max-w-sm">
         <Search size={18} className="text-gray-400" />
-        <input className="bg-transparent outline-none text-sm flex-1" placeholder="搜索昵称 / 手机号" value={kw} onChange={e => setKw(e.target.value)} />
+        <input className="bg-transparent outline-none text-sm flex-1" placeholder="搜索昵称 / QQ号" value={kw} onChange={e => setKw(e.target.value)} />
       </div>
 
       <div className="card overflow-hidden">
@@ -38,7 +38,7 @@ export default function Users() {
           <thead className="bg-gray-50 text-gray-500 text-xs">
             <tr>
               <th className="text-left font-medium px-4 py-3">用户</th>
-              <th className="text-left font-medium px-4 py-3">手机号</th>
+              <th className="text-left font-medium px-4 py-3">QQ号</th>
               <th className="text-right font-medium px-4 py-3">余额</th>
               <th className="text-right font-medium px-4 py-3">冻结</th>
               <th className="text-center font-medium px-4 py-3">状态</th>
@@ -57,7 +57,7 @@ export default function Users() {
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-gray-600">{u.phone}</td>
+                <td className="px-4 py-3 text-gray-600">{u.qq}</td>
                 <td className="px-4 py-3 text-right text-ink font-medium">¥{u.balance.toFixed(2)}</td>
                 <td className="px-4 py-3 text-right text-gray-500">¥{u.frozen.toFixed(2)}</td>
                 <td className="px-4 py-3 text-center">

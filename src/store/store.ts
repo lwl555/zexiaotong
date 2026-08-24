@@ -35,7 +35,7 @@ interface State {
   init: () => Promise<void>
 
   // 用户
-  login: (phone?: string, role?: Role) => Promise<void>
+  login: (qq?: string, role?: Role) => Promise<void>
   logout: () => void
   switchRole: () => void
   getUser: (id: string) => Profile | undefined
@@ -109,7 +109,7 @@ export const useStore = create<State>((set, get) => ({
       if (s.loading) {
         const guestId = (typeof localStorage !== 'undefined' && (localStorage.getItem('zex:user_id') || 'guest')) || 'guest'
         const fallback: any = {
-          id: guestId, phone: '', nickname: '游客' + String(guestId).slice(-4),
+          id: guestId, qq: '', nickname: '游客' + String(guestId).slice(-4),
           avatar: '', role: 'user', balance: 0, frozen: 0, status: 'active',
           created_at: new Date().toISOString()
         }
@@ -159,8 +159,8 @@ export const useStore = create<State>((set, get) => ({
   },
 
   // ─── 用户 ───
-  login: async (phone, role?: Role) => {
-    const me = await db.loginUser(phone, role)
+  login: async (qq = '', role?: Role) => {
+    const me = await db.loginUser(qq, role)
     set({ me })
   },
 
@@ -177,7 +177,7 @@ export const useStore = create<State>((set, get) => ({
     try { id = localStorage.getItem('zex:user_id') || '' } catch {}
     if (!id) id = `guest-${Date.now().toString(36)}`
     const fallback: any = {
-      id, phone: '', nickname: '游客' + id.slice(-4),
+      id, qq: '', nickname: '游客' + id.slice(-4),
       avatar: '', role: 'user', balance: 0, frozen: 0, status: 'active',
       created_at: new Date().toISOString()
     }

@@ -22,7 +22,7 @@ export default function Mine() {
   const unread = useStore(s => s.notifications.filter(n => n.user_id === me.id && !n.read).length)
   const switchRole = useStore(s => s.switchRole)
   const logout = useStore(s => s.logout)
-  const isGuest = !me.phone
+  const isGuest = !me.qq
 
   const rows = [
     { icon: ListOrdered, label: '我的发布', val: myPosted, onClick: () => nav('/my-tasks?role=poster') },
@@ -49,7 +49,7 @@ export default function Mine() {
           <img src={me.avatar} className="w-16 h-16 rounded-full bg-gray-100" alt="" />
           <div className="flex-1">
             <div className="font-black text-lg">{me.nickname}</div>
-            <div className="text-xs text-gray-400">{me.phone} · {me.status === 'banned' ? '已封禁' : '正常'}</div>
+            <div className="text-xs text-gray-400">{me.qq} · {me.status === 'banned' ? '已封禁' : '正常'}</div>
           </div>
           <button onClick={() => nav('/wallet')} className="flex items-center gap-1 text-brand-600 text-sm"><WalletIcon size={16} /> 钱包</button>
         </div>

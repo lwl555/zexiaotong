@@ -47,7 +47,7 @@ export default function Home() {
           <Search size={18} className="text-gray-400" />
           <input className="bg-transparent outline-none text-sm flex-1" placeholder="搜索任务 / 二手 / 帖子" value={kw} onChange={e => setKw(e.target.value)} />
         </div>
-        {me && !me.phone ? (
+        {me && !me.qq ? (
           <button onClick={() => nav('/login')} className="shrink-0 px-3 h-10 rounded-xl bg-brand-500 text-white text-sm font-medium active:scale-95 transition">登录</button>
         ) : (
           <button onClick={() => nav('/notifications')} className="relative w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center">

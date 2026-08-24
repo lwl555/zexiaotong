@@ -42,11 +42,26 @@ function ensureUserId(): string {
   return id
 }
 
+// 数据层映射：profiles 表的登录标识列历史命名为 phone（unique not null），
+// 应用层统一用 qq 表示「QQ 号」。仅在 db 层做转换，避免改动数据库结构。
+function rowToProfile(row: any): Profile {
+  if (!row) return row
+  return { ...row, qq: (row.qq ?? row.phone ?? '') } as Profile
+}
+function profileToRow(p: Partial<Profile>): Record<string, any> {
+  const row: Record<string, any> = { ...p }
+  if ('qq' in row) {
+    row.phone = row.qq
+    delete row.qq
+  }
+  return row
+}
+
 // 本地兜底用户：网络彻底不通时也要让 UI 跑起来，不能一直卡在「加载中...」转圈
 function localGuest(id: string): Profile {
   return {
     id,
-    phone: '',
+    qq: '',
     nickname: '游客' + id.slice(-4),
     avatar: '',
     role: 'user',
@@ -74,13 +89,13 @@ export async function getCurrentUser(roleOverride?: Role): Promise<Profile> {
     )
     if (!error && data) {
       // roleOverride 仅用于登录时首次写入（演示用：新建账号时赋予角色）
-      return data as Profile
+      return rowToProfile(data)
     }
 
     // 拉不到 → 试着 insert 一个（匿名游客注册）；insert 也限时，失败直接返回本地兜底
     const insertPayload = roleOverride ? { ...fallback, role: roleOverride } : fallback
     const ins = await withTimeout(
-      supabase.from('profiles').insert(insertPayload).select().single(),
+      supabase.from('profiles').insert(profileToRow(insertPayload)).select().single(),
       6000,
       'insertProfile'
     ).catch(() => ({ data: null as any, error: { message: 'insert timeout' } }))
@@ -96,13 +111,13 @@ export function logoutUser() {
   localStorage.removeItem(STORAGE_KEY)
 }
 
-// 真正的登录：把用户填的手机号写入 profile（匿名游客默认 phone 为空，登录后才算「已登录」）
-// 用于区分「游客」与「已登录用户」——UI 以 me.phone 是否非空判断。
-export async function loginUser(phone: string, roleOverride?: Role): Promise<Profile> {
+// 真正的登录：把用户填的 QQ 号写入 profile（匿名游客默认 qq 为空，登录后才算「已登录」）
+// 用于区分「游客」与「已登录用户」——UI 以 me.qq 是否非空判断。
+export async function loginUser(qq: string, roleOverride?: Role): Promise<Profile> {
   const id = ensureUserId()
   const base = localGuest(id)
-  const nickname = phone ? phone.slice(0, 3) + '****' + phone.slice(7) : base.nickname
-  const prof: Profile = { ...base, phone, nickname, role: roleOverride ?? base.role }
+  const nickname = qq ? qq.slice(0, 3) + '****' + qq.slice(-2) : base.nickname
+  const prof: Profile = { ...base, qq, nickname, role: roleOverride ?? base.role }
   if (!supabase) return prof
 
   try {
@@ -111,21 +126,21 @@ export async function loginUser(phone: string, roleOverride?: Role): Promise<Pro
       6000, 'loginSelect'
     )
     if (!error && data) {
-      // 已有档案：补登手机号 + 角色
-      const upd: Partial<Profile> = { phone }
+      // 已有档案：补登 QQ 号 + 角色
+      const upd: Record<string, any> = { phone: qq }
       if (roleOverride) upd.role = roleOverride
       const { data: u } = await withTimeout(
         supabase.from('profiles').update(upd).eq('id', id).select().single(),
         6000, 'loginUpdate'
       ).catch(() => ({ data: null as any }))
-      return (u as Profile) || { ...(data as Profile), ...upd }
+      return u ? rowToProfile(u) : { ...rowToProfile(data), ...(roleOverride ? { role: roleOverride } : {}) }
     }
-    // 没有档案：插入（带手机号）
+    // 没有档案：插入（带 QQ 号）
     const ins = await withTimeout(
-      supabase.from('profiles').insert(prof).select().single(),
+      supabase.from('profiles').insert(profileToRow(prof)).select().single(),
       6000, 'loginInsert'
     ).catch(() => ({ data: null as any }))
-    return (ins?.data as Profile) || prof
+    return ins?.data ? rowToProfile(ins.data) : prof
   } catch {
     return prof
   }

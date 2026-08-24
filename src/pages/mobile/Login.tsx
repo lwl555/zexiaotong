@@ -3,19 +3,19 @@ import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../store/store'
 import { ShieldCheck, CheckCircle, XCircle } from 'lucide-react'
 
-// 管理员账号（手机号 + 密码）
-const ADMIN_ACCOUNT = { phone: '18882632073', password: '110110nm' }
+// 管理员账号（QQ号 + 密码）
+const ADMIN_ACCOUNT = { qq: '18882632073', password: '110110nm' }
 
 export default function Login() {
   const nav = useNavigate()
   const login = useStore(s => s.login)
-  const [phone, setPhone] = useState('')
+  const [qq, setQq] = useState('')
   const [code, setCode] = useState('')
   const [agree, setAgree] = useState(true)
   const [count, setCount] = useState(0)
   const [toast, setToast] = useState<{ type: 'ok' | 'err'; msg: string } | null>(null)
 
-  const isAdminPhone = phone === ADMIN_ACCOUNT.phone
+  const isAdminQq = qq === ADMIN_ACCOUNT.qq
 
   const showToast = (type: 'ok' | 'err', msg: string) => {
     setToast({ type, msg })
@@ -23,24 +23,24 @@ export default function Login() {
   }
 
   const sendCode = () => {
-    if (!/^1\d{10}$/.test(phone)) { showToast('err', '手机号格式不正确'); return }
+    if (!/^[1-9]\d{4,10}$/.test(qq)) { showToast('err', 'QQ号格式不正确'); return }
     setCount(60)
     const t = setInterval(() => setCount(c => { if (c <= 1) { clearInterval(t); return 0 } return c - 1 }), 1000)
   }
 
   const submit = () => {
     if (!agree) { showToast('err', '请先同意用户协议与隐私政策'); return }
-    if (!/^1\d{10}$/.test(phone)) { showToast('err', '手机号格式不正确'); return }
+    if (!/^[1-9]\d{4,10}$/.test(qq)) { showToast('err', 'QQ号格式不正确'); return }
     // 管理员账号：校验密码
-    if (isAdminPhone) {
+    if (isAdminQq) {
       if (code !== ADMIN_ACCOUNT.password) {
         showToast('err', '管理员密码错误')
         return
       }
-      login(phone, 'admin')
+      login(qq, 'admin')
       nav('/admin')
     } else {
-      login(phone, 'user')
+      login(qq, 'user')
       nav('/')
     }
   }
@@ -56,32 +56,32 @@ export default function Login() {
       )}
 
       <button onClick={() => nav(-1)} className="self-start text-gray-400 mb-6">‹ 返回</button>
-      <h1 className="text-2xl font-black text-ink">手机号登录</h1>
-      <p className="text-gray-500 text-sm mt-1">未注册手机号将自动创建账号</p>
+      <h1 className="text-2xl font-black text-ink">QQ号登录</h1>
+      <p className="text-gray-500 text-sm mt-1">未注册QQ号将自动创建账号</p>
 
-      <label className="mt-8 text-sm text-gray-600">手机号</label>
-      <input className="input mt-2" value={phone} onChange={e => setPhone(e.target.value)} placeholder="请输入手机号" inputMode="numeric" maxLength={11} />
+      <label className="mt-8 text-sm text-gray-600">QQ号</label>
+      <input className="input mt-2" value={qq} onChange={e => setQq(e.target.value)} placeholder="请输入QQ号" inputMode="numeric" maxLength={11} />
 
-      {isAdminPhone && (
+      {isAdminQq && (
         <div className="mt-2 flex items-center gap-2 text-xs text-brand-600 bg-brand-50 px-3 py-2 rounded-lg">
           <ShieldCheck size={14} /> 管理员账号，请输入密码登录
         </div>
       )}
 
       <label className="mt-5 text-sm text-gray-600">
-        {isAdminPhone ? '管理员密码' : '验证码'}
+        {isAdminQq ? '管理员密码' : '验证码'}
       </label>
       <div className="flex gap-3 mt-2">
         <input
           className="input flex-1"
           value={code}
           onChange={e => setCode(e.target.value)}
-          placeholder={isAdminPhone ? '请输入管理员密码' : '6 位验证码（演示任意填写）'}
-          inputMode={isAdminPhone ? 'text' : 'numeric'}
-          maxLength={isAdminPhone ? 20 : 6}
-          type={isAdminPhone ? 'password' : 'text'}
+          placeholder={isAdminQq ? '请输入管理员密码' : '6 位验证码（演示任意填写）'}
+          inputMode={isAdminQq ? 'text' : 'numeric'}
+          maxLength={isAdminQq ? 20 : 6}
+          type={isAdminQq ? 'password' : 'text'}
         />
-        {!isAdminPhone && (
+        {!isAdminQq && (
           <button onClick={sendCode} disabled={count > 0} className="btn-ghost whitespace-nowrap w-28">
             {count > 0 ? count + 's' : '获取验证码'}
           </button>
@@ -94,7 +94,7 @@ export default function Login() {
       </label>
 
       <button className="btn-primary mt-8 w-full" onClick={submit}>
-        {isAdminPhone ? '管理员登录' : '一键登录 / 注册'}
+        {isAdminQq ? '管理员登录' : '一键登录 / 注册'}
       </button>
     </div>
   )
