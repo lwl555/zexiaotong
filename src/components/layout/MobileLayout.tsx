@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { Home as HomeIcon, PlusCircle, ShoppingBag, MessageSquare, User, Bell } from 'lucide-react'
 import { useStore } from '../../store/store'
 
@@ -31,13 +31,13 @@ function GuestFallback() {
 
 export default function MobileLayout() {
   const nav = useNavigate()
+  const loc = useLocation()
   const me = useStore(s => s.me)
   const loading = useStore(s => s.loading)
   const error = useStore(s => s.error)
   const init = useStore(s => s.init)
   const unread = useStore(s => me ? s.notifications.filter(n => n.user_id === me.id && !n.read).length : 0)
   const [showSkip, setShowSkip] = useState(false)
-  // 底部导航栏固定常驻（用户反馈：去掉 ▼ 折叠按钮，纯展示 5 个 tab 更稳）
 
   // 启动数据拉取（profiles / tasks / goods / posts / config 等）
   useEffect(() => {
@@ -52,9 +52,12 @@ export default function MobileLayout() {
     setShowSkip(false)
   }, [loading])
 
+  // 登录/启动页不需要 me 守卫，直接渲染（用户要能看到登录入口）
+  const isPublicPage = loc.pathname === '/login' || loc.pathname === '/splash'
+
   // 数据未加载完前显示 loading。store.init 有 12 秒总兜底，
   // 这里再暴露手动跳过按钮，最大可能性保证用户能进界面。
-  if (!me) {
+  if (!me && !isPublicPage) {
     return (
       <div className="flex items-center justify-center" style={{ minHeight: '100vh' }}>
         {showSkip ? (
