@@ -3,9 +3,9 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { MessageCircle, UserPlus, Compass, User } from 'lucide-react'
 import { useStore } from '../../store/store'
 
-// 微信式底部 4 Tab：微信 / 通讯录 / 发现 / 我
+// 微信式底部 4 Tab：首页 / 通讯录 / 发现 / 我
 const tabs = [
-  { to: '/', label: '微信', icon: MessageCircle, end: true },
+  { to: '/', label: '首页', icon: MessageCircle, end: true },
   { to: '/contacts', label: '通讯录', icon: UserPlus, end: false },
   { to: '/discover', label: '发现', icon: Compass, end: false },
   { to: '/mine', label: '我', icon: User, end: false },

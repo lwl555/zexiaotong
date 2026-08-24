@@ -1,6 +1,18 @@
 import { useNavigate } from 'react-router-dom'
 import { Search, Plus } from 'lucide-react'
 
+// 顶部一排快捷卡片（横滑）—— 微信「服务」宫格的变体，最高频入口
+// 点击 → 进对应微信式聊天页（/chat/xxx）
+const QUICK = [
+  { to: '/chat/baishitong', label: '百事通', glyph: '百', color: '#0f766e' },
+  { to: '/chat/tangdou', label: '糖豆', glyph: '豆', color: '#9d174d' },
+  { to: '/chat/tutor', label: '资讯台', glyph: '讯', color: '#1d4ed8' },
+  { to: '/chat/doc', label: '文档工坊', glyph: '档', color: '#5b21b6' },
+  { to: '/chat/warnings', label: '避雷', glyph: '⚠', color: '#b91c1c' },
+  { to: '/chat/money', label: '搞钱', glyph: '¥', color: '#a16207' },
+  { to: '/chat/wallet', label: '钱包', glyph: '￥', color: '#047857' },
+]
+
 // 微信式会话列表：去 AI 化预览、去 [应用消息] 前缀、改成自然聊天
 // type: 'ai' 普通彩色头像 | 'app' 绿色应用消息头像 | 'group' 群聊
 const SESSIONS = [
@@ -64,17 +76,27 @@ export default function MobileWechatHome() {
 
   return (
     <div className="wx-page">
-      {/* 微信式 header：左 ‹‹、中"微信(N)"、右 搜索/＋ */}
+      {/* 微信式 header：左 ‹‹、中"首页(N)"、右 搜索/＋ */}
       <header className="wx-header">
         <button className="wx-h-icon" aria-label="聊天列表" onClick={() => nav('/contacts')}>‹‹</button>
-        <div className="wx-title">微信{totalUnread > 0 ? `(${totalUnread})` : ''}</div>
+        <div className="wx-title">首页{totalUnread > 0 ? `(${totalUnread})` : ''}</div>
         <div className="wx-h-right">
-          <button className="wx-h-icon" aria-label="搜索" onClick={() => nav('/ai-search')}><Search size={20} /></button>
+          <button className="wx-h-icon" aria-label="搜索" onClick={() => nav('/discover')}><Search size={20} /></button>
           <button className="wx-h-icon" aria-label="更多" onClick={() => nav('/mine')}><Plus size={22} /></button>
         </div>
       </header>
 
-      {/* 会话列表（去掉 banner，更贴近真实微信） */}
+      {/* 顶部一排快捷卡片（横滑）：最高频功能，一点即进对应聊天页 */}
+      <div className="wx-quick">
+        {QUICK.map(q => (
+          <button key={q.to} className="wx-quick-item" onClick={() => nav(q.to)}>
+            <div className="wx-quick-avatar" style={{ background: q.color }}>{q.glyph}</div>
+            <span className="wx-quick-label">{q.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* 会话列表（微信式） */}
       <div className="wx-list">
         {SESSIONS.map(s => (
           <button key={s.key} className="wx-row" onClick={() => nav(s.to)}>
