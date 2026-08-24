@@ -4,7 +4,6 @@ import { SYSTEM_IDENTITY } from '../lib/prompts'
 import { renderReport, ThemeKey } from '../components/Report'
 import { exportDocx } from '../lib/docx'
 import { addQuery, newId } from '../lib/history'
-import { Building2, Briefcase, Megaphone, AlertTriangle } from 'lucide-react'
 
 // 实时资讯台：把「文档工坊」改为「实时信息查询」。
 // 每个视角（学校/就业/生活学习/各省通知）实时检索最新公开资料，再由 AI 整理成清晰中文输出

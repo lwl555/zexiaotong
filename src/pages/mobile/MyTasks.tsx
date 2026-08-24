@@ -21,7 +21,7 @@ export default function MyTasks() {
   const [params] = useSearchParams()
   const [tab, setTab] = useState<'poster' | 'worker'>((params.get('role') as any) || 'poster')
 
-  const list = tasks.filter(t => tab === 'poster' ? t.poster_id === me.id : t.accepted_by === me.id)
+  const list = tasks.filter(t => tab === 'poster' ? t.poster_id === me.id : t.accepted_id === me.id)
 
   return (
     <div className="px-4 pt-3 pb-10">

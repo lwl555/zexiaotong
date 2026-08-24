@@ -34,7 +34,7 @@ export interface Task {
   poster_name: string
   poster_avatar: string
   status: TaskStatus
-  accepted_by: string | null
+  accepted_id: string | null
   accepted_name: string | null
   top_until: string | null  // 置顶到期时间
   created_at: string
@@ -101,6 +101,7 @@ export interface Comment {
   target_id: string
   author_id: string
   author_name: string
+  author_avatar?: string
   content: string
   created_at: string
 }

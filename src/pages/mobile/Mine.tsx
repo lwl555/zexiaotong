@@ -18,7 +18,7 @@ export default function Mine() {
   const me = useMe()
   const tasks = useStore(s => s.tasks)
   const myPosted = tasks.filter(t => t.poster_id === me.id).length
-  const myTaken = tasks.filter(t => t.accepted_by === me.id).length
+  const myTaken = tasks.filter(t => t.accepted_id === me.id).length
   const unread = useStore(s => s.notifications.filter(n => n.user_id === me.id && !n.read).length)
   const switchRole = useStore(s => s.switchRole)
   const logout = useStore(s => s.logout)

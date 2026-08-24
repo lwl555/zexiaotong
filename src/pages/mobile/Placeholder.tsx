@@ -9,7 +9,7 @@ export default function Placeholder({ title, desc, admin }: { title: string; des
       <h2 className="text-lg font-bold text-ink">{title}</h2>
       {desc && <p className="text-sm text-gray-400 mt-2 max-w-xs">{desc}</p>}
       <p className="text-xs text-gray-300 mt-3">该模块已规划，本轮先交付可交互核心闭环，后续轮次补全。</p>
-      <button className="btn-ghost mt-6" onClick={() => nav(admin ? '/admin' : ''/')}>返回{admin ? '看板' : '首页'}</button>
+      <button className="btn-ghost mt-6" onClick={() => nav(admin ? '/admin' : '/')}>返回{admin ? '看板' : '首页'}</button>
     </div>
   )
 }

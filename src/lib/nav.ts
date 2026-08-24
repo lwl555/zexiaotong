@@ -2,7 +2,7 @@
 // 关键：所有功能都在同一套 URL 下，不再有 /m 这种独立命名空间。
 // 设备自适应由 App 里的 ResponsiveShell 决定用手机壳还是桌面壳。
 
-import type { ComponentType } from 'react'
+import type { LucideIcon } from 'lucide-react'
 import {
   Home, Compass, Sparkles, Radio, FileText, ShoppingBag, MessageSquare,
   Wallet, AlertTriangle, Coins, Shield, Info
@@ -11,7 +11,7 @@ import {
 export interface NavDef {
   to: string
   label: string
-  icon: ComponentType<{ size?: number; strokeWidth?: number }> | null
+  icon: LucideIcon | null
   live?: boolean
   end?: boolean
 }

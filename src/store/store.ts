@@ -247,8 +247,8 @@ export const useStore = create<State>((set, get) => ({
       task_title: task.title,
       plaintiff_id: me.id,
       plaintiff_name: me.nickname,
-      defendant_id: task.accepted_id,
-      defendant_name: task.accepted_name,
+      defendant_id: task.accepted_id ?? undefined,
+      defendant_name: task.accepted_name ?? undefined,
       reason
     })
     await db.updateTask(taskId, { status: 'arbitration' })

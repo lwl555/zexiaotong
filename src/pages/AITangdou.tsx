@@ -239,7 +239,7 @@ function storedToMsg(s: StoredMsg): Msg {
     links: s.links ?? null,
     image: s.image?.url || null,
     videoUrl: s.videoUrl ?? null,
-    error: s.error ?? null
+    error: s.error ?? undefined
   }
 }
 
@@ -524,7 +524,7 @@ export default function AITangdou() {
       const sysContent = mode ? `${PROMPT}\n\n${MODE_SYSTEM[mode] ?? ''}`.trim() : PROMPT
       const chatMessages: ChatMsg[] = [
         { role: 'system', content: sysContent },
-        ...next.slice(0, -1).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }))
+        ...next.slice(0, -1).map(m => ({ role: (m.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant', content: m.content }))
       ]
       const lastMsg = next[next.length - 1]
       if (lastMsg.image) {

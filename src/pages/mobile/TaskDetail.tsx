@@ -23,7 +23,7 @@ export default function TaskDetail() {
   if (!task) return <div className="p-10 text-center text-gray-400">任务不存在</div>
 
   const isPoster = task.poster_id === me.id
-  const isWorker = task.accepted_by === me.id
+  const isWorker = task.accepted_id === me.id
 
   const renderAction = () => {
     if (task.status === 'open') {
@@ -85,7 +85,7 @@ export default function TaskDetail() {
           <div className="font-medium text-sm">{task.poster_name}</div>
           <div className="text-xs text-gray-400">发布者</div>
         </div>
-        {task.accepted_by && <div className="text-right">
+        {task.accepted_id && <div className="text-right">
           <div className="font-medium text-sm">{task.accepted_name}</div>
           <div className="text-xs text-gray-400">接单者</div>
         </div>}
@@ -102,7 +102,7 @@ export default function TaskDetail() {
       {/* 底部功能 */}
       <div className="flex items-center justify-around mt-6 text-gray-400 text-sm">
         <button className="flex flex-col items-center gap-1" onClick={() => nav('/messages?peer=' + task.poster_id)}><MessageSquare size={18} /><span>联系发布者</span></button>
-        <button className="flex flex-col items-center gap-1" onClick={() => nav('/messages?peer=' + task.accepted_by)}><MessageSquare size={18} /><span>联系接单者</span></button>
+        <button className="flex flex-col items-center gap-1" onClick={() => nav('/messages?peer=' + task.accepted_id)}><MessageSquare size={18} /><span>联系接单者</span></button>
         <button className="flex flex-col items-center gap-1" onClick={() => nav('/')}><Share2 size={18} /><span>分享</span></button>
       </div>
 

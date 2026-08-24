@@ -17,7 +17,6 @@ const TASK_TEXT: any = {
 export default function Dashboard() {
   const users = useStore(s => s.users)
   const tasks = useStore(s => s.tasks)
-  const orders = useStore(s => s.orders)
   const withdrawals = useStore(s => s.withdrawals)
   const arbitrations = useStore(s => s.arbitrations)
   const goods = useStore(s => s.goods)
@@ -26,7 +25,9 @@ export default function Dashboard() {
   const userTotal = users.length
   const banned = users.filter(u => u.status === 'banned').length
   const activeTasks = tasks.filter(t => ['open', 'accepted', 'doing', 'review', 'arbitration'].includes(t.status)).length
-  const gmv = orders.reduce((s, o) => s + (o.amount || 0), 0)
+  // GMV / 订单数：从真实「已完成」任务推导（store 无独立 orders 表）
+  const doneTasks = tasks.filter(t => t.status === 'done')
+  const gmv = doneTasks.reduce((s, t) => s + (t.amount || 0), 0)
   const pendingWd = withdrawals.filter(w => w.status === 'pending').length
   const openArb = arbitrations.filter(a => a.status === 'open').length
   const totalBalance = users.reduce((s, u) => s + u.balance, 0)
@@ -37,11 +38,11 @@ export default function Dashboard() {
   const pieData = Object.keys(TASK_TONE).map(k => ({ name: TASK_TEXT[k], value: statusCounts[k] || 0 }))
   const PIE_COLORS = ['#06bf83', '#3b82f6', '#f59e0b', '#a855f7', '#22c55e', '#ef4444', '#9ca3af']
 
-  // 近 7 日成交额（演示数据，含已完成订单）
+  // 近 7 日成交额（来自已完成任务）
   const gmvByDay: any = {}
-  orders.forEach((o: any) => {
-    const d = (o.finished_at || o.created_at || '').slice(5, 10)
-    if (d) gmvByDay[d] = (gmvByDay[d] || 0) + (o.amount || 0)
+  doneTasks.forEach((t: any) => {
+    const d = (t.created_at || '').slice(5, 10)
+    if (d) gmvByDay[d] = (gmvByDay[d] || 0) + (t.amount || 0)
   })
   const days = Array.from({ length: 7 }).map((_, i) => {
     const dt = new Date(Date.now() - (6 - i) * 86400000)
@@ -49,7 +50,7 @@ export default function Dashboard() {
     return { day: key, gmv: Math.round(gmvByDay[key] || 0) }
   })
   // 订单稀疏时填充演示基数，避免图表全 0 难看（明确标注演示）
-  const hasOrder = orders.length > 0
+  const hasOrder = doneTasks.length > 0
   const barData = days.map(d => ({ day: d.day, gmv: hasOrder ? d.gmv : [12, 28, 19, 35, 22, 46, 38][days.indexOf(d)] }))
 
   return (
@@ -59,7 +60,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="注册用户" value={userTotal} sub={`封禁 ${banned} 人`} tone="brand" />
         <StatCard label="进行中任务" value={activeTasks} sub={`共 ${tasks.length} 个`} tone="amber" />
-        <StatCard label="累计成交额" value={'¥' + gmv.toFixed(0)} sub={`已完成 ${orders.length} 单`} tone="green" />
+        <StatCard label="累计成交额" value={'¥' + gmv.toFixed(0)} sub={`已完成 ${doneTasks.length} 单`} tone="green" />
         <StatCard label="用户钱包总额" value={'¥' + totalBalance.toFixed(0)} sub="冻结计入余额" tone="ink" />
         <StatCard label="待审提现" value={pendingWd} sub={`¥${withdrawals.filter(w => w.status === 'pending').reduce((s, w) => s + w.amount, 0)}`} tone="clay" />
         <StatCard label="仲裁中" value={openArb} sub={`共 ${arbitrations.length} 起`} tone="red" />

@@ -6,10 +6,11 @@
 // - 用户 id 存在 localStorage，启动时自动匿名注册
 // - 后续可升级为真实 Supabase Auth
 
-import { supabase, type SupabaseClient } from './supabase'
+import { supabase } from './supabase'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   Profile, Task, Goods, Post, Comment, Message, WalletTxn, Withdrawal,
-  Arbitration, Notification, Category, Banner, PlatformConfig,
+  Arbitration, Notification, Category, Banner, PlatformConfig, Role,
   TaskStatus, GoodsStatus, PostStatus
 } from './types'
 
@@ -32,7 +33,7 @@ function withTimeout<T>(p: PromiseLike<T>, ms: number, label = 'query'): Promise
 }
 
 function ensureUserId(): string {
-  let id = localStorage.getItem(STORAGE_KEY)
+  let id = localStorage.getItem(STORAGE_KEY) || ''
   if (!id) {
     // 匿名游客：生成随机 id，写入 profiles
     id = (crypto as any)?.randomUUID?.() || `anon-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
@@ -427,7 +428,7 @@ export async function publishTask(input: {
     accepted_id: null,
     accepted_name: null,
     top_until: null
-  })
+  } as Partial<Task>)
 
   await addTxn({
     user_id: input.poster_id,
@@ -473,7 +474,6 @@ export async function takeTask(taskId: string) {
 
 // 验收通过：结算
 export async function reviewPass(taskId: string) {
-  const me = await getCurrentUser()
   const { data: task } = await supabase!
     .from('tasks')
     .select('*')

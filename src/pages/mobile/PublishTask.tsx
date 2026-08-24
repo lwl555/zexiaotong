@@ -24,13 +24,13 @@ export default function PublishTask() {
   const addImg = () => setImages([...images, img('图片' + (images.length + 1), 400, 300)])
   const rmImg = (i: number) => setImages(images.filter((_, k) => k !== i))
 
-  const submit = () => {
+  const submit = async () => {
     const amt = Number(amount)
     if (!title.trim()) { setErr('请填写任务标题'); return }
     if (!amt || amt <= 0) { setErr('请填写正确的悬赏金额'); return }
     if (!deadline) { setErr('请选择截止时间'); return }
     if (amt > usable) { setErr(`可用余额不足：需 ¥${amt}，当前可用 ¥${usable.toFixed(2)}`); return }
-    const r = publish({ title, category, amount: amt, deadline: new Date(deadline).toISOString(), description: desc, images })
+    const r = await publish({ title, category, amount: amt, deadline: new Date(deadline).toISOString(), description: desc, images })
     if (!r.ok) { setErr(r.msg); return }
     nav('/')
   }
