@@ -1216,3 +1216,96 @@ textarea { resize: vertical; min-height: 88px; }
 .wx-discover-name { font-size: 16px; color: #111; }
 .wx-discover-desc { font-size: 12px; color: #999; margin-top: 2px; }
 .wx-discover-arrow { color: #c8c8c8; font-size: 20px; }
+
+/* ===================== 微信式聊天详情页 ===================== */
+.wx-chat {
+  display: flex; flex-direction: column;
+  min-height: 100vh; padding-bottom: 56px;
+  background: #ededed;
+}
+.wx-chat-header {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; gap: 8px;
+  height: 44px; padding: 0 6px;
+  background: #ededed; border-bottom: 1px solid #d8d8d8;
+}
+.wx-chat-back, .wx-chat-more {
+  width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+  background: transparent; border: 0; color: #111;
+}
+.wx-chat-title { flex: 1; display: flex; flex-direction: column; align-items: center; }
+.wx-chat-name { font-size: 16px; font-weight: 600; color: #111; line-height: 1.1; }
+.wx-chat-status { font-size: 11px; color: #888; margin-top: 2px; }
+
+.wx-chat-body {
+  flex: 1; padding: 12px 12px 16px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.wx-chat-time {
+  text-align: center; font-size: 12px; color: #888; padding: 4px 0 8px;
+}
+.wx-msg-row {
+  display: flex; align-items: flex-start; gap: 8px;
+  margin: 2px 0;
+}
+.wx-msg-row.me { flex-direction: row-reverse; }
+.wx-msg-avatar {
+  width: 36px; height: 36px; border-radius: 4px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 15px; font-weight: 600;
+}
+.wx-msg-bubble {
+  max-width: 70%;
+  background: #fff; color: #111;
+  padding: 9px 11px; border-radius: 4px; font-size: 15px; line-height: 1.45;
+  word-break: break-word; white-space: pre-wrap;
+  border: 1px solid #e5e5e5;
+}
+.wx-msg-row.me .wx-msg-bubble {
+  background: #95ec69; border-color: #95ec69;
+}
+.wx-msg-card {
+  max-width: 70%; background: #fff; border: 1px solid #e5e5e5; border-radius: 6px;
+  padding: 10px 12px; text-align: left; cursor: pointer;
+}
+.wx-msg-card-title { font-size: 14px; font-weight: 600; color: #111; }
+.wx-msg-card-sub { font-size: 12px; color: #888; margin-top: 3px; }
+.wx-msg-card-btn { font-size: 13px; color: #576b95; margin-top: 6px; }
+
+.wx-chat-input {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; max-width: 480px; margin: 0 auto;
+  background: #f7f7f7; border-top: 1px solid #e5e5e5;
+}
+.wx-chat-icon {
+  width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+  background: transparent; border: 0; color: #111;
+}
+.wx-chat-textbox {
+  flex: 1; display: flex; align-items: center; gap: 6px;
+  background: #fff; border-radius: 6px; padding: 6px 10px;
+  min-height: 36px;
+}
+.wx-chat-textbox input {
+  flex: 1; border: 0; outline: 0; font-size: 15px; background: transparent;
+}
+.wx-chat-send {
+  background: #07c160; color: #fff; border: 0; border-radius: 6px;
+  padding: 8px 14px; font-size: 14px; font-weight: 600;
+}
+
+.wx-chat-plus {
+  position: fixed; inset: 0; z-index: 30; background: rgba(0,0,0,.4);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.wx-chat-plus-grid {
+  width: 100%; max-width: 480px; background: #f7f7f7;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
+  padding: 18px 12px 24px;
+}
+.wx-chat-plus-item {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 12px 0; background: #fff; border-radius: 6px; color: #111;
+  font-size: 12px;
+}

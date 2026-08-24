@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { MessageCircle, UserPlus, Compass, User, Bell } from 'lucide-react'
+import { MessageCircle, UserPlus, Compass, User } from 'lucide-react'
 import { useStore } from '../../store/store'
 
 // 微信式底部 4 Tab：微信 / 通讯录 / 发现 / 我
@@ -36,7 +36,6 @@ export default function MobileLayout() {
   const loading = useStore(s => s.loading)
   const error = useStore(s => s.error)
   const init = useStore(s => s.init)
-  const unread = useStore(s => me ? s.notifications.filter(n => n.user_id === me.id && !n.read).length : 0)
   const [showSkip, setShowSkip] = useState(false)
 
   // 启动数据拉取（profiles / tasks / goods / posts / config 等）
@@ -102,12 +101,6 @@ export default function MobileLayout() {
           </NavLink>
         ))}
       </nav>
-      {/* 浮动通知入口（贴着底部导航栏之上） */}
-      <button onClick={() => nav('/notifications')} className="fixed z-30 w-10 h-10 rounded-full bg-white shadow-card flex items-center justify-center text-brand-600"
-        style={{ bottom: 56, left: 12 }}>
-        <Bell size={18} strokeWidth={1.9} />
-        {unread > 0 && <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">{unread}</span>}
-      </button>
     </div>
   )
 }

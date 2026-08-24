@@ -53,6 +53,7 @@ import Wallet from './pages/mobile/Wallet'
 import Mine from './pages/mobile/Mine'
 import Contacts from './pages/mobile/Contacts'
 import Discover from './pages/mobile/Discover'
+import Chat from './pages/mobile/Chat'
 
 // PC 管理后台（同一平台内的模块，自身响应式）
 import Dashboard from './pages/admin/Dashboard'
@@ -126,6 +127,7 @@ export default function App() {
         <Route index element={<DeviceHome />} />
         <Route path="contacts" element={<Contacts />} />
         <Route path="discover" element={<Discover />} />
+        <Route path="chat/:type" element={<Chat />} />
         <Route path="splash" element={<Splash />} />
         <Route path="login" element={<Login />} />
         <Route path="publish" element={<PublishTask />} />

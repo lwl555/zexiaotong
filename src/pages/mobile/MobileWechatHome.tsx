@@ -1,112 +1,80 @@
 import { useNavigate } from 'react-router-dom'
 import { Search, Plus } from 'lucide-react'
-import { useStore } from '../../store/store'
 
-// 顶部一排快捷卡片（最高频入口）
-const QUICK = [
-  { to: '/ai-search', label: '百事通', glyph: '百', color: '#0f766e' },
-  { to: '/ai-tangdou', label: '糖豆', glyph: '豆', color: '#9d174d' },
-  { to: '/ai-tutor', label: '资讯台', glyph: '讯', color: '#1d4ed8' },
-  { to: '/document-workshop', label: '文档工坊', glyph: '档', color: '#5b21b6' },
-  { to: '/warnings', label: '避雷', glyph: '⚠', color: '#b91c1c' },
-  { to: '/money', label: '搞钱', glyph: '¥', color: '#a16207' },
-]
-
-// 微信式会话列表：把每个平台功能做成一条 chat session
-// type: 'ai' 普通彩色头像 | 'app' 绿色应用消息头像 | 'group' 群聊（九宫格用单色块占位）
+// 微信式会话列表：去 AI 化预览、去 [应用消息] 前缀、改成自然聊天
+// type: 'ai' 普通彩色头像 | 'app' 绿色应用消息头像 | 'group' 群聊
 const SESSIONS = [
   {
-    key: 'community', to: '/community', type: 'group' as const,
+    key: 'community', to: '/chat/community', type: 'group' as const,
     glyph: '校', color: '#c2410c', name: '择校社区',
-    preview: '护考姐妹：26 护考大纲已上传，点开看 >>', time: '16:26', unread: 86,
+    preview: '学姐:下周三有学长分享会,主题考研规划', time: '16:26', unread: 86,
   },
   {
-    key: 'baishitong', to: '/ai-search', type: 'ai' as const,
-    glyph: '百', color: '#0f766e', name: 'AI 百事通',
-    preview: '百事通：查到上海交大 2026 招生章程，要发你吗？', time: '14:48', unread: 0,
+    key: 'service', to: '/chat/service', type: 'app' as const,
+    glyph: '✓', color: '#1aad19', name: '服务通知',
+    preview: '您的账号近期有 1 次登录提醒', time: '14:48', unread: 1,
   },
   {
-    key: 'tangdou', to: '/ai-tangdou', type: 'ai' as const,
-    glyph: '豆', color: '#9d174d', name: '糖豆 · 学习搭子',
-    preview: '糖豆：再来一组今天的复习卡？', time: '13:00', unread: 2,
+    key: 'baishitong', to: '/chat/baishitong', type: 'ai' as const,
+    glyph: '百', color: '#0f766e', name: '百事通',
+    preview: '上海交大 2026 招生章程有调整,详见 招生处官网', time: '14:48', unread: 0,
   },
   {
-    key: 'tutor', to: '/ai-tutor', type: 'app' as const,
-    glyph: '讯', color: '#1d4ed8', name: '实时资讯台',
-    preview: '[应用消息] 今日 3 条快讯 · 志愿填报新动态', time: '12:39', unread: 1,
+    key: 'tangdou', to: '/chat/tangdou', type: 'ai' as const,
+    glyph: '豆', color: '#9d174d', name: '糖豆',
+    preview: '今天的小测我已经批完,平均分 82', time: '13:00', unread: 2,
   },
   {
-    key: 'doc', to: '/document-workshop', type: 'app' as const,
+    key: 'tutor', to: '/chat/tutor', type: 'app' as const,
+    glyph: '讯', color: '#1d4ed8', name: '资讯台',
+    preview: '今日招生快讯 3 条 · 志愿填报新动态', time: '12:39', unread: 1,
+  },
+  {
+    key: 'doc', to: '/chat/doc', type: 'app' as const,
     glyph: '档', color: '#5b21b6', name: '文档工坊',
-    preview: '[应用消息] 上次的志愿报告已生成', time: '昨天', unread: 0,
+    preview: '您的志愿报告已生成,点击查看', time: '昨天', unread: 0,
   },
   {
-    key: 'warnings', to: '/warnings', type: 'app' as const,
-    glyph: '⚠', color: '#b91c1c', name: '避雷清单',
-    preview: '[应用消息] 新增 1 所预警院校', time: '周五', unread: 0,
+    key: 'warnings', to: '/chat/warnings', type: 'app' as const,
+    glyph: '⚠', color: '#b91c1c', name: '避雷',
+    preview: '新增预警: 1 所院校存在虚假宣传', time: '周五', unread: 0,
   },
   {
-    key: 'money', to: '/money', type: 'app' as const,
-    glyph: '¥', color: '#a16207', name: '搞钱项目',
-    preview: '[应用消息] 今日第 3 单佣金已到账', time: '周一', unread: 0,
+    key: 'money', to: '/chat/money', type: 'app' as const,
+    glyph: '¥', color: '#a16207', name: '搞钱',
+    preview: '第 3 单佣金 ¥18.00 已到账', time: '周一', unread: 0,
   },
   {
-    key: 'wallet', to: '/wallet', type: 'ai' as const,
-    glyph: '¥', color: '#047857', name: '钱包 · 我的资产',
+    key: 'wallet', to: '/chat/wallet', type: 'ai' as const,
+    glyph: '¥', color: '#047857', name: '钱包',
     preview: '余额 ¥126.50 · 上次佣金已到账', time: '8月13日', unread: 0,
   },
 ]
 
 function Avatar({ type, glyph, color }: { type: string; glyph: string; color: string }) {
   if (type === 'app') {
-    return (
-      <div className="wx-avatar wx-app">
-        <span>{glyph}</span>
-      </div>
-    )
+    return <div className="wx-avatar wx-app"><span>{glyph}</span></div>
   }
-  return (
-    <div className="wx-avatar" style={{ background: color }}>
-      <span>{glyph}</span>
-    </div>
-  )
+  return <div className="wx-avatar" style={{ background: color }}><span>{glyph}</span></div>
 }
 
 export default function MobileWechatHome() {
   const nav = useNavigate()
-  const me = useStore(s => s.me)
-  const unread = useStore(s => (me ? s.notifications.filter(n => n.user_id === me.id && !n.read).length : 0))
-  const totalUnread = SESSIONS.reduce((a, s) => a + (s.unread || 0), 0) + unread
+  const totalUnread = SESSIONS.reduce((a, s) => a + (s.unread || 0), 0)
 
   return (
     <div className="wx-page">
-      {/* 微信式 header */}
+      {/* 微信式 header：左 ‹‹、中"微信(N)"、右 搜索/＋ */}
       <header className="wx-header">
-        <button className="wx-h-icon" aria-label="返回">‹‹</button>
-        <div className="wx-title">择校通{totalUnread > 0 ? `(${totalUnread})` : ''}</div>
+        <button className="wx-h-icon" aria-label="聊天列表" onClick={() => nav('/contacts')}>‹‹</button>
+        <div className="wx-title">微信{totalUnread > 0 ? `(${totalUnread})` : ''}</div>
         <div className="wx-h-right">
           <button className="wx-h-icon" aria-label="搜索" onClick={() => nav('/ai-search')}><Search size={20} /></button>
           <button className="wx-h-icon" aria-label="更多" onClick={() => nav('/mine')}><Plus size={22} /></button>
         </div>
       </header>
 
-      {/* 一行轻提示 banner（仿微信登录设备提示） */}
-      <div className="wx-banner">
-        <span className="wx-banner-dot" />
-        <span>学习季 · AI 已更新 2026 招生数据</span>
-      </div>
-
-      {/* 顶部快捷卡片横排（scroll-snap 横滑） */}
-      <div className="wx-quick">
-        {QUICK.map(q => (
-          <button key={q.to} className="wx-quick-item" onClick={() => nav(q.to)}>
-            <span className="wx-quick-avatar" style={{ background: q.color }}>{q.glyph}</span>
-            <span className="wx-quick-label">{q.label}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* 会话列表 */}
+      {/* 会话列表（去掉 banner，更贴近真实微信） */}
       <div className="wx-list">
         {SESSIONS.map(s => (
           <button key={s.key} className="wx-row" onClick={() => nav(s.to)}>
