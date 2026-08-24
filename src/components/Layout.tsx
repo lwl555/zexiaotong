@@ -2,11 +2,17 @@ import { ReactNode, useState, useEffect, useRef } from 'react'
 import { NavLink, useNavigate, Outlet, useLocation } from 'react-router-dom'
 import HistoryDrawer from './HistoryDrawer'
 import PcSplash from './PcSplash'
+import { useStore } from '../store/store'
 import { primaryNav, moreNav, type NavDef } from '../lib/nav'
 import { Clock } from 'lucide-react'
 
 export default function Layout() {
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const me = useStore(s => s.me)
+  // PC 端：挂载时拉一次用户态（手机版 MobileLayout 也会跑 init，共用同一 store，幂等）
+  useEffect(() => { useStore.getState().init() }, [])
+  // 游客判定：me 存在但没填 qq（与手机版一致）
+  const isGuest = !!me && !me.qq
   // PC 入场 Splash：每个会话（tab）首次加载播一次，避免每次路由切换都弹
   const [showSplash, setShowSplash] = useState<boolean>(() => {
     try { return !sessionStorage.getItem('zex:pcSplash') } catch { return true }
@@ -49,10 +55,10 @@ export default function Layout() {
       <div className="shell">
       <header className="topbar">
         <div className="topbar-inner">
-          {/* 左：极简紫色 logo */}
+          {/* 左：纯文字 logo（去掉原「紫渐变方块」那套 AI 紫做法），保留暖陶土下划线作识别点 */}
           <NavLink to="/" className="brand" end>
-            <span className="brand-mark">择</span>
             <span className="brand-text">择校通</span>
+            <span className="brand-bar" aria-hidden="true" />
           </NavLink>
 
           {/* 中：4 个主链接 + 「更多」下拉（仅在桌面显示，窄屏由汉堡菜单接管） */}
@@ -98,7 +104,7 @@ export default function Layout() {
             </div>
           </nav>
 
-          {/* 右：克制 — 历史按钮 + 头像下拉（含 uid）+ 汉堡（仅窄屏显示） */}
+          {/* 右：克制 — 历史按钮 + 登录入口（游客）OR 头像+uid（已登录） + 汉堡（仅窄屏显示） */}
           <div className="topbar-right">
             <button
               className="ghost-btn"
@@ -107,9 +113,23 @@ export default function Layout() {
             >
               <span className="ico"><Clock size={16} strokeWidth={1.9} /></span>历史
             </button>
-            <div className="avatar" onClick={() => nav('/about')} title="关于本站">
-              兄
-            </div>
+            {isGuest ? (
+              <button
+                className="pc-login-btn"
+                onClick={() => nav('/login')}
+                title="登录 / 注册"
+              >
+                登录 / 注册
+              </button>
+            ) : (
+              <div
+                className="avatar"
+                onClick={() => nav('/about')}
+                title={me?.qq ? `已登录 · QQ ${me.qq}` : '关于本站'}
+              >
+                {me?.nickname ? me.nickname.slice(0, 1) : '兄'}
+              </div>
+            )}
             <button
               className={'hamburger' + (menuOpen ? ' open' : '')}
               onClick={() => setMenuOpen((v) => !v)}

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 /* —— 与手机版 Splash 同款：一笔手绘学位帽 + 衬线中文 + 等宽 eyebrow —— */
-const SERIF = '"Songti SC","Noto Serif CJK SC",ui-serif,Georgia,"Times New Roman",serif'
+const SERIF = '"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Heiti SC","微软雅黑",-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif'
 const MONO = 'ui-monospace,"SF Mono",Menlo,Consolas,"Courier New",monospace'
 
 export default function PcSplash({ onDone }: { onDone: () => void }) {

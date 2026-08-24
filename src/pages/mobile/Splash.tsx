@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-/* 鈥斺€?涓€绗旀墜缁樺浣嶅附锛氱敤 SVG 涓夋 path + stroke-dasharray 璁╁叾銆岀敾鍑烘潵銆?鈥斺€?*/
-const SERIF = '"Songti SC","Noto Serif CJK SC",ui-serif,Georgia,"Times New Roman",serif'
+/* —— 一笔手绘学位帽：用 SVG 三段 path + stroke-dasharray 让其「画出来」 —— */
+const SERIF = '"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Heiti SC","微软雅黑",-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif'
 const MONO = 'ui-monospace,"SF Mono",Menlo,Consolas,"Courier New",monospace'
 
 export default function Splash() {
   const nav = useNavigate()
 
-  // 鍏ュ満搴忓垪鐘舵€侊細绗旂敾瀹屾垚 / 娴佽嫃鍦嗙偣浜?/ 鏂囧瓧娓愬叆 / 鎸夐挳涓婃粦 / footer 娓愬叆
+  // 入场序列状态：笔画完成 / 流苏圆点亮 / 文字渐入 / 按钮上滑 / footer 渐入
   const [drawn, setDrawn] = useState(false)
   const [tassel, setTassel] = useState(false)
   const [body, setBody] = useState(false)
@@ -23,7 +23,7 @@ export default function Splash() {
       window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
     if (reduced.current) {
-      // 鐢ㄦ埛鍋忓ソ鍑忓皯鍔ㄧ敾 鈫?鐩存帴鍏ㄩ儴鍛堢幇
+      // 用户偏好减少动画 → 直接全部呈现
       setDrawn(true); setTassel(true); setBody(true); setCta(true); setFoot(true)
       return
     }
@@ -47,13 +47,13 @@ export default function Splash() {
       className="relative"
       style={{
         minHeight: '100vh',
-        background: '#f6f1e7',          // 鏆栫焊鐧?
+        background: '#f6f1e7',          // 暖纸白
         color: '#1a1a1a',
         overflow: 'hidden',
         fontFamily: SERIF
       }}
     >
-      {/* 涓诲眰锛歠lex column 涓夋锛堥《閮?spacer / logo+鏂囧瓧 / 搴曢儴 spacer锛?*/}
+      {/* 主层：flex column 三段（顶部 spacer / logo+文字 / 底部 spacer） */}
       <div
         className="flex flex-col items-center"
         style={{
@@ -62,10 +62,10 @@ export default function Splash() {
           justifyContent: 'space-between'
         }}
       >
-        {/* 椤堕儴鐣欑櫧锛堣 logo 鑷劧涓嬫矇鍒颁笂 1/3锛?*/}
+        {/* 顶部留白（让 logo 自然下沉到上 1/3） */}
         <div />
 
-        {/* 鈥斺€?Logo锛氬崟绗旀墜缁樺浣嶅附 鈥斺€?*/}
+        {/* —— Logo：单笔手绘学位帽 —— */}
         <div className="flex justify-center" style={{ marginBottom: 32 }}>
           <svg
             width="190"
@@ -74,7 +74,7 @@ export default function Splash() {
             xmlns="http://www.w3.org/2000/svg"
             aria-hidden="true"
           >
-            {/* 甯介《锛氭墎鑿卞舰锛堝乏鍙充袱椤剁偣 + 涓ぎ灏栵級 */}
+            {/* 帽顶：扁菱形（左右两顶点 + 中央尖） */}
             <path
               d="M 26 50 L 95 24 L 164 50 L 95 76 Z"
               fill="none"
@@ -88,7 +88,7 @@ export default function Splash() {
                 transition: 'stroke-dashoffset 1.0s cubic-bezier(0.65, 0, 0.35, 1)'
               }}
             />
-            {/* 甯藉簳锛氭褰?+ 鐭簳杈?*/}
+            {/* 帽底：梯形 + 短底边 */}
             <path
               d="M 52 60 L 95 78 L 138 60 L 138 78 L 95 96 L 52 78 Z"
               fill="none"
@@ -102,7 +102,7 @@ export default function Splash() {
                 transition: 'stroke-dashoffset 0.9s cubic-bezier(0.65, 0, 0.35, 1) 0.1s'
               }}
             />
-            {/* 娴佽嫃缁筹細浠庡附搴曞彸椤剁偣鍨備笅 */}
+            {/* 流苏绳：从帽底右顶点垂下 */}
             <path
               d="M 138 78 L 162 78 L 162 96"
               fill="none"
@@ -116,7 +116,7 @@ export default function Splash() {
                 transition: 'stroke-dashoffset 0.45s cubic-bezier(0.65, 0, 0.35, 1) 0.25s'
               }}
             />
-            {/* 娴佽嫃鍦嗙彔锛氭殩闄跺湡姗欙紝寮瑰叆 */}
+            {/* 流苏圆珠：暖陶土橙，弹入 */}
             <circle
               cx="162"
               cy="100"
@@ -133,9 +133,9 @@ export default function Splash() {
           </svg>
         </div>
 
-        {/* 鈥斺€?涓儴锛氭爣棰?+ eyebrow + 鐭绾?+ 涓绘寜閽?+ 娆￠摼鎺?鈥斺€?*/}
+        {/* —— 中部：标题 + eyebrow + 短橙线 + 主按钮 + 次链接 —— */}
         <div className="w-full" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          {/* 琛嚎涓绘爣棰橈細鍔?letter-spacing锛屾ā鎷熸埅鍥惧瓧闂磋窛 */}
+          {/* 衬线主标题：加 letter-spacing，模拟截图字间距 */}
           <h1
             className="select-none"
             style={{
@@ -152,10 +152,10 @@ export default function Splash() {
                 'opacity 0.7s ease, transform 0.7s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
           >
-            鎷╂牎閫?
+            择校通
           </h1>
 
-          {/* 绛夊 eyebrow */}
+          {/* 等宽 eyebrow */}
           <div
             style={{
               marginTop: 18,
@@ -172,7 +172,7 @@ export default function Splash() {
             GRADUATION, SIMPLIFIED.
           </div>
 
-          {/* 鐭绾?*/}
+          {/* 短橙线 */}
           <div
             style={{
               width: 64,
@@ -187,7 +187,7 @@ export default function Splash() {
             }}
           />
 
-          {/* 涓绘寜閽紙鐩磋榛戝簳锛?*/}
+          {/* 主按钮（直角黑底） */}
           <button
             onClick={goLogin}
             className="select-none"
@@ -200,7 +200,7 @@ export default function Splash() {
               background: '#1a1a1a',
               color: '#fff',
               border: 'none',
-              borderRadius: 0, // 鐩磋
+              borderRadius: 0, // 直角
               fontFamily: MONO,
               fontSize: 14,
               letterSpacing: 8,
@@ -233,7 +233,7 @@ export default function Splash() {
             LOG IN / REGISTER
           </button>
 
-          {/* 娆￠摼鎺ワ細鍏堥€涢€涳紙琛嚎 + 澶ч棿璺濓級 */}
+          {/* 次链接：先逛逛（衬线 + 大间距） */}
           <button
             onClick={skip}
             className="select-none"
@@ -259,15 +259,15 @@ export default function Splash() {
               ;(e.currentTarget as HTMLButtonElement).style.letterSpacing = '10px'
             }}
           >
-            鍏?閫?閫?
+            先 逛 逛
           </button>
         </div>
 
-        {/* 搴曢儴 spacer */}
+        {/* 底部 spacer */}
         <div />
       </div>
 
-      {/* 鈥斺€?Footer锛氬簳閮ㄦ笎闅愰槾褰?+ 绛夊灏忓瓧 鈥斺€?*/}
+      {/* —— Footer：底部渐隐阴影 + 等宽小字 —— */}
       <div
         className="absolute left-0 right-0 text-center pointer-events-none"
         style={{

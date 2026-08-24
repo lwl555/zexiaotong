@@ -93,20 +93,18 @@ a { color: inherit; text-decoration: none; }
   display: flex; align-items: center; justify-content: space-between; gap: 18px;
 }
 
-/* 极简紫色 logo：纯文字 + 紫色色块强调 */
+/* 顶栏 logo：纯文字 + 暖陶土下划线（去掉原「紫渐变方块」做法） */
 .brand {
-  display: inline-flex; align-items: center; gap: 9px;
+  display: inline-flex; align-items: center; gap: 8px;
   text-decoration: none; color: var(--fg);
   font-weight: 750; font-size: 16.5px; letter-spacing: -0.01em;
-}
-.brand-mark {
-  display: inline-grid; place-items: center;
-  width: 28px; height: 28px; border-radius: 7px;
-  background: linear-gradient(135deg, var(--accent-2), var(--accent));
-  color: #fff; font-size: 14px; font-weight: 800;
-  box-shadow: 0 3px 10px color-mix(in srgb, var(--accent) 26%, transparent);
+  font-family: "PingFang SC","Hiragino Sans GB","Microsoft YaHei","Heiti SC",sans-serif;
 }
 .brand-text { line-height: 1; }
+.brand-bar {
+  display: inline-block; width: 22px; height: 2px;
+  background: var(--accent); border-radius: 0;
+}
 
 /* 中央导航：横排单行主链接 + 更多下拉 */
 .nav {
@@ -188,6 +186,27 @@ a { color: inherit; text-decoration: none; }
 }
 .avatar:hover { transform: scale(1.05); border-color: var(--accent); }
 
+/* PC 端登录入口：黑色直角按钮（与 Splash 风格统一） */
+.pc-login-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 36px; padding: 0 16px; min-width: 108px;
+  background: #1a1a1a; color: #f6f1e7;
+  border: 0; border-radius: 0; cursor: pointer;
+  font-family: "JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  font-size: 12px; font-weight: 600; letter-spacing: 4px;
+  transition: transform .15s ease, box-shadow .15s ease, background .2s ease;
+  box-shadow: 0 2px 0 0 rgba(0,0,0,.06);
+}
+.pc-login-btn:hover {
+  background: #000;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,.18);
+}
+.pc-login-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 0 0 rgba(0,0,0,.06);
+}
+
 .uid-hint {
   font-size: 12px; color: var(--faint); font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
@@ -208,6 +227,7 @@ a { color: inherit; text-decoration: none; }
 @media (max-width: 720px) {
   .topbar-inner { padding: 8px 14px; }
   .brand-text { display: none; }
+  .brand-bar { width: 18px; }
 }
 
 .container { max-width: var(--maxw); margin: 0 auto; padding: 24px 18px 80px; width: 100%; }
@@ -887,6 +907,9 @@ textarea { resize: vertical; min-height: 88px; }
   .topbar-inner { padding: 8px 10px; gap: 6px; }
   .brand { gap: 0; }
   .brand-text { display: none; }
+  .brand-bar { width: 18px; }
+  /* 窄屏 PC 登录按钮：字号收一点，避免顶栏横向溢出 */
+  .pc-login-btn { padding: 0 10px; min-width: 0; font-size: 11px; letter-spacing: 2px; }
   .nav { gap: 0; }
   .nav-link { padding: 8px 6px; }
   /* 「更多」在窄屏也只留 ⋯，否则文字会把导航挤爆 */
