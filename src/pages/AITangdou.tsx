@@ -182,12 +182,21 @@ function renderMarkdown(text: string) {
 }
 
 function inlineRender(text: string) {
+  // 检测图片 URL（http(s)://.../*.jpg|png|webp|gif）并渲染为内联图片
+  const imgExt = /\.(jpe?g|png|webp|gif)(\?|$)/i
   const parts = text.split(/(\*\*[^*]+\*\*)/g)
   return parts.map((p, i) => {
     const m = p.match(/^\*\*([^*]+)\*\*$/)
     if (m) return <strong key={i} style={{ color: '#c2410c', fontWeight: 600 }}>{m[1]}</strong>
-    if (p) return <span key={i}>{p}</span>
-    return null
+    if (!p) return null
+    // 检测 URL 是否为图片链接
+    const urlMatch = p.match(/(https?:\/\/[^\s]+\.(?:jpe?g|png|webp|gif)(?:\?[^\s]*)?)/i)
+    if (urlMatch) {
+      const before = p.slice(0, urlMatch.index)
+      const after = p.slice((urlMatch.index || 0) + urlMatch[0].length)
+      return <span key={i}>{before}<img src={urlMatch[1]} alt="" style={{ maxWidth: 200, maxHeight: 160, borderRadius: 8, display: 'block', margin: '6px 0' }} onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />{after}</span>
+    }
+    return <span key={i}>{p}</span>
   })
 }
 
@@ -1081,6 +1090,27 @@ export default function AITangdou() {
                     {lk.title || lk.url}
                   </a>
                 ))}
+              </div>
+            )}
+            {/* AI 回复操作栏：重新生成 + 复制 */}
+            {m.role === 'ai' && !m.error && (
+              <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                <button
+                  onClick={() => { navigator.clipboard?.writeText(m.content) }}
+                  style={{ fontSize: 11, color: '#888', background: 'none', border: '1px solid #e5e5e5', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}
+                >📋 复制</button>
+                <button
+                  onClick={() => { stop(); run(messages.slice(0, -1)) }}
+                  style={{ fontSize: 11, color: '#888', background: 'none', border: '1px solid #e5e5e5', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}
+                >🔄 重新生成</button>
+              </div>
+            )}
+            {m.role === 'ai' && m.error && (
+              <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                <button
+                  onClick={() => { stop(); run(messages.slice(0, -1)) }}
+                  style={{ fontSize: 11, color: '#888', background: 'none', border: '1px solid #e5e5e5', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}
+                >🔄 重新生成</button>
               </div>
             )}
           </div>

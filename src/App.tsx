@@ -48,6 +48,7 @@ import PublishPost from './pages/mobile/PublishPost'
 import Messages from './pages/mobile/Messages'
 import Notifications from './pages/mobile/Notifications'
 import MyTasks from './pages/mobile/MyTasks'
+import AIHistory from './pages/mobile/AIHistory'
 import Wallet from './pages/mobile/Wallet'
 import Mine from './pages/mobile/Mine'
 
@@ -134,6 +135,7 @@ export default function App() {
         <Route path="messages" element={<Messages />} />
         <Route path="notifications" element={<Notifications />} />
         <Route path="my-tasks" element={<MyTasks />} />
+        <Route path="ai-history" element={<AIHistory />} />
         <Route path="wallet" element={<Wallet />} />
         <Route path="mine" element={<Mine />} />
         {/* 原桌面 AI 功能：手机端也走同一 URL，在手机壳里渲染 */}

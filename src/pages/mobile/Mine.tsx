@@ -1,10 +1,11 @@
 import { useNavigate } from 'react-router-dom'
-import { Wallet as WalletIcon, ListOrdered, Package, Heart, Settings, Shield, LogOut, ChevronRight, Megaphone, Compass, Radio, FileText, AlertTriangle, Coins, Info } from 'lucide-react'
+import { Wallet as WalletIcon, ListOrdered, Package, Heart, Settings, Shield, LogOut, ChevronRight, Megaphone, Compass, Radio, FileText, AlertTriangle, Coins, Info, Clock, Bot } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { useMe } from '../../store/useMe'
 
 const aiTools = [
   { to: '/ai-search', label: 'AI百事通', icon: Compass },
+  { to: '/ai-tangdou', label: '糖豆', icon: Bot },
   { to: '/ai-tutor', label: '实时资讯台', icon: Radio },
   { to: '/document-workshop', label: '文档工坊', icon: FileText },
   { to: '/warnings', label: '避雷清单', icon: AlertTriangle },
@@ -25,6 +26,7 @@ export default function Mine() {
   const rows = [
     { icon: ListOrdered, label: '我的发布', val: myPosted, onClick: () => nav('/my-tasks?role=poster') },
     { icon: Package, label: '我的接单', val: myTaken, onClick: () => nav('/my-tasks?role=worker') },
+    { icon: Clock, label: 'AI 查询记录', val: 0, onClick: () => nav('/ai-history') },
     { icon: Heart, label: '我的收藏', val: 0, onClick: () => nav('/community') },
     { icon: Megaphone, label: '消息通知', val: unread, onClick: () => nav('/notifications') }
   ]

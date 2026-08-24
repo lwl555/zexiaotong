@@ -1,9 +1,17 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Bell, Pin, Clock, ChevronRight, Heart, Star, MessageSquare } from 'lucide-react'
+import { Search, Bell, Pin, Clock, ChevronRight, Heart, Star, MessageSquare, Sparkles, Bot, Radio, FileText, AlertTriangle } from 'lucide-react'
 import { useStore } from '../../store/store'
 
 const TABS = ['全部', '悬赏', '跑腿', '文档设计', '问卷', '二手', '论坛']
+
+const AI_TOOLS = [
+  { to: '/ai-search', label: '查院校', icon: Search, desc: 'AI + 联网检索', cls: 'bg-orange-50 text-orange-700 border-orange-200' },
+  { to: '/ai-tangdou', label: '糖豆', icon: Bot, desc: '全能对话助手', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+  { to: '/ai-tutor', label: '资讯台', icon: Radio, desc: '志愿填报推荐', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+  { to: '/document-workshop', label: '文档工坊', icon: FileText, desc: '一键生成报告', cls: 'bg-green-50 text-green-700 border-green-200' },
+  { to: '/warnings', label: '避雷清单', icon: AlertTriangle, desc: '真实优缺点', cls: 'bg-red-50 text-red-700 border-red-200' },
+]
 
 function remain(d?: string) {
   if (!d) return ''
@@ -55,13 +63,31 @@ export default function Home() {
         ))}
       </div>
 
+      {/* AI 工具入口（仅在"全部"tab 显示） */}
+      {tab === '全部' && (
+        <div className="mb-3">
+          <div className="flex items-center gap-1.5 mb-2"><Sparkles size={14} className="text-brand-600" /><span className="text-xs font-medium text-gray-600">AI 工具</span></div>
+          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+            {AI_TOOLS.map(t => (
+              <button key={t.to} onClick={() => nav(t.to)} className={'shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl border active:scale-[.97] transition ' + t.cls}>
+                <t.icon size={16} strokeWidth={1.9} />
+                <div className="text-left">
+                  <div className="text-xs font-medium leading-none">{t.label}</div>
+                  <div className="text-[10px] opacity-70 mt-0.5 leading-none">{t.desc}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* 列表 */}
       <div className="space-y-3">
         {list.length === 0 && <div className="text-center text-gray-400 text-sm py-16">暂无内容</div>}
         {list.map((x: any) => {
           if (tab === '二手') {
             return (
-              <div key={x.id} onClick={() => nav('/goods')} className="card p-3 flex gap-3 active:scale-[.99] transition">
+              <div key={x.id} onClick={() => nav('/goods/' + x.id)} className="card p-3 flex gap-3 active:scale-[.99] transition">
                 <img src={x.images[0] || ''} className="w-20 h-20 rounded-xl bg-gray-100 object-cover" alt="" />
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">{x.title}</div>

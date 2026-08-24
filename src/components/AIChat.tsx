@@ -132,6 +132,8 @@ interface Msg {
   images?: { url: string; title: string }[] | null
   /** 检索到的真实参考链接（可点击打开 / 复制），可空 */
   links?: LinkInfo[] | null
+  /** 错误标记：true 时为错误气泡 */
+  error?: boolean | null
 }
 
 export default function AIChat({
@@ -152,7 +154,7 @@ export default function AIChat({
   const convId = `${pageKey}:${channel}`
   const [messages, setMessages] = useState<Msg[]>(() => {
     const c = getConversation(convId)
-    return c ? c.messages.map((m: StoredMsg) => ({ role: m.role, content: m.content, image: m.image ?? null, reasoning: m.reasoning ?? null, images: m.images ?? null, links: m.links ?? null })) : []
+    return c ? c.messages.map((m: StoredMsg) => ({ role: m.role, content: m.content, image: m.image ?? null, reasoning: m.reasoning ?? null, images: m.images ?? null, links: m.links ?? null, error: m.error ?? null })) : []
   })
   const [convTitle, setConvTitle] = useState<string>(() => getConversation(convId)?.title ?? '')
   const [convCreated, setConvCreated] = useState<number>(() => getConversation(convId)?.createdAt ?? Date.now())
@@ -320,7 +322,13 @@ export default function AIChat({
         setError('')
         return
       }
-      setError(String(e?.message || e))
+      // 错误信息以 AI 气泡样式显示在聊天框中，与糖豆保持一致
+      const errMsg: Msg = {
+        role: 'ai' as const,
+        content: `❌ 请求出错：${String(e?.message || e)}\n\n💡 可以尝试：\n- 点击「重新生成」按钮\n- 换个问题再试试\n- 检查网络连接`,
+        error: true
+      }
+      setMessages(prev => [...prev, errMsg])
     } finally {
       if (timerRef.current) {
         clearInterval(timerRef.current)
@@ -431,13 +439,14 @@ export default function AIChat({
           </div>
         )}
         {messages.map((m, i) => (
-          <div key={i} className={`msg ${m.role}`}>
+          <div key={i} className={`msg ${m.role}${m.error ? ' msg-error' : ''}`}>
             <div className="bubble">
               <div className="role">{roleLabel(m.role)}</div>
               {m.role === 'user' ? (
                 m.content
               ) : (
                 <>
+                  {m.error && <div className="error-badge">出错</div>}
                   {m.image?.url && (
                     <figure className="lead-photo">
                       <img src={imgProxy(m.image.url)} alt={m.image.title || '配图'} loading="lazy" referrerPolicy="no-referrer"
@@ -491,6 +500,24 @@ export default function AIChat({
                           <figcaption>{sceneLabel(img.title)}</figcaption>
                         </figure>
                       ))}
+                    </div>
+                  )}
+                  {/* AI 回复操作栏：重新生成 + 复制 */}
+                  {!m.error && (
+                    <div className="msg-actions">
+                      <button className="msg-action-btn" onClick={() => { navigator.clipboard?.writeText(m.content); }} title="复制全文">
+                        📋 复制
+                      </button>
+                      <button className="msg-action-btn" onClick={() => resend()} title="重新生成回答">
+                        🔄 重新生成
+                      </button>
+                    </div>
+                  )}
+                  {m.error && (
+                    <div className="msg-actions">
+                      <button className="msg-action-btn" onClick={() => resend()} title="重新生成回答">
+                        🔄 重新生成
+                      </button>
                     </div>
                   )}
                   <div className="report">{renderReport(m.content, theme)}</div>
