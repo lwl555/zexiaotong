@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ImagePlus, X } from 'lucide-react'
+import { ImagePlus, X, CheckCircle, XCircle } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { img } from '../../lib/img'
 
@@ -18,6 +18,12 @@ export default function PublishPost() {
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [images, setImages] = useState<string[]>([])
+  const [toast, setToast] = useState<{ type: 'ok' | 'err'; msg: string } | null>(null)
+
+  const showToast = (type: 'ok' | 'err', msg: string) => {
+    setToast({ type, msg })
+    setTimeout(() => setToast(null), 2500)
+  }
 
   const onPick = async (e: any) => {
     const files: File[] = Array.from(e.target.files || [])
@@ -31,15 +37,23 @@ export default function PublishPost() {
   }
 
   const submit = () => {
-    if (!title.trim()) { alert('请填写标题'); return }
-    if (!content.trim()) { alert('请填写内容'); return }
+    if (!title.trim()) { showToast('err', '请填写标题'); return }
+    if (!content.trim()) { showToast('err', '请填写内容'); return }
     publishPost({ title: title.trim(), content: content.trim(), images: images.length ? images : [img('图文帖', 400, 240, '#a855f7')] })
-    alert('发布成功')
-    nav('/community')
+    showToast('ok', '发布成功')
+    setTimeout(() => nav('/community'), 800)
   }
 
   return (
     <div className="px-4 pt-3 pb-10">
+      {/* Toast 通知 */}
+      {toast && (
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium shadow-lg ${toast.type === 'ok' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+          {toast.type === 'ok' ? <CheckCircle size={16} /> : <XCircle size={16} />}
+          {toast.msg}
+        </div>
+      )}
+
       <button onClick={() => nav(-1)} className="text-gray-400 mb-2">‹ 返回</button>
       <h1 className="text-xl font-black text-ink mb-4">发布帖子</h1>
 

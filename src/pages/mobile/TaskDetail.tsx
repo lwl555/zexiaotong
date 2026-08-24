@@ -101,8 +101,8 @@ export default function TaskDetail() {
 
       {/* 底部功能 */}
       <div className="flex items-center justify-around mt-6 text-gray-400 text-sm">
-        <button className="flex flex-col items-center gap-1" onClick={() => nav('/mine')}><MessageSquare size={18} /><span>评论</span></button>
-        <button className="flex flex-col items-center gap-1" onClick={() => nav('/mine')}><Flag size={18} /><span>举报</span></button>
+        <button className="flex flex-col items-center gap-1" onClick={() => nav('/messages?peer=' + task.poster_id)}><MessageSquare size={18} /><span>联系发布者</span></button>
+        <button className="flex flex-col items-center gap-1" onClick={() => nav('/messages?peer=' + task.accepted_by)}><MessageSquare size={18} /><span>联系接单者</span></button>
         <button className="flex flex-col items-center gap-1" onClick={() => nav('/')}><Share2 size={18} /><span>分享</span></button>
       </div>
 

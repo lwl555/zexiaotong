@@ -1,9 +1,10 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, ListChecks, ShoppingBag, MessageSquare, Gavel,
-  Wallet, Settings2, Shield, ArrowLeft
+  Wallet, Settings2, Shield, ArrowLeft, Lock
 } from 'lucide-react'
 import { useStore } from '../../store/store'
+import { useMe } from '../../store/useMe'
 
 const menu = [
   { to: '/admin', label: '数据看板', icon: LayoutDashboard, end: true },
@@ -20,6 +21,21 @@ const menu = [
 export default function AdminLayout() {
   const nav = useNavigate()
   const cfg = useStore(s => s.config)
+  const me = useMe()
+
+  // 角色校验：非管理员禁止进入后台
+  if (me && me.role !== 'admin') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+        <div className="text-center">
+          <Lock size={48} className="text-gray-300 mx-auto mb-4" />
+          <h1 className="text-xl font-bold text-ink mb-2">无权访问</h1>
+          <p className="text-gray-500 text-sm mb-6">管理后台仅对管理员开放，当前账号无权限。</p>
+          <button className="btn-primary" onClick={() => nav('/')}>返回首页</button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="admin min-h-screen flex flex-col md:flex-row bg-gray-50 text-ink">

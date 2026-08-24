@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type {
-  Profile, Task, Goods, Post, Message, WalletTxn, Withdrawal,
+  Profile, Role, Task, Goods, Post, Message, WalletTxn, Withdrawal,
   Arbitration, Notification, Category, Banner, PlatformConfig,
   TaskStatus, GoodsStatus, PostStatus
 } from '../lib/types'
@@ -35,7 +35,7 @@ interface State {
   init: () => Promise<void>
 
   // 用户
-  login: (phone?: string) => Promise<void>
+  login: (phone?: string, role?: Role) => Promise<void>
   logout: () => void
   switchRole: () => void
   getUser: (id: string) => Profile | undefined
@@ -159,8 +159,8 @@ export const useStore = create<State>((set, get) => ({
   },
 
   // ─── 用户 ───
-  login: async (phone) => {
-    const me = await db.getCurrentUser()
+  login: async (phone, role?: Role) => {
+    const me = await db.getCurrentUser(role)
     set({ me })
   },
 

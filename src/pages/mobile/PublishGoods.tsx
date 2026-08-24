@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ImagePlus, X } from 'lucide-react'
+import { ImagePlus, X, CheckCircle, XCircle } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { img } from '../../lib/img'
 
@@ -22,6 +22,12 @@ export default function PublishGoods() {
   const [category, setCategory] = useState(cats[0]?.name || '数码')
   const [description, setDescription] = useState('')
   const [images, setImages] = useState<string[]>([])
+  const [toast, setToast] = useState<{ type: 'ok' | 'err'; msg: string } | null>(null)
+
+  const showToast = (type: 'ok' | 'err', msg: string) => {
+    setToast({ type, msg })
+    setTimeout(() => setToast(null), 2500)
+  }
 
   const onPick = async (e: any) => {
     const files: File[] = Array.from(e.target.files || [])
@@ -35,15 +41,23 @@ export default function PublishGoods() {
   }
 
   const submit = () => {
-    if (!title.trim()) { alert('请填写商品名称'); return }
-    if (!Number(price) || Number(price) <= 0) { alert('请填写有效价格'); return }
+    if (!title.trim()) { showToast('err', '请填写商品名称'); return }
+    if (!Number(price) || Number(price) <= 0) { showToast('err', '请填写有效价格'); return }
     publishGoods({ title: title.trim(), price: Number(price), category, description: description.trim(), images: images.length ? images : [img('二手商品', 400, 300)] })
-    alert('发布成功，等待审核上架')
-    nav('/goods')
+    showToast('ok', '发布成功，等待审核上架')
+    setTimeout(() => nav('/goods'), 800)
   }
 
   return (
     <div className="px-4 pt-3 pb-10">
+      {/* Toast 通知 */}
+      {toast && (
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium shadow-lg ${toast.type === 'ok' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+          {toast.type === 'ok' ? <CheckCircle size={16} /> : <XCircle size={16} />}
+          {toast.msg}
+        </div>
+      )}
+
       <button onClick={() => nav(-1)} className="text-gray-400 mb-2">‹ 返回</button>
       <h1 className="text-xl font-black text-ink mb-4">发布二手商品</h1>
 

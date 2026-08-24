@@ -99,7 +99,7 @@ export default function Home() {
           }
           if (tab === '论坛') {
             return (
-              <div key={x.id} onClick={() => nav('/community')} className="card p-3 active:scale-[.99] transition">
+              <div key={x.id} onClick={() => nav('/post/' + x.id)} className="card p-3 active:scale-[.99] transition">
                 <div className="font-medium">{x.title}</div>
                 <div className="text-sm text-gray-500 mt-1 line-clamp-2">{x.content}</div>
                 <div className="flex items-center gap-4 text-xs text-gray-400 mt-2">

@@ -1,36 +1,65 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../store/store'
+import { ShieldCheck, CheckCircle, XCircle } from 'lucide-react'
+
+// 管理员手机号白名单（演示用；真实环境应查 profiles 表的 role 字段）
+const ADMIN_PHONES = ['13800000000', '13900000000', '18800000000']
 
 export default function Login() {
   const nav = useNavigate()
   const login = useStore(s => s.login)
-  const [phone, setPhone] = useState('13800001234')
+  const [phone, setPhone] = useState('')
   const [code, setCode] = useState('')
   const [agree, setAgree] = useState(true)
   const [count, setCount] = useState(0)
+  const [showAdmin, setShowAdmin] = useState(false)
+  const [toast, setToast] = useState<{ type: 'ok' | 'err'; msg: string } | null>(null)
+
+  const isAdminPhone = ADMIN_PHONES.includes(phone)
+
+  const showToast = (type: 'ok' | 'err', msg: string) => {
+    setToast({ type, msg })
+    setTimeout(() => setToast(null), 2500)
+  }
 
   const sendCode = () => {
-    if (!/^1\d{10}$/.test(phone)) { alert('手机号格式不正确'); return }
+    if (!/^1\d{10}$/.test(phone)) { showToast('err', '手机号格式不正确'); return }
     setCount(60)
     const t = setInterval(() => setCount(c => { if (c <= 1) { clearInterval(t); return 0 } return c - 1 }), 1000)
   }
 
   const submit = () => {
-    if (!agree) { alert('请先同意用户协议与隐私政策'); return }
-    if (!/^1\d{10}$/.test(phone)) { alert('手机号格式不正确'); return }
-    login(phone)
-    nav('/')
+    if (!agree) { showToast('err', '请先同意用户协议与隐私政策'); return }
+    if (!/^1\d{10}$/.test(phone)) { showToast('err', '手机号格式不正确'); return }
+    login(phone, isAdminPhone ? 'admin' : 'user')
+    // 管理员登录后直接跳转后台
+    if (isAdminPhone) nav('/admin')
+    else nav('/')
   }
 
   return (
     <div className="app-shell flex flex-col px-6 pt-16" style={{ minHeight: '100vh' }}>
+      {/* Toast 通知 */}
+      {toast && (
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium shadow-lg ${toast.type === 'ok' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+          {toast.type === 'ok' ? <CheckCircle size={16} /> : <XCircle size={16} />}
+          {toast.msg}
+        </div>
+      )}
+
       <button onClick={() => nav(-1)} className="self-start text-gray-400 mb-6">‹ 返回</button>
       <h1 className="text-2xl font-black text-ink">手机号登录</h1>
       <p className="text-gray-500 text-sm mt-1">未注册手机号将自动创建账号</p>
 
       <label className="mt-8 text-sm text-gray-600">手机号</label>
       <input className="input mt-2" value={phone} onChange={e => setPhone(e.target.value)} placeholder="请输入手机号" inputMode="numeric" maxLength={11} />
+
+      {isAdminPhone && (
+        <div className="mt-2 flex items-center gap-2 text-xs text-brand-600 bg-brand-50 px-3 py-2 rounded-lg">
+          <ShieldCheck size={14} /> 检测到管理员手机号，登录后将进入管理后台
+        </div>
+      )}
 
       <label className="mt-5 text-sm text-gray-600">验证码</label>
       <div className="flex gap-3 mt-2">
@@ -45,7 +74,25 @@ export default function Login() {
         <span>我已阅读并同意《用户协议》与《隐私政策》，了解平台「先冻结后分账」的资金规则。</span>
       </label>
 
-      <button className="btn-primary mt-8 w-full" onClick={submit}>一键登录 / 注册</button>
+      <button className="btn-primary mt-8 w-full" onClick={submit}>
+        {isAdminPhone ? '管理员登录' : '一键登录 / 注册'}
+      </button>
+
+      <button
+        onClick={() => setShowAdmin(!showAdmin)}
+        className="text-xs text-gray-400 mt-4 text-center"
+      >
+        {showAdmin ? '隐藏管理员入口' : '管理员入口'}
+      </button>
+
+      {showAdmin && (
+        <div className="mt-3 p-3 bg-gray-50 rounded-xl text-xs text-gray-500 space-y-1">
+          <p className="font-medium text-gray-700">管理员手机号（演示）：</p>
+          {ADMIN_PHONES.map(p => (
+            <p key={p} className="font-mono cursor-pointer hover:text-brand-600" onClick={() => setPhone(p)}>{p}</p>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

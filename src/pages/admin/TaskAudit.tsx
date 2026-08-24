@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Pin, Search, EyeOff, Trash2 } from 'lucide-react'
+import { Pin, Search, EyeOff, Trash2, CheckCircle, XCircle } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { PageHeader, StatusBadge, confirmDanger } from './ui'
 import type { TaskStatus } from '../../lib/types'
@@ -20,17 +20,31 @@ export default function TaskAudit() {
   const removeTask = useStore(s => s.removeTask)
   const topTask = useStore(s => s.topTask)
   const [kw, setKw] = useState('')
+  const [toast, setToast] = useState<{ type: 'ok' | 'err'; msg: string } | null>(null)
 
   let list = tasks
   if (kw) list = tasks.filter(t => t.title.includes(kw) || t.poster_name.includes(kw))
 
-  const doTop = (id: string) => {
-    const r = topTask(id, 3)
-    alert(r.msg)
+  const showToast = (type: 'ok' | 'err', msg: string) => {
+    setToast({ type, msg })
+    setTimeout(() => setToast(null), 2500)
+  }
+
+  const doTop = async (id: string) => {
+    const r = await topTask(id, 3)
+    showToast(r.ok ? 'ok' : 'err', r.msg)
   }
 
   return (
     <div>
+      {/* Toast 通知 */}
+      {toast && (
+        <div className={`fixed top-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium shadow-lg ${toast.type === 'ok' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+          {toast.type === 'ok' ? <CheckCircle size={16} /> : <XCircle size={16} />}
+          {toast.msg}
+        </div>
+      )}
+
       <PageHeader title="悬赏任务审核" desc="管理任务上下架、状态流转与置顶；违规任务可强制关闭">
         <div className="flex items-center gap-2 bg-gray-100 rounded-xl px-3 py-2.5">
           <Search size={16} className="text-gray-400" />

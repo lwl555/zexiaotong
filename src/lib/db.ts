@@ -8,7 +8,7 @@
 
 import { supabase, type SupabaseClient } from './supabase'
 import type {
-  Profile, Task, Goods, Post, Message, WalletTxn, Withdrawal,
+  Profile, Task, Goods, Post, Comment, Message, WalletTxn, Withdrawal,
   Arbitration, Notification, Category, Banner, PlatformConfig,
   TaskStatus, GoodsStatus, PostStatus
 } from './types'
@@ -55,10 +55,14 @@ function localGuest(id: string): Profile {
   } as Profile
 }
 
-export async function getCurrentUser(): Promise<Profile> {
+export async function getCurrentUser(roleOverride?: Role): Promise<Profile> {
   const id = ensureUserId()
   const fallback = localGuest(id)
-  if (!supabase) return fallback
+  if (!supabase) {
+    // 无 supabase 时用本地兜底，但应用 roleOverride（演示模式）
+    if (roleOverride) return { ...fallback, role: roleOverride }
+    return fallback
+  }
 
   // 拉 profile（最多等 6 秒；微信内置浏览器慢/连接被掐时不能干等）
   try {
@@ -67,17 +71,22 @@ export async function getCurrentUser(): Promise<Profile> {
       6000,
       'selectProfile'
     )
-    if (!error && data) return data as Profile
+    if (!error && data) {
+      // roleOverride 仅用于登录时首次写入（演示用：新建账号时赋予角色）
+      return data as Profile
+    }
 
     // 拉不到 → 试着 insert 一个（匿名游客注册）；insert 也限时，失败直接返回本地兜底
+    const insertPayload = roleOverride ? { ...fallback, role: roleOverride } : fallback
     const ins = await withTimeout(
-      supabase.from('profiles').insert(fallback).select().single(),
+      supabase.from('profiles').insert(insertPayload).select().single(),
       6000,
       'insertProfile'
     ).catch(() => ({ data: null as any, error: { message: 'insert timeout' } }))
     return (ins?.data as Profile) || fallback
   } catch {
     // 任何超时 / 异常 → 直接返回本地兜底，保证 init() 不卡死
+    if (roleOverride) return { ...fallback, role: roleOverride }
     return fallback
   }
 }
@@ -211,6 +220,29 @@ export async function updatePost(id: string, updates: Partial<Post>): Promise<Po
     .single()
   if (error) throw error
   return data as Post
+}
+
+// ─── 评论 ───────────────────────────────────────────────────────
+
+export async function fetchComments(target_type: string, target_id: string): Promise<Comment[]> {
+  const { data, error } = await supabase!
+    .from('comments')
+    .select('*')
+    .eq('target_type', target_type)
+    .eq('target_id', target_id)
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return (data || []) as Comment[]
+}
+
+export async function createComment(comment: Partial<Comment>): Promise<Comment> {
+  const { data, error } = await supabase!
+    .from('comments')
+    .insert(comment)
+    .select()
+    .single()
+  if (error) throw error
+  return data as Comment
 }
 
 // ─── 私信 ───────────────────────────────────────────────────────

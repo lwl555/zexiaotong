@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Shield, Tags, FileText, Database, Plus, Trash2 } from 'lucide-react'
+import { Shield, Tags, FileText, Database, Plus, Trash2, CheckCircle, XCircle } from 'lucide-react'
 import { useStore } from '../../store/store'
-import { PageHeader, confirmDanger } from './ui'
+import { PageHeader } from './ui'
 
 const SEED_WORDS = ['代写', '刷单', '赌博', '贷款', '私彩', '色情']
 const SEED_LOGS = [
@@ -17,14 +17,21 @@ export default function System() {
   const [words, setWords] = useState<string[]>(SEED_WORDS)
   const [newWord, setNewWord] = useState('')
   const [logs] = useState(SEED_LOGS)
+  const [toast, setToast] = useState<{ type: 'ok' | 'err'; msg: string } | null>(null)
+
+  const showToast = (type: 'ok' | 'err', msg: string) => {
+    setToast({ type, msg })
+    setTimeout(() => setToast(null), 2500)
+  }
 
   const addWord = () => {
     const w = newWord.trim()
     if (!w) return
-    if (words.includes(w)) { alert('已存在'); return }
+    if (words.includes(w)) { showToast('err', '该敏感词已存在'); return }
     setWords([...words, w]); setNewWord('')
+    showToast('ok', `已添加「${w}」`)
   }
-  const delWord = (w: string) => setWords(words.filter(x => x !== w))
+  const delWord = (w: string) => { setWords(words.filter(x => x !== w)); showToast('ok', `已删除「${w}」`) }
 
   const backup = () => {
     const blob = new Blob([JSON.stringify({ ts: new Date().toISOString() }, null, 2)], { type: 'application/json' })
@@ -32,13 +39,20 @@ export default function System() {
     a.href = URL.createObjectURL(blob)
     a.download = 'zexiaotong-backup.json'
     a.click()
-    alert('已导出备份快照（演示）')
+    showToast('ok', '已导出备份快照')
   }
 
   return (
     <div>
-      <PageHeader title="系统安全" desc="敏感词库、分类管理、操作日志与数据备份" />
+      {/* Toast 通知 */}
+      {toast && (
+        <div className={`fixed top-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium shadow-lg ${toast.type === 'ok' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+          {toast.type === 'ok' ? <CheckCircle size={16} /> : <XCircle size={16} />}
+          {toast.msg}
+        </div>
+      )}
 
+      <PageHeader title="系统安全" desc="敏感词库、分类管理、操作日志与数据备份" />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* 敏感词 */}
         <div className="card p-5">

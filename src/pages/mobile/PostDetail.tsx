@@ -1,13 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Heart, Star, MessageCircle, Flag, ChevronLeft } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { useMe } from '../../store/useMe'
-
-const MOCK_COMMENTS = [
-  { id: 'c1', name: '学委小李', text: '蹲一个搭子！', avatar: '', time: '10 分钟前' },
-  { id: 'c2', name: '跑腿王哥', text: '我也是，一起呗', avatar: '', time: '5 分钟前' }
-]
+import { fetchComments, createComment } from '../../lib/db'
+import type { Comment } from '../../lib/types'
 
 export default function PostDetail() {
   const { id } = useParams()
@@ -17,14 +14,48 @@ export default function PostDetail() {
   const likePost = useStore(s => s.likePost)
   const collectPost = useStore(s => s.collectPost)
   const [comment, setComment] = useState('')
-  const [local, setLocal] = useState(MOCK_COMMENTS)
+  const [comments, setComments] = useState<Comment[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // 拉取真实评论
+  useEffect(() => {
+    if (!id) return
+    setLoading(true)
+    fetchComments('post', id)
+      .then(setComments)
+      .catch(() => setComments([]))
+      .finally(() => setLoading(false))
+  }, [id])
 
   if (!post) return <div className="p-10 text-center text-gray-400">帖子不存在或已删除</div>
 
-  const send = () => {
+  const send = async () => {
     if (!comment.trim()) return
-    setLocal([...local, { id: 'c' + Date.now(), name: me.nickname, text: comment.trim(), avatar: me.avatar, time: '刚刚' }])
-    setComment('')
+    try {
+      const c = await createComment({
+        target_type: 'post',
+        target_id: post.id,
+        author_id: me.id,
+        author_name: me.nickname,
+        author_avatar: me.avatar,
+        content: comment.trim()
+      })
+      setComments(prev => [...prev, c])
+      setComment('')
+    } catch {
+      // 兜底：本地追加
+      setComments(prev => [...prev, {
+        id: 'c' + Date.now(),
+        target_type: 'post',
+        target_id: post.id,
+        author_id: me.id,
+        author_name: me.nickname,
+        author_avatar: me.avatar,
+        content: comment.trim(),
+        created_at: new Date().toISOString()
+      }])
+      setComment('')
+    }
   }
 
   return (
@@ -48,14 +79,16 @@ export default function PostDetail() {
         <button onClick={() => nav('/')} className="flex items-center gap-1.5 text-gray-500 ml-auto"><Flag size={16} /> 举报</button>
       </div>
 
-      <h2 className="font-bold text-ink mt-5 mb-2">评论 {local.length}</h2>
+      <h2 className="font-bold text-ink mt-5 mb-2">评论 {comments.length}</h2>
       <div className="space-y-3">
-        {local.map(c => (
+        {loading && <div className="text-sm text-gray-400">加载评论中…</div>}
+        {!loading && comments.length === 0 && <div className="text-sm text-gray-400">暂无评论，来抢沙发</div>}
+        {comments.map(c => (
           <div key={c.id} className="flex gap-2">
-            <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-brand-600 text-sm shrink-0">{c.name.slice(-1)}</div>
+            <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-brand-600 text-sm shrink-0">{c.author_name.slice(-1)}</div>
             <div className="flex-1">
-              <div className="text-sm font-medium">{c.name} <span className="text-xs text-gray-400 font-normal ml-2">{c.time}</span></div>
-              <div className="text-sm text-gray-600 mt-0.5">{c.text}</div>
+              <div className="text-sm font-medium">{c.author_name} <span className="text-xs text-gray-400 font-normal ml-2">{new Date(c.created_at).toLocaleString('zh-CN')}</span></div>
+              <div className="text-sm text-gray-600 mt-0.5">{c.content}</div>
             </div>
           </div>
         ))}

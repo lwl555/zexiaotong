@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Save, Megaphone, Percent, Pin } from 'lucide-react'
+import { Save, Megaphone, Percent, Pin, CheckCircle } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { PageHeader } from './ui'
 import type { PlatformConfig } from '../../lib/types'
@@ -8,17 +8,22 @@ export default function Config() {
   const config = useStore(s => s.config)
   const setConfig = useStore(s => s.setConfig)
   const [draft, setDraft] = useState<PlatformConfig>(config)
+  const [saved, setSaved] = useState(false)
 
   const save = () => {
     const rate = Math.min(0.3, Math.max(0.01, Number(draft.commission_rate)))
     setConfig({ ...draft, commission_rate: rate })
-    alert('配置已保存（本地演示，刷新后还原）')
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2500)
   }
 
   return (
     <div>
       <PageHeader title="运营配置" desc="设置平台抽佣、置顶价格与全局公告">
-        <button className="btn-primary" onClick={save}><Save size={16} /> 保存配置</button>
+        <div className="flex items-center gap-2">
+          {saved && <span className="text-xs text-green-600 flex items-center gap-1"><CheckCircle size={14} /> 已保存</span>}
+          <button className="btn-primary" onClick={save}><Save size={16} /> 保存配置</button>
+        </div>
       </PageHeader>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
