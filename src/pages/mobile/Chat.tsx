@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, type SyntheticEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   ChevronLeft, MoreVertical, Mic, Plus, Smile, Image as ImageIcon,
@@ -750,10 +751,16 @@ function AIChatView({ chat, nav, me }: { chat: ChatDef; nav: ReturnType<typeof u
         chat={chat} nav={nav}
       />
 
-      {/* + 弹层(拍照/历史/新建会话) */}
-      {plusOpen && (
+      {/* + 弹层(拍照/历史/新建会话) —— portal 到 document.body，绕开 app-shell 480px 容器
+          对 position:fixed 容器块的影响；同时让网格底部内边距留出输入条 + 底部 tab 的高度，
+          避免遮住输入条。 */}
+      {plusOpen && createPortal(
         <div className="wx-chat-plus" onClick={() => setPlusOpen(false)}>
-          <div className="wx-chat-plus-grid" onClick={e => e.stopPropagation()}>
+          <div
+            className="wx-chat-plus-grid"
+            onClick={e => e.stopPropagation()}
+            style={{ paddingBottom: 'calc(56px + 60px + 8px)' }}
+          >
             <div className="wx-chat-plus-item" onClick={pickImage}>
               <ImageIcon size={22} /><span>照片</span>
             </div>
@@ -770,7 +777,8 @@ function AIChatView({ chat, nav, me }: { chat: ChatDef; nav: ReturnType<typeof u
               <Eye size={22} /><span>关于</span>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* 历史抽屉 */}
