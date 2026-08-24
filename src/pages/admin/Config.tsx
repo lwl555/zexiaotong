@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Save, Megaphone, Percent, Pin, CheckCircle } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Save, Megaphone, Percent, Pin, CheckCircle, Loader2 } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { PageHeader } from './ui'
 import type { PlatformConfig } from '../../lib/types'
@@ -7,8 +7,31 @@ import type { PlatformConfig } from '../../lib/types'
 export default function Config() {
   const config = useStore(s => s.config)
   const setConfig = useStore(s => s.setConfig)
-  const [draft, setDraft] = useState<PlatformConfig>(config)
+  // 用默认值兜底：config 还在加载（null）时不挂；config 到位后再用真实数据
+  const [draft, setDraft] = useState<PlatformConfig>({
+    commission_rate: 0.10,
+    top_price: { d1: 2, d3: 5, d7: 10 },
+    announce: ''
+  })
   const [saved, setSaved] = useState(false)
+
+  // config 加载完成后同步到 draft；加载中的 draft 用兜底值，避免渲染时 .commission_rate 崩溃
+  useEffect(() => {
+    if (config) setDraft(config)
+  }, [config])
+
+  // 配置还没拉回来：给个轻提示而不是直接 blank（也不要 `draft.xxx` 解构 null）
+  if (!config) {
+    return (
+      <div>
+        <PageHeader title="运营配置" desc="设置平台抽佣、置顶价格与全局公告" />
+        <div className="card p-10 flex flex-col items-center justify-center text-gray-400">
+          <Loader2 size={28} className="animate-spin mb-2" />
+          <div className="text-sm">配置加载中…</div>
+        </div>
+      </div>
+    )
+  }
 
   const save = () => {
     const rate = Math.min(0.3, Math.max(0.01, Number(draft.commission_rate)))

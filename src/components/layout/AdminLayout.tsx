@@ -73,7 +73,9 @@ export default function AdminLayout() {
       {/* 内容区：桌面左移 224px；手机占满 */}
       <div className="flex-1 md:ml-56 flex flex-col min-w-0">
         <header className="h-14 bg-white border-b flex items-center justify-between px-4 md:px-6 sticky top-0 z-20">
-          <div className="text-xs md:text-sm text-gray-500 truncate">平台佣金 {Math.round(cfg.commission_rate * 100)}% · 置顶 ¥{cfg.top_price.d1}/¥{cfg.top_price.d3}/¥{cfg.top_price.d7}（1/3/7天）</div>
+          <div className="text-xs md:text-sm text-gray-500 truncate">
+            {cfg ? <>平台佣金 {Math.round(cfg.commission_rate * 100)}% · 置顶 ¥{cfg.top_price.d1}/¥{cfg.top_price.d3}/¥{cfg.top_price.d7}（1/3/7天）</> : '配置加载中…'}
+          </div>
           <div className="flex items-center gap-3 text-sm shrink-0">
             <span className="px-2 py-0.5 rounded bg-brand-50 text-brand-700">管理员</span>
             <button onClick={() => nav('/')} className="text-gray-500 hover:text-ink">前台视角</button>

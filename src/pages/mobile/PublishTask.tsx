@@ -39,7 +39,7 @@ export default function PublishTask() {
     <div className="px-4 pt-3 pb-10">
       <button onClick={() => nav(-1)} className="text-gray-400 mb-2">‹ 返回</button>
       <h1 className="text-xl font-black text-ink mb-1">发布悬赏任务</h1>
-      <p className="text-xs text-gray-500 mb-4">发布即冻结金额，任务完成自动解冻并分账（平台抽佣 {Math.round(useStore.getState().config.commission_rate * 100)}%）</p>
+      <p className="text-xs text-gray-500 mb-4">{(() => { const c = useStore.getState().config; return c ? `发布即冻结金额，任务完成自动解冻并分账（平台抽佣 ${Math.round(c.commission_rate * 100)}%）` : '发布即冻结金额，任务完成自动解冻并分账' })()}</p>
 
       <label className="text-sm text-gray-600">任务标题</label>
       <input className="input mt-2" value={title} onChange={e => setTitle(e.target.value)} placeholder="例如：代取快递到宿舍楼下" />

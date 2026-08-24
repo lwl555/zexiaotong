@@ -74,7 +74,7 @@ export default function TaskDetail() {
       </div>
 
       <div className="text-brand-600 font-black text-2xl my-4">¥{task.amount}
-        <span className="text-xs text-gray-400 font-normal ml-2">平台抽佣 {Math.round(useStore.getState().config.commission_rate * 100)}%</span>
+        <span className="text-xs text-gray-400 font-normal ml-2">{(() => { const c = useStore.getState().config; return c ? `平台抽佣 ${Math.round(c.commission_rate * 100)}%` : '' })()}</span>
       </div>
 
       <div className="card p-4 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{task.description}</div>
