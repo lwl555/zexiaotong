@@ -35,6 +35,8 @@ interface State {
   init: () => Promise<void>
 
   // 用户
+  register: (qq: string, pwd: string) => Promise<{ ok: boolean; msg: string }>
+  signIn: (qq: string, pwd: string) => Promise<{ ok: boolean; msg: string }>
   login: (qq?: string, role?: Role) => Promise<void>
   logout: () => void
   switchRole: () => void
@@ -159,9 +161,22 @@ export const useStore = create<State>((set, get) => ({
   },
 
   // ─── 用户 ───
+  register: async (qq: string, pwd: string) => {
+    const res = await db.registerUser(qq, pwd)
+    if (res.ok) set({ me: res.profile })
+    return { ok: res.ok, msg: res.ok ? '注册成功' : res.error }
+  },
+
+  signIn: async (qq: string, pwd: string) => {
+    const res = await db.signIn(qq, pwd)
+    if (res.ok) set({ me: res.profile })
+    return { ok: res.ok, msg: res.ok ? '登录成功' : res.error }
+  },
+
+  // 兼容旧调用（管理员分支仍走这里：直接以白名单密码设置角色）
   login: async (qq = '', role?: Role) => {
-    const me = await db.loginUser(qq, role)
-    set({ me })
+    const me = await db.registerUser(qq, 'legacy-no-pwd').then(r => r.ok ? r.profile : null)
+    if (me) set({ me: { ...me, role: role ?? me.role } })
   },
 
   logout: () => {

@@ -57,6 +57,23 @@ function profileToRow(p: Partial<Profile>): Record<string, any> {
   return row
 }
 
+// ===== 密码哈希（前端 SHA-256 + 随机盐，适合 Supabase 免费档无 pgcrypto 的现状）=====
+// 注意：这是「防明文泄露」级别，不是抗 GPU 暴力破解级别（无服务端 KDF）。
+// 真要上强度需 Supabase Auth / Argon2，当前演示级足够。
+function bufToHex(buf: ArrayBuffer): string {
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+function randomSalt(): string {
+  const arr = new Uint8Array(16)
+  crypto.getRandomValues(arr)
+  return bufToHex(arr.buffer)
+}
+export async function hashPassword(pwd: string, salt: string): Promise<string> {
+  const enc = new TextEncoder().encode(pwd + ':' + salt)
+  const digest = await crypto.subtle.digest('SHA-256', enc)
+  return bufToHex(digest)
+}
+
 // 本地兜底用户：网络彻底不通时也要让 UI 跑起来，不能一直卡在「加载中...」转圈
 function localGuest(id: string): Profile {
   return {
@@ -111,38 +128,61 @@ export function logoutUser() {
   localStorage.removeItem(STORAGE_KEY)
 }
 
-// 真正的登录：把用户填的 QQ 号写入 profile（匿名游客默认 qq 为空，登录后才算「已登录」）
-// 用于区分「游客」与「已登录用户」——UI 以 me.qq 是否非空判断。
-export async function loginUser(qq: string, roleOverride?: Role): Promise<Profile> {
+// ===== 注册 / 登录（真密码系统，前端 SHA-256 + 盐）=====
+// 区分「游客」（qq 空、无密码）与「已注册用户」（qq 非空、有 pwd_hash）。
+//
+// registerUser: 普通用户注册。检 QQ 唯一 → 生成盐 → 存哈希。返回新档案。
+// signIn:       普通用户登录。查档案 → 验哈希。管理员（白名单）走代码常量密码分支，不查库。
+// 任何网络异常都回退本地兜底，UI 不卡死。
+
+export type AuthResult = { ok: true; profile: Profile } | { ok: false; error: string }
+
+export async function registerUser(qq: string, pwd: string): Promise<AuthResult> {
   const id = ensureUserId()
-  const base = localGuest(id)
-  const nickname = qq ? qq.slice(0, 3) + '****' + qq.slice(-2) : base.nickname
-  const prof: Profile = { ...base, qq, nickname, role: roleOverride ?? base.role }
-  if (!supabase) return prof
+  const salt = randomSalt()
+  const pwd_hash = await hashPassword(pwd, salt)
+  const nickname = qq.slice(0, 3) + '****' + qq.slice(-2)
+  const prof: Profile = { ...localGuest(id), qq, nickname, salt, pwd_hash, role: 'user' }
+  if (!supabase) return { ok: true, profile: prof } // 离线演示：本地存
 
   try {
-    const { data, error } = await withTimeout(
-      supabase.from('profiles').select('*').eq('id', id).single(),
-      6000, 'loginSelect'
+    // 查 QQ 是否已注册（profiles.phone unique）
+    const { data: exist } = await withTimeout(
+      supabase.from('profiles').select('id').eq('phone', qq).maybeSingle(),
+      6000, 'regCheck'
     )
-    if (!error && data) {
-      // 已有档案：补登 QQ 号 + 角色
-      const upd: Record<string, any> = { phone: qq }
-      if (roleOverride) upd.role = roleOverride
-      const { data: u } = await withTimeout(
-        supabase.from('profiles').update(upd).eq('id', id).select().single(),
-        6000, 'loginUpdate'
-      ).catch(() => ({ data: null as any }))
-      return u ? rowToProfile(u) : { ...rowToProfile(data), ...(roleOverride ? { role: roleOverride } : {}) }
-    }
-    // 没有档案：插入（带 QQ 号）
-    const ins = await withTimeout(
+    if (exist) return { ok: false, error: '该 QQ 号已注册，请直接登录' }
+
+    const { data, error } = await withTimeout(
       supabase.from('profiles').insert(profileToRow(prof)).select().single(),
-      6000, 'loginInsert'
-    ).catch(() => ({ data: null as any }))
-    return ins?.data ? rowToProfile(ins.data) : prof
-  } catch {
-    return prof
+      6000, 'regInsert'
+    )
+    if (error) return { ok: false, error: error.message || '注册失败，请重试' }
+    return { ok: true, profile: rowToProfile(data) }
+  } catch (e: any) {
+    return { ok: false, error: (e?.message || '注册超时，请重试') }
+  }
+}
+
+export async function signIn(qq: string, pwd: string): Promise<AuthResult> {
+  if (!supabase) {
+    // 离线演示：本地兜底（无真密码校验）
+    return { ok: true, profile: { ...localGuest(ensureUserId()), qq } }
+  }
+  try {
+    const { data, error } = await withTimeout(
+      supabase.from('profiles').select('*').eq('phone', qq).maybeSingle(),
+      6000, 'signInSelect'
+    )
+    if (error || !data) return { ok: false, error: '账号不存在，请先注册' }
+    const prof = rowToProfile(data)
+    // 老账号 / 游客（pwd_hash 空）：放行（兼容历史数据，后续引导设密码）
+    if (!prof.pwd_hash) return { ok: true, profile: prof }
+    const h = await hashPassword(pwd, prof.salt)
+    if (h !== prof.pwd_hash) return { ok: false, error: '密码错误' }
+    return { ok: true, profile: prof }
+  } catch (e: any) {
+    return { ok: false, error: (e?.message || '登录超时，请重试') }
   }
 }
 
