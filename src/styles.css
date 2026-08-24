@@ -1301,19 +1301,176 @@ textarea { resize: vertical; min-height: 88px; }
 }
 
 .wx-chat-plus {
-  position: fixed; inset: 0; z-index: 30; background: rgba(0,0,0,.4);
+  position: fixed; inset: 0; z-index: 30;
+  background: rgba(0,0,0,.4);
   display: flex; align-items: flex-end; justify-content: center;
+  animation: wxChatPlusFade .18s ease-out;
 }
+@keyframes wxChatPlusFade { from { background: rgba(0,0,0,0); } to { background: rgba(0,0,0,.4); } }
+/* + 弹层内容面板,固定宽度不超过 mobile-shell,全屏内嵌为垂直 stack,
+   不再是横向 grid; 与老糖豆(AITangdou)+ 弹层布局对齐 */
+.wx-chat-plus-panel {
+  width: 100%; max-width: 480px;
+  background: #fafafa;
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 14px 14px;
+  padding-bottom: calc(56px + 60px + 14px);  /* 留出输入条 + 底部 tab + 余量 */
+  border-top-left-radius: 16px; border-top-right-radius: 16px;
+  box-shadow: 0 -8px 24px rgba(0,0,0,.08);
+  animation: wxChatPlusSlide .26s cubic-bezier(.4,0,.2,1);
+  max-height: 86vh; overflow-y: auto;
+}
+@keyframes wxChatPlusSlide {
+  from { transform: translateY(28%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.wx-chat-plus-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-bottom: 4px;
+}
+.wx-chat-plus-title { font-size: 14px; font-weight: 600; color: #1c1814; }
+.wx-chat-plus-close {
+  width: 28px; height: 28px; border-radius: 8px;
+  background: #f0f0f0; color: #666; border: none;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+/* 联网三态行(对齐老糖豆 + 弹层 顶部) */
+.wx-chat-plus-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px; background: #fff;
+  border: 1px solid #ececec; border-radius: 10px;
+}
+.wx-chat-plus-row-label {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; color: #555; font-weight: 500;
+}
+.wx-chat-plus-row-label svg { color: #15803d; }
+.wx-chat-plus-seg {
+  margin-left: auto;
+  display: inline-flex; border-radius: 6px; overflow: hidden;
+  border: 1px solid #e5e5e5;
+}
+.wx-chat-plus-seg-btn {
+  padding: 4px 12px; font-size: 12px; border: none; cursor: pointer;
+  background: #fff; color: #666;
+  transition: all .15s;
+  border-right: 1px solid #e5e5e5;
+}
+.wx-chat-plus-seg-btn:last-child { border-right: none; }
+.wx-chat-plus-seg-btn.on.auto {
+  background: #f0fdf4; color: #15803d; font-weight: 600;
+}
+.wx-chat-plus-seg-btn.on.manual {
+  background: #0f766e; color: #fff; font-weight: 600;
+}
+.wx-chat-plus-seg-btn.on.off {
+  background: #f3f4f6; color: #9ca3af; font-weight: 600;
+}
+/* 6 快捷功能 grid(写作/翻译/写代码/算题/头脑风暴/做表格) */
 .wx-chat-plus-grid {
-  width: 100%; max-width: 480px; background: #f7f7f7;
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
-  padding: 18px 12px 24px;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
 }
 .wx-chat-plus-item {
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
-  padding: 12px 0; background: #fff; border-radius: 6px; color: #111;
-  font-size: 12px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  padding: 14px 0; background: #fff; border-radius: 8px; color: #333;
+  font-size: 12px; cursor: pointer;
+  transition: all .15s cubic-bezier(.4,0,.2,1);
+  border: 1px solid #f0f0f0;
 }
+.wx-chat-plus-item:active { transform: scale(.96); }
+.wx-chat-plus-item svg { color: #555; transition: color .15s; }
+.wx-chat-plus-item:hover { border-color: #c2410c; }
+.wx-chat-plus-item:hover svg { color: #c2410c; }
+.wx-chat-plus-foot {
+  text-align: center; font-size: 10px; color: #bbb; margin-top: 4px;
+  letter-spacing: .3px;
+}
+
+/* ===================== 糖豆生成对话框(图像/视频) ===================== */
+.wx-gen-backdrop {
+  position: fixed; inset: 0; z-index: 110;
+  background: rgba(0,0,0,.45);
+  display: flex; align-items: center; justify-content: center;
+  animation: wxGenFade .18s ease-out;
+}
+@keyframes wxGenFade { from { background: rgba(0,0,0,0); } }
+.wx-gen-panel {
+  width: min(420px, 92vw); background: #fff; border-radius: 14px;
+  box-shadow: 0 12px 36px rgba(0,0,0,.18);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  animation: wxGenPop .22s cubic-bezier(.16,1,.3,1);
+}
+@keyframes wxGenPop {
+  from { transform: scale(.94); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.wx-gen-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px; border-bottom: 1px solid #f0f0f0;
+  font-size: 14px; font-weight: 600; color: #1c1814;
+}
+.wx-gen-close {
+  width: 28px; height: 28px; border-radius: 8px;
+  background: #f5f5f5; color: #666; border: none;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.wx-gen-body {
+  padding: 12px 14px; display: flex; flex-direction: column; gap: 10px;
+  max-height: 60vh; overflow-y: auto;
+}
+.wx-gen-textarea {
+  width: 100%; min-height: 72px;
+  padding: 10px 12px; border: 1px solid #e5e5e5; border-radius: 8px;
+  font-size: 14px; font-family: inherit; color: #111;
+  resize: vertical;
+  outline: none; transition: border-color .15s;
+  box-sizing: border-box;
+}
+.wx-gen-textarea:focus { border-color: #c2410c; }
+.wx-gen-textarea:disabled { background: #f7f7f7; color: #999; }
+.wx-gen-err {
+  padding: 8px 10px; background: #fef2f2; color: #b91c1c;
+  border: 1px solid #fecaca; border-radius: 6px; font-size: 12px;
+}
+.wx-gen-loading {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: #555;
+  padding: 8px 10px; background: #f7f7f7; border-radius: 6px;
+}
+.wx-gen-spin { animation: wxGenSpin 1s linear infinite; color: #c2410c; }
+@keyframes wxGenSpin { to { transform: rotate(360deg); } }
+.wx-gen-result {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 8px; background: #f7f7f7; border-radius: 8px;
+}
+.wx-gen-result img,
+.wx-gen-result video {
+  width: 100%; max-height: 50vh; border-radius: 6px; background: #000;
+  object-fit: contain;
+}
+.wx-gen-result a {
+  display: inline-block; text-align: center;
+  font-size: 12px; color: #c2410c; text-decoration: none;
+  padding: 6px;
+}
+.wx-gen-foot {
+  display: flex; gap: 8px; padding: 10px 14px 12px;
+  border-top: 1px solid #f0f0f0; justify-content: flex-end;
+}
+.wx-gen-cancel,
+.wx-gen-submit {
+  padding: 8px 18px; border-radius: 8px; font-size: 13px;
+  border: 1px solid #e5e5e5; background: #fff; color: #555;
+  cursor: pointer; transition: all .15s;
+}
+.wx-gen-submit {
+  background: #c2410c; color: #fff; border-color: #c2410c; font-weight: 600;
+}
+.wx-gen-cancel:disabled,
+.wx-gen-submit:disabled { opacity: .5; cursor: not-allowed; }
 
 /* ===================== 聊天内糖豆模式栏 / 欢迎态 / Markdown 渲染 ===================== */
 .wx-ai-mode-bar {
@@ -1338,7 +1495,20 @@ textarea { resize: vertical; min-height: 88px; }
 .wx-ai-mode-chip.on {
   background: #9d174d; color: #fff; border-color: #9d174d;
 }
-.wx-ai-mode-chip.on.web { background: #0f766e; border-color: #0f766e; }
+/* 联网 chip 三态(默认auto/手动/关闭):色阶由浅到灰,提示对回答的影响 */
+.wx-ai-mode-chip.web.auto {
+  background: #f0fdf4; color: #15803d; border-color: #86efac;
+}
+.wx-ai-mode-chip.on.web,
+.wx-ai-mode-chip.web.manual {
+  background: #0f766e; color: #fff; border-color: #0f766e;
+}
+.wx-ai-mode-chip.web.off {
+  background: #f3f4f6; color: #9ca3af; border-color: #e5e7eb;
+}
+.wx-ai-mode-chip.web.off svg { color: #9ca3af; }
+.wx-ai-mode-chip.web.auto svg,
+.wx-ai-mode-chip.web.manual svg { color: inherit; }
 .wx-ai-mode-clear {
   flex: none; width: 22px; height: 22px; border-radius: 50%;
   background: #ddd; color: #fff; border: 0;

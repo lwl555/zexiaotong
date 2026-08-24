@@ -6,11 +6,11 @@ import {
   Folder, Calculator, FileText, History, Compass, Bot, Radio,
   AlertTriangle, Coins, Wallet as WalletIcon, Users, BellRing,
   SquarePen, Languages, Code2, Lightbulb, Table2, Globe,
-  Sparkles, Loader2, Trash2, X, Eye
+  Sparkles, Loader2, Trash2, X, Eye, Clapperboard
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useStore } from '../../store/store'
-import { agnesChatStream } from '../../lib/agnes'
+import { agnesChatStream, agnesImageGen, agnesVideoSubmit, agnesVideoPoll } from '../../lib/agnes'
 import { renderMarkdown, previewText } from '../../lib/markdown'
 import { Conversation, StoredMsg, getConversation, getConversations, upsertConversation, deleteConversation } from '../../lib/history'
 
@@ -373,10 +373,15 @@ function AIChatView({ chat, nav, me }: { chat: ChatDef; nav: ReturnType<typeof u
   const [elapsedMs, setElapsedMs] = useState(0)
   const [error, setError] = useState('')
   const [mode, setMode] = useState<string | null>(null)        // 当前快捷模式
-  const [webSearch, setWebSearch] = useState(false)             // 是否联网
+  // 联网搜索三态：'auto' 让 server 端自己判断要不要检索(默认,等同于老糖豆行为);
+  //               'manual' 强制走 web_search(用户明确"我要最新的");
+  //               'off'    关闭,不联网(纯模型知识)
+  const [searchMode, setSearchMode] = useState<'auto' | 'manual' | 'off'>('auto')
   const [historyOpen, setHistoryOpen] = useState(false)
   const [topTime] = useState(formatTime(new Date()))
   const [meImgErr, setMeImgErr] = useState(false)
+  // 图/视频生成对话框:'idle'=关闭; 'image'/ 'video'=打开对应模态
+  const [genDialog, setGenDialog] = useState<'idle' | 'image' | 'video'>('idle')
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const endRef = useRef<HTMLDivElement>(null)
@@ -517,12 +522,15 @@ function AIChatView({ chat, nav, me }: { chat: ChatDef; nav: ReturnType<typeof u
     const sysParts: string[] = []
     if (chat.systemPrompt) sysParts.push(chat.systemPrompt)
     if (mode && MODE_PROMPTS[mode]) sysParts.push(MODE_PROMPTS[mode])
-    if (webSearch) sysParts.push('【当前模式:联网检索】优先联网获取最新资料再回答,资料末尾附【资料·来源:xxx】链接。')
+    if (searchMode === 'manual') sysParts.push('【当前模式:联网检索(强制)】必须先联网获取最新资料再回答,资料末尾附【资料·来源:xxx】链接,自身知识只在确证后引用。')
+    else if (searchMode === 'auto') sysParts.push('【当前模式:联网检索(自动)】如问题涉及最新信息(新闻/政策/数据/榜单/AI 截止时间等),主动联网检索真实资料,资料末尾附【资料·来源:xxx】链接;非实时常识问题不需要联网。')
+    // 'off' 时不追加联网指令
 
     try {
       const apiMsgs = buildApiMessages(sysParts.join('\n\n'), userText, pendingImage)
       await agnesChatStream(apiMsgs, {
-        autoSearch: webSearch,
+        autoSearch: searchMode === 'auto',
+        webSearch: searchMode === 'manual',
         signal: ac.signal,
         onContent: (delta) => {
           setMessages(prev => {
@@ -629,8 +637,8 @@ function AIChatView({ chat, nav, me }: { chat: ChatDef; nav: ReturnType<typeof u
       {/* 快捷模式条：放在 header 之下、正文滚动区之外，避免嵌套 sticky 与 fixed 输入栏冲突 */}
       <div className="wx-ai-mode-bar">
         <button
-          className={'wx-ai-mode-chip ' + (mode === null && !webSearch ? 'on' : '')}
-          onClick={() => { setMode(null); setWebSearch(false) }}
+          className={'wx-ai-mode-chip ' + (mode === null && searchMode === 'auto' ? 'on' : '')}
+          onClick={() => { setMode(null); setSearchMode('auto') }}
           title="默认对话"
         >
           <Sparkles size={12} /> 默认
@@ -644,15 +652,16 @@ function AIChatView({ chat, nav, me }: { chat: ChatDef; nav: ReturnType<typeof u
             <m.icon size={12} /> {m.label}
           </button>
         ))}
+        {/* 联网三态 chip:auto / manual / off,跟随状态循环; 默认 'auto'(=老糖豆体验) */}
         <button
-          className={'wx-ai-mode-chip ' + (webSearch ? 'on web' : '')}
-          onClick={() => setWebSearch(v => !v)}
-          title="联网搜索"
+          className={'wx-ai-mode-chip web ' + (searchMode === 'auto' ? 'auto' : searchMode === 'manual' ? 'on manual' : 'off')}
+          onClick={() => setSearchMode(s => s === 'auto' ? 'manual' : s === 'manual' ? 'off' : 'auto')}
+          title={searchMode === 'auto' ? '联网·自动(server 端自动判断)' : searchMode === 'manual' ? '联网·手动(强制先检索再回答)' : '联网·关(纯模型知识)'}
         >
-          <Globe size={12} /> 联网
+          <Globe size={12} /> 联网·{searchMode === 'auto' ? '自动' : searchMode === 'manual' ? '手动' : '关'}
         </button>
-        {(mode || webSearch) && (
-          <button className="wx-ai-mode-clear" onClick={() => { setMode(null); setWebSearch(false) }} aria-label="清除">
+        {(mode || searchMode !== 'auto') && (
+          <button className="wx-ai-mode-clear" onClick={() => { setMode(null); setSearchMode('auto') }} aria-label="清除">
             <X size={11} />
           </button>
         )}
@@ -751,35 +760,89 @@ function AIChatView({ chat, nav, me }: { chat: ChatDef; nav: ReturnType<typeof u
         chat={chat} nav={nav}
       />
 
-      {/* + 弹层(拍照/历史/新建会话) —— portal 到 document.body，绕开 app-shell 480px 容器
-          对 position:fixed 容器块的影响；同时让网格底部内边距留出输入条 + 底部 tab 的高度，
-          避免遮住输入条。 */}
+      {/* + 弹层 —— portal 到 document.body，绕开 app-shell 480px 容器 对 position:fixed 容器块的影响
+          与底部 tab + 输入条的高度，避免遮住输入条。
+          内容对齐老糖豆(AITangdou)的 + 面板:联网三态 + 6 快捷 + 图像/视频生成 + 5 基础卡。 */}
       {plusOpen && createPortal(
         <div className="wx-chat-plus" onClick={() => setPlusOpen(false)}>
           <div
-            className="wx-chat-plus-grid"
+            className="wx-chat-plus-panel"
             onClick={e => e.stopPropagation()}
-            style={{ paddingBottom: 'calc(56px + 60px + 8px)' }}
           >
-            <div className="wx-chat-plus-item" onClick={pickImage}>
-              <ImageIcon size={22} /><span>照片</span>
+            <div className="wx-chat-plus-head">
+              <span className="wx-chat-plus-title">糖豆功能</span>
+              <button className="wx-chat-plus-close" onClick={() => setPlusOpen(false)} aria-label="关闭">
+                <X size={14} />
+              </button>
             </div>
-            <div className="wx-chat-plus-item" onClick={() => { setPlusOpen(false); setHistoryOpen(true) }}>
-              <History size={22} /><span>历史</span>
+
+            {/* 联网三态切换(auto/manual/off),与老糖豆(AITangdou) + 弹层完全对齐 */}
+            <div className="wx-chat-plus-row">
+              <span className="wx-chat-plus-row-label"><Globe size={13} /> 联网搜索</span>
+              <div className="wx-chat-plus-seg">
+                {(['auto', 'manual', 'off'] as const).map(s => (
+                  <button key={s}
+                    className={'wx-chat-plus-seg-btn ' + (searchMode === s ? 'on ' + s : '')}
+                    onClick={() => setSearchMode(s)}>
+                    {s === 'auto' ? '自动' : s === 'manual' ? '手动' : '关'}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="wx-chat-plus-item" onClick={() => { setPlusOpen(false); clearAll() }}>
-              <Trash2 size={22} /><span>清空</span>
+
+            {/* 6 个快捷功能:写作/翻译/写代码/算题/头脑风暴/做表格 */}
+            <div className="wx-chat-plus-grid">
+              {QUICK_MODES.map(m => (
+                <div key={m.id} className="wx-chat-plus-item"
+                  onClick={() => { setPlusOpen(false); setMode(m.id === mode ? null : m.id) }}>
+                  <m.icon size={22} /><span>{m.label}</span>
+                </div>
+              ))}
             </div>
-            <div className="wx-chat-plus-item" onClick={() => { setPlusOpen(false); newChat() }}>
-              <SquarePen size={22} /><span>新会话</span>
+
+            {/* 媒体入口:图像生成 / 视频生成(调 agnes 图/视频 API,完整对齐老糖豆) */}
+            <div className="wx-chat-plus-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+              <div className="wx-chat-plus-item"
+                onClick={() => { setPlusOpen(false); setGenDialog('image') }}>
+                <ImageIcon size={22} /><span>图像生成</span>
+              </div>
+              <div className="wx-chat-plus-item"
+                onClick={() => { setPlusOpen(false); setGenDialog('video') }}>
+                <Clapperboard size={22} /><span>视频生成</span>
+              </div>
             </div>
-            <div className="wx-chat-plus-item" onClick={() => { setPlusOpen(false); nav('/about') }}>
-              <Eye size={22} /><span>关于</span>
+
+            {/* 5 张基础卡:拍照(已选文件触发图片输入)、历史、清空、新会话、关于 */}
+            <div className="wx-chat-plus-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)', paddingTop: 4, borderTop: '1px solid #f0f0f0' }}>
+              <div className="wx-chat-plus-item" onClick={pickImage}>
+                <ImageIcon size={22} /><span>照片</span>
+              </div>
+              <div className="wx-chat-plus-item" onClick={() => { setPlusOpen(false); setHistoryOpen(true) }}>
+                <History size={22} /><span>历史</span>
+              </div>
+              <div className="wx-chat-plus-item" onClick={() => { setPlusOpen(false); clearAll() }}>
+                <Trash2 size={22} /><span>清空</span>
+              </div>
+              <div className="wx-chat-plus-item" onClick={() => { setPlusOpen(false); newChat() }}>
+                <SquarePen size={22} /><span>新会话</span>
+              </div>
+              <div className="wx-chat-plus-item" onClick={() => { setPlusOpen(false); nav('/about') }}>
+                <Eye size={22} /><span>关于</span>
+              </div>
             </div>
+
+            {/* 关于版权(移到 + 弹层底部,与老糖豆一致) */}
+            <div className="wx-chat-plus-foot">糖豆 由 择校通 平台提供 · 内容仅供参考</div>
           </div>
         </div>,
         document.body
       )}
+
+      {/* 图/视频生成对话框(点击 + 弹层里的"图像生成/视频生成"打开) */}
+      <GenerateDialog
+        open={genDialog}
+        onClose={() => { setGenDialog('idle'); setGenError('') }}
+      />
 
       {/* 历史抽屉 */}
       <HistoryDrawer
@@ -916,4 +979,137 @@ export default function Chat() {
     return <AIChatView chat={chat} nav={nav} me={me} />
   }
   return <StaticChatView chat={chat} nav={nav} me={me} />
+}
+
+// ===== 图/视频生成对话框 =====
+// 点击 + 弹层里的"图像生成/视频生成"打开。
+// 图像走 agnesImageGen(同步,~10s);视频走 agnesVideoSubmit + 轮询 agnesVideoPoll (~1-3min)。
+function GenerateDialog({ open, onClose }: { open: 'idle' | 'image' | 'video'; onClose: () => void }) {
+  const [prompt, setPrompt] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<string | null>(null)        // 单图 image URL 或 视频 URL
+  const [error, setError] = useState('')
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
+  const isVideo = open === 'video'
+  const isImage = open === 'image'
+
+  // 关闭时清状态与轮询
+  useEffect(() => {
+    if (open === 'idle') {
+      setPrompt(''); setLoading(false); setResult(null); setError('')
+      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+      abortRef.current?.abort()
+    }
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current)
+      abortRef.current?.abort()
+    }
+  }, [open])
+
+  if (open === 'idle') return null
+
+  async function submit() {
+    if (loading) return
+    const text = prompt.trim()
+    if (!text) { setError('请输入生成描述'); return }
+    setLoading(true); setError(''); setResult(null)
+    abortRef.current = new AbortController()
+    try {
+      if (isImage) {
+        // 文/图生图 同步,timeout 60s
+        const ac = abortRef.current
+        const t = setTimeout(() => ac?.abort(), 60_000)
+        const r = await agnesImageGen({ prompt: text, signal: ac.signal })
+        clearTimeout(t)
+        if (r.ok && r.url) setResult(r.url)
+        else setError(r.error || '生成失败,请重试')
+      } else {
+        // 视频异步
+        const r = await agnesVideoSubmit({ prompt: text, height: 768, width: 1152, num_frames: 121, frame_rate: 24 })
+        if (!r.ok || !r.video_id) {
+          setError(r.error || '提交失败'); setLoading(false); return
+        }
+        const vid = r.video_id
+        let attempts = 0
+        const MAX = 60   // 60 * 3s = 180s 上限
+        pollRef.current = setInterval(async () => {
+          attempts++
+          if (attempts > MAX) {
+            clearInterval(pollRef.current!); pollRef.current = null
+            setLoading(false); setError('生成超时,请稍后重试'); return
+          }
+          try {
+            const p = await agnesVideoPoll(vid, abortRef.current?.signal)
+            if (p.ok && p.status === 'completed' && p.url) {
+              clearInterval(pollRef.current!); pollRef.current = null
+              setResult(p.url); setLoading(false)
+            } else if (p.ok === false && p.status === 'failed') {
+              clearInterval(pollRef.current!); pollRef.current = null
+              setLoading(false); setError(p.error || '生成失败')
+            }
+          } catch {}
+        }, 3000)
+      }
+    } catch (e: any) {
+      if (e?.name !== 'AbortError') setError(e?.message || '出错了')
+    } finally {
+      if (!isVideo) setLoading(false)
+    }
+  }
+
+  const onBackdrop = () => {
+    if (loading) {
+      if (!confirm('生成正在进行中,确定要关闭吗?')) return
+      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+      abortRef.current?.abort()
+    }
+    onClose()
+  }
+
+  return (
+    <div className="wx-gen-backdrop" onClick={onBackdrop}>
+      <div className="wx-gen-panel" onClick={e => e.stopPropagation()}>
+        <div className="wx-gen-head">
+          <span>{isImage ? '图像生成' : '视频生成'}</span>
+          <button className="wx-gen-close" onClick={onBackdrop} aria-label="关闭"><X size={14} /></button>
+        </div>
+        <div className="wx-gen-body">
+          <textarea
+            value={prompt}
+            onChange={e => setPrompt(e.target.value)}
+            placeholder={isImage ? '描述要生成的图像,例如:一只橘猫在窗台看夕阳,胶片质感' : '描述要生成的视频,例如:延时摄影下城市天际线日落至夜晚,慢动作'}
+            rows={3}
+            className="wx-gen-textarea"
+            disabled={loading}
+          />
+          {error && <div className="wx-gen-err">{error}</div>}
+          {loading && (
+            <div className="wx-gen-loading">
+              <Loader2 size={14} className="wx-gen-spin" />
+              <span>{isImage ? '正在生成图像,约 10s…' : '视频生成中,通常 1-3 分钟,请稍候…'}</span>
+            </div>
+          )}
+          {result && isImage && (
+            <div className="wx-gen-result">
+              <img src={result} alt="" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
+              <a href={result} target="_blank" rel="noreferrer">在新窗口打开</a>
+            </div>
+          )}
+          {result && isVideo && (
+            <div className="wx-gen-result">
+              <video src={result} controls playsInline />
+              <a href={result} target="_blank" rel="noreferrer">在新窗口打开 / 下载</a>
+            </div>
+          )}
+        </div>
+        <div className="wx-gen-foot">
+          <button onClick={onBackdrop} disabled={loading} className="wx-gen-cancel">取消</button>
+          <button onClick={submit} disabled={loading || !prompt.trim()} className="wx-gen-submit">
+            {loading ? '生成中…' : '开始生成'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }

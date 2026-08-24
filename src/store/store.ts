@@ -144,8 +144,7 @@ export const useStore = create<State>((set, get) => ({
     // 这样 MobileLayout 的「加载中...」最多转 12 秒，不会无限卡死。
     const hardStop = setTimeout(() => {
       const s = get()
-      // 仅在「尚无身份」时降级游客：已有登录态（含管理员）绝不覆盖，否则会丢失 role
-      if (s.loading && !s.me) {
+      if (s.loading) {
         const guestId = (typeof localStorage !== 'undefined' && (localStorage.getItem('zex:user_id') || 'guest')) || 'guest'
         const fallback: any = {
           id: guestId, qq: '', nickname: '游客' + String(guestId).slice(-4),
@@ -162,14 +161,7 @@ export const useStore = create<State>((set, get) => ({
 
     try {
       // 先拿用户（getCurrentUser 自身已带 6 秒超时 + 失败回退本地，不会死锁）
-      const fetched = await db.getCurrentUser()
-      const existing = get().me
-      // 关键修复：已有真实登录态（带 qq 或管理员角色）时，绝不用网络兜底的空游客档案
-      // 覆盖它——否则管理员从后台「前台视角 / 返回前台」回到前台会被 needSplash 弹去登录页
-      //（qq 变空→游客），再回后台又因 role 被降级成 user 被判「不是管理员」。
-      const realUser = !!existing && (!!existing.qq || existing.role === 'admin')
-      const blankFallback = !fetched.qq && fetched.role !== 'admin'
-      const me = (realUser && blankFallback) ? existing : fetched
+      const me = await db.getCurrentUser()
       set({ me })
 
       // 数据列表也限时：最多 9 秒。拉不到就保留空数组，让 UI 至少能进
