@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../store/store'
 import { ShieldCheck, CheckCircle, XCircle } from 'lucide-react'
 
-// 管理员手机号白名单（演示用；真实环境应查 profiles 表的 role 字段）
-const ADMIN_PHONES = ['13800000000', '13900000000', '18800000000']
+// 管理员账号（手机号 + 密码）
+const ADMIN_ACCOUNT = { phone: '18882632073', password: '110110nm' }
 
 export default function Login() {
   const nav = useNavigate()
@@ -13,10 +13,9 @@ export default function Login() {
   const [code, setCode] = useState('')
   const [agree, setAgree] = useState(true)
   const [count, setCount] = useState(0)
-  const [showAdmin, setShowAdmin] = useState(false)
   const [toast, setToast] = useState<{ type: 'ok' | 'err'; msg: string } | null>(null)
 
-  const isAdminPhone = ADMIN_PHONES.includes(phone)
+  const isAdminPhone = phone === ADMIN_ACCOUNT.phone
 
   const showToast = (type: 'ok' | 'err', msg: string) => {
     setToast({ type, msg })
@@ -32,10 +31,18 @@ export default function Login() {
   const submit = () => {
     if (!agree) { showToast('err', '请先同意用户协议与隐私政策'); return }
     if (!/^1\d{10}$/.test(phone)) { showToast('err', '手机号格式不正确'); return }
-    login(phone, isAdminPhone ? 'admin' : 'user')
-    // 管理员登录后直接跳转后台
-    if (isAdminPhone) nav('/admin')
-    else nav('/')
+    // 管理员账号：校验密码
+    if (isAdminPhone) {
+      if (code !== ADMIN_ACCOUNT.password) {
+        showToast('err', '管理员密码错误')
+        return
+      }
+      login(phone, 'admin')
+      nav('/admin')
+    } else {
+      login(phone, 'user')
+      nav('/')
+    }
   }
 
   return (
@@ -57,16 +64,28 @@ export default function Login() {
 
       {isAdminPhone && (
         <div className="mt-2 flex items-center gap-2 text-xs text-brand-600 bg-brand-50 px-3 py-2 rounded-lg">
-          <ShieldCheck size={14} /> 检测到管理员手机号，登录后将进入管理后台
+          <ShieldCheck size={14} /> 管理员账号，请输入密码登录
         </div>
       )}
 
-      <label className="mt-5 text-sm text-gray-600">验证码</label>
+      <label className="mt-5 text-sm text-gray-600">
+        {isAdminPhone ? '管理员密码' : '验证码'}
+      </label>
       <div className="flex gap-3 mt-2">
-        <input className="input flex-1" value={code} onChange={e => setCode(e.target.value)} placeholder="6 位验证码（演示任意填写）" inputMode="numeric" maxLength={6} />
-        <button onClick={sendCode} disabled={count > 0} className="btn-ghost whitespace-nowrap w-28">
-          {count > 0 ? count + 's' : '获取验证码'}
-        </button>
+        <input
+          className="input flex-1"
+          value={code}
+          onChange={e => setCode(e.target.value)}
+          placeholder={isAdminPhone ? '请输入管理员密码' : '6 位验证码（演示任意填写）'}
+          inputMode={isAdminPhone ? 'text' : 'numeric'}
+          maxLength={isAdminPhone ? 20 : 6}
+          type={isAdminPhone ? 'password' : 'text'}
+        />
+        {!isAdminPhone && (
+          <button onClick={sendCode} disabled={count > 0} className="btn-ghost whitespace-nowrap w-28">
+            {count > 0 ? count + 's' : '获取验证码'}
+          </button>
+        )}
       </div>
 
       <label className="mt-6 flex items-start gap-2 text-xs text-gray-500">
@@ -77,22 +96,6 @@ export default function Login() {
       <button className="btn-primary mt-8 w-full" onClick={submit}>
         {isAdminPhone ? '管理员登录' : '一键登录 / 注册'}
       </button>
-
-      <button
-        onClick={() => setShowAdmin(!showAdmin)}
-        className="text-xs text-gray-400 mt-4 text-center"
-      >
-        {showAdmin ? '隐藏管理员入口' : '管理员入口'}
-      </button>
-
-      {showAdmin && (
-        <div className="mt-3 p-3 bg-gray-50 rounded-xl text-xs text-gray-500 space-y-1">
-          <p className="font-medium text-gray-700">管理员手机号（演示）：</p>
-          {ADMIN_PHONES.map(p => (
-            <p key={p} className="font-mono cursor-pointer hover:text-brand-600" onClick={() => setPhone(p)}>{p}</p>
-          ))}
-        </div>
-      )}
     </div>
   )
 }
