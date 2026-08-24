@@ -35,16 +35,21 @@ export default function Login() {
     setSubmitting(true)
     try {
       if (isAdminQq) {
-        // 管理员：白名单 + 固定密码
+        // 管理员：白名单密码。直接走 signIn 命中 db.signIn 里的管理员分支，
+        // 返回 role='admin' 档案 + 持久化真实 id（之前用 register + legacy login
+        // 会先把 ADMIN_QQ 注册成 role='user'，导致 AdminLayout 把人挡在门外）。
         if (pwd !== ADMIN_ACCOUNT.password) {
           showToast('err', '管理员密码错误')
+          setSubmitting(false)
           return
         }
-        await register(qq, pwd)  // 确保档案存在
-        // 强制 admin 角色
-        const st = useStore.getState()
-        st.login(qq, 'admin')
-        nav('/admin')
+        const r = await signIn(ADMIN_ACCOUNT.qq, pwd)
+        if (r.ok) {
+          nav('/admin')
+        } else {
+          showToast('err', r.msg || '管理员登录失败')
+        }
+        setSubmitting(false)
         return
       }
 

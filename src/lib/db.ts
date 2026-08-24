@@ -194,27 +194,38 @@ export async function signIn(qq: string, pwd: string): Promise<AuthResult> {
   // 管理员白名单：代码常量密码（不查库）。命中即返回 role='admin' 的档案，可进后台。
   const ADMIN_QQ = '18882632073'
   const ADMIN_PWD = '110110nm'
+  // 用一个固定 id 作为管理员档案主键，避免每次浏览器清空缓存 / 走游客分支时插出
+  // 新 id 的僵尸行（之前 register(ADMIN_QQ) 留下的 role='user' 行就是这种）。
+  const ADMIN_ID = '00000000-0000-4000-8000-000000000001'
   if (qq === ADMIN_QQ && pwd === ADMIN_PWD) {
     if (!supabase) {
-      const p = { ...localGuest(ensureUserId()), qq, nickname: '管理员', role: 'admin' } as Profile
-      persistUserId(p.id)
+      const p: Profile = { ...localGuest(ADMIN_ID), qq: ADMIN_QQ, nickname: '管理员', role: 'admin' }
+      persistUserId(ADMIN_ID)
       return { ok: true, profile: p }
     }
-    // 仍尝试拉取库里该管理员档案（若有），避免 nickname 丢失；失败则退回白名单档案。
+    // upsert 一条以 ADMIN_ID 为主键、phone=ADMIN_QQ 的管理员档案
+    // 这样无论之前 register 留下什么 id、role 是 user/admin，都会被刷新成 admin
     try {
-      const { data } = await withTimeout(
-        supabase.from('profiles').select('*').eq('phone', ADMIN_QQ).maybeSingle(),
-        6000, 'adminSelect'
+      const prof: Profile = { ...localGuest(ADMIN_ID), qq: ADMIN_QQ, nickname: '管理员', role: 'admin' }
+      const { data, error } = await withTimeout(
+        supabase.from('profiles')
+          .upsert(profileToRow(prof), { onConflict: 'id' })
+          .select()
+          .single(),
+        6000, 'adminUpsert'
       )
-      if (data) {
-        const prof = { ...rowToProfile(data), role: 'admin' } as Profile
-        persistUserId(prof.id)
-        return { ok: true, profile: prof }
+      if (!error && data) {
+        const out = { ...rowToProfile(data), role: 'admin' } as Profile
+        persistUserId(out.id)
+        return { ok: true, profile: out }
       }
-    } catch { /* 忽略，走白名单兜底 */ }
-    const p = { ...localGuest(ensureUserId()), qq, nickname: '管理员', role: 'admin' } as Profile
-    persistUserId(p.id)
-    return { ok: true, profile: p }
+      // upsert 失败 / 网络问题：降级返回本地档案（依然 role='admin'）
+      persistUserId(ADMIN_ID)
+      return { ok: true, profile: { ...prof } }
+    } catch {
+      persistUserId(ADMIN_ID)
+      return { ok: true, profile: { ...localGuest(ADMIN_ID), qq: ADMIN_QQ, nickname: '管理员', role: 'admin' } as Profile }
+    }
   }
 
   if (!supabase) {
