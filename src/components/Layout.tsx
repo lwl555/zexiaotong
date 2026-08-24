@@ -2,9 +2,9 @@ import { ReactNode, useState, useEffect, useRef } from 'react'
 import { NavLink, useNavigate, Outlet, useLocation } from 'react-router-dom'
 import HistoryDrawer from './HistoryDrawer'
 import PcSplash from './PcSplash'
-import { useStore } from '../store/store'
+import { useStore, compressImageToDataUrl } from '../store/store'
 import { primaryNav, moreNav, type NavDef } from '../lib/nav'
-import { Clock } from 'lucide-react'
+import { Clock, LogOut, Camera } from 'lucide-react'
 
 export default function Layout() {
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -23,11 +23,17 @@ export default function Layout() {
   }
   const [moreOpen, setMoreOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [avatarOpen, setAvatarOpen] = useState(false)
+  const [avatarBusy, setAvatarBusy] = useState(false)
   const moreRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  const avatarRef = useRef<HTMLDivElement>(null)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
   const nav = useNavigate()
   const loc = useLocation()
   const isTangdou = loc.pathname === '/ai-tangdou'
+  const logout = useStore(s => s.logout)
+  const updateProfile = useStore(s => s.updateProfile)
 
   // 点外面关掉「更多」下拉
   useEffect(() => {
@@ -49,6 +55,38 @@ export default function Layout() {
     document.addEventListener('mousedown', onDoc)
     return () => document.removeEventListener('mousedown', onDoc)
   }, [menuOpen])
+
+  // 点外面关掉头像下拉
+  useEffect(() => {
+    if (!avatarOpen) return
+    const onDoc = (e: MouseEvent) => {
+      if (avatarRef.current && !avatarRef.current.contains(e.target as Node)) setAvatarOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [avatarOpen])
+
+  // 头像上传：选图 → 压缩 → 更新 store（写库在 store 内完成）
+  const onAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // 允许重复选同一文件
+    if (!file) return
+    setAvatarBusy(true)
+    try {
+      const dataUrl = await compressImageToDataUrl(file, 256, 0.82)
+      if (dataUrl) {
+        await updateProfile({ avatar: dataUrl })
+      } else {
+        // 压缩失败（如非图片），回退到原文件直读
+        const reader = new FileReader()
+        reader.onload = () => { if (typeof reader.result === 'string') updateProfile({ avatar: reader.result }) }
+        reader.readAsDataURL(file)
+      }
+    } finally {
+      setAvatarBusy(false)
+      setAvatarOpen(false)
+    }
+  }
 
   return (
     <>
@@ -122,12 +160,44 @@ export default function Layout() {
                 登录 / 注册
               </button>
             ) : (
-              <div
-                className="avatar"
-                onClick={() => nav('/about')}
-                title={me?.qq ? `已登录 · QQ ${me.qq}` : '关于本站'}
-              >
-                {me?.nickname ? me.nickname.slice(0, 1) : '兄'}
+              <div className="avatar-wrap" ref={avatarRef}>
+                {me?.avatar ? (
+                  <img
+                    src={me.avatar}
+                    className={'avatar' + (avatarOpen ? ' open' : '')}
+                    alt="头像"
+                    onClick={() => setAvatarOpen(v => !v)}
+                  />
+                ) : (
+                  <div
+                    className={'avatar' + (avatarOpen ? ' open' : '')}
+                    onClick={() => setAvatarOpen(v => !v)}
+                    title={me?.qq ? `已登录 · QQ ${me.qq}` : '账号'}
+                  >
+                    {me?.nickname ? me.nickname.slice(0, 1) : '兄'}
+                  </div>
+                )}
+                {avatarOpen && (
+                  <div className="avatar-menu">
+                    <div className="avatar-menu-head">
+                      <div className="avatar-menu-name">{me?.nickname || '用户'}</div>
+                      <div className="avatar-menu-sub">{me?.qq ? `QQ ${me.qq}` : '未绑定 QQ'}</div>
+                    </div>
+                    <button className="avatar-menu-item" onClick={() => avatarInputRef.current?.click()} disabled={avatarBusy}>
+                      <Camera size={16} /> {avatarBusy ? '上传中…' : '更换头像'}
+                    </button>
+                    <button className="avatar-menu-item danger" onClick={() => { logout(); nav('/splash') }}>
+                      <LogOut size={16} /> 退出登录
+                    </button>
+                  </div>
+                )}
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={onAvatarFile}
+                />
               </div>
             )}
             <button

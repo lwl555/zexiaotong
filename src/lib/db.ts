@@ -128,6 +128,23 @@ export function logoutUser() {
   localStorage.removeItem(STORAGE_KEY)
 }
 
+// 更新头像：前端已压缩成小尺寸 data URL，这里只负责写库并回传最新档案。
+// 写入失败（超时/网络）时返回 null，UI 端保留本地预览、不破坏登录态。
+export async function updateAvatar(userId: string, dataUrl: string): Promise<Profile | null> {
+  if (!supabase) return null
+  try {
+    const { data, error } = await withTimeout(
+      supabase.from('profiles').update({ avatar: dataUrl }).eq('id', userId).select().single(),
+      6000,
+      'updateAvatar'
+    )
+    if (error) return null
+    return rowToProfile(data)
+  } catch {
+    return null
+  }
+}
+
 // ===== 注册 / 登录（真密码系统，前端 SHA-256 + 盐）=====
 // 区分「游客」（qq 空、无密码）与「已注册用户」（qq 非空、有 pwd_hash）。
 //

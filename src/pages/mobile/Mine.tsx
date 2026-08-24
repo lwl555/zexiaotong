@@ -1,6 +1,7 @@
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Wallet as WalletIcon, ListOrdered, Package, Heart, Settings, Shield, LogOut, ChevronRight, Megaphone, Compass, Radio, FileText, AlertTriangle, Coins, Info, Clock, Bot } from 'lucide-react'
-import { useStore } from '../../store/store'
+import { Wallet as WalletIcon, ListOrdered, Package, Heart, Settings, Shield, LogOut, ChevronRight, Megaphone, Compass, Radio, FileText, AlertTriangle, Coins, Info, Clock, Bot, Camera } from 'lucide-react'
+import { useStore, compressImageToDataUrl } from '../../store/store'
 import { useMe } from '../../store/useMe'
 
 const aiTools = [
@@ -17,12 +18,34 @@ export default function Mine() {
   const nav = useNavigate()
   const me = useMe()
   const tasks = useStore(s => s.tasks)
+  const updateProfile = useStore(s => s.updateProfile)
   const myPosted = tasks.filter(t => t.poster_id === me.id).length
   const myTaken = tasks.filter(t => t.accepted_id === me.id).length
   const unread = useStore(s => s.notifications.filter(n => n.user_id === me.id && !n.read).length)
   const switchRole = useStore(s => s.switchRole)
   const logout = useStore(s => s.logout)
   const isGuest = !me.qq
+  const [avatarBusy, setAvatarBusy] = useState(false)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
+
+  // 手机版头像更换：选图 → 压缩 → 更新 store（写库在 store 内完成）
+  const onAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setAvatarBusy(true)
+    try {
+      const dataUrl = await compressImageToDataUrl(file, 256, 0.82)
+      if (dataUrl) await updateProfile({ avatar: dataUrl })
+      else {
+        const reader = new FileReader()
+        reader.onload = () => { if (typeof reader.result === 'string') updateProfile({ avatar: reader.result }) }
+        reader.readAsDataURL(file)
+      }
+    } finally {
+      setAvatarBusy(false)
+    }
+  }
 
   const rows = [
     { icon: ListOrdered, label: '我的发布', val: myPosted, onClick: () => nav('/my-tasks?role=poster') },
@@ -46,14 +69,33 @@ export default function Mine() {
         </button>
       ) : (
         <div className="flex items-center gap-4 py-4">
-          <img src={me.avatar} className="w-16 h-16 rounded-full bg-gray-100" alt="" />
+          <div className="relative">
+            {me.avatar ? (
+              <img src={me.avatar} className="w-16 h-16 rounded-full bg-gray-100 object-cover" alt="头像" onClick={() => avatarInputRef.current?.click()} />
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-brand-100 flex items-center justify-center text-2xl text-brand-600" onClick={() => avatarInputRef.current?.click()}>
+                {me.nickname.slice(0, 1)}
+              </div>
+            )}
+            <button
+              className="absolute -bottom-0.5 -right-0.5 w-6 h-6 rounded-full bg-brand-600 text-white flex items-center justify-center shadow"
+              onClick={() => avatarInputRef.current?.click()}
+              title="更换头像"
+            >
+              <Camera size={13} />
+            </button>
+          </div>
           <div className="flex-1">
             <div className="font-black text-lg">{me.nickname}</div>
-            <div className="text-xs text-gray-400">{me.qq} · {me.status === 'banned' ? '已封禁' : '正常'}</div>
+            <div className="text-xs text-gray-400">QQ {me.qq} · {me.status === 'banned' ? '已封禁' : '正常'}</div>
           </div>
           <button onClick={() => nav('/wallet')} className="flex items-center gap-1 text-brand-600 text-sm"><WalletIcon size={16} /> 钱包</button>
         </div>
       )}
+
+      {/* 头像上传：压缩在 store.compressImageToDataUrl 完成 */}
+      <input ref={avatarInputRef} type="file" accept="image/*" hidden onChange={onAvatarFile} />
+      {avatarBusy && <div className="text-xs text-brand-600 px-1 pb-1">头像上传中…</div>}
 
       {/* 我的模块 */}
       <div className="card divide-y divide-gray-50">
@@ -84,7 +126,7 @@ export default function Mine() {
 
       {/* 设置 */}
       <div className="card mt-4 divide-y divide-gray-50">
-        <button className="w-full flex items-center gap-3 px-4 py-3.5 text-left"><Settings size={20} className="text-gray-500" /><span className="flex-1 text-sm">设置中心</span><ChevronRight size={16} className="text-gray-300" /></button>
+        <button onClick={() => nav('/wallet')} className="w-full flex items-center gap-3 px-4 py-3.5 text-left"><Settings size={20} className="text-gray-500" /><span className="flex-1 text-sm">设置中心</span><ChevronRight size={16} className="text-gray-300" /></button>
         <button onClick={() => { switchRole(); nav('/admin') }} className="w-full flex items-center gap-3 px-4 py-3.5 text-left"><Shield size={20} className="text-gray-500" /><span className="flex-1 text-sm">进入管理后台</span><ChevronRight size={16} className="text-gray-300" /></button>
       </div>
 

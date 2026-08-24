@@ -186,6 +186,30 @@ a { color: inherit; text-decoration: none; }
 }
 .avatar:hover { transform: scale(1.05); border-color: var(--accent); }
 
+/* 头像下拉菜单（PC 顶栏）：点击头像展开，查看账号 / 换头像 / 退出 */
+.avatar-wrap { position: relative; display: inline-flex; }
+.avatar.open { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+.avatar-menu {
+  position: absolute; top: calc(100% + 10px); right: 0; z-index: 60;
+  min-width: 188px; background: #fff; color: #1a1a1a;
+  border: 1px solid rgba(0,0,0,.08); border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0,0,0,.16); padding: 6px;
+  animation: avatarPop .14s ease;
+}
+@keyframes avatarPop { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+.avatar-menu-head { padding: 8px 10px 10px; border-bottom: 1px solid rgba(0,0,0,.06); margin-bottom: 4px; }
+.avatar-menu-name { font-weight: 700; font-size: 14px; }
+.avatar-menu-sub { font-size: 12px; color: #888; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.avatar-menu-item {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  padding: 9px 10px; border: 0; background: transparent; cursor: pointer;
+  font-size: 13px; color: #333; border-radius: 7px; text-align: left;
+}
+.avatar-menu-item:hover { background: #f6f1e7; }
+.avatar-menu-item.danger { color: #c0392b; }
+.avatar-menu-item.danger:hover { background: #fdecea; }
+.avatar-menu-item:disabled { opacity: .6; cursor: default; }
+
 /* PC 端登录入口：黑色直角按钮（与 Splash 风格统一） */
 .pc-login-btn {
   display: inline-flex; align-items: center; justify-content: center;
