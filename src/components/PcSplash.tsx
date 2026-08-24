@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-/* 鈥斺€?涓庢墜鏈虹増 Splash 鍚屾锛氫竴绗旀墜缁樺浣嶅附 + 琛嚎涓枃 + 绛夊 eyebrow 鈥斺€?*/
+/* —— 与手机版 Splash 同款：一笔手绘学位帽 + 衬线中文 + 等宽 eyebrow —— */
 const SERIF = '"Songti SC","Noto Serif CJK SC",ui-serif,Georgia,"Times New Roman",serif'
 const MONO = 'ui-monospace,"SF Mono",Menlo,Consolas,"Courier New",monospace'
 
@@ -30,7 +30,7 @@ export default function PcSplash({ onDone }: { onDone: () => void }) {
     const t3 = setTimeout(() => setBody(true), 1650)
     const t4 = setTimeout(() => setCta(true), 2350)
     const t5 = setTimeout(() => setFoot(true), 2750)
-    // 鍏滃簳锛氬姩鐢绘斁瀹岃嚜鍔ㄨ繘鍏ワ紝缁濅笉鎶婄敤鎴峰崱鍦ㄦ杩庨〉
+    // 兜底：动画放完自动进入，绝不把用户卡在欢迎页
     const t6 = setTimeout(() => finish(), 4800)
     return () => { [t1, t2, t3, t4, t5, t6].forEach(clearTimeout) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -40,16 +40,17 @@ export default function PcSplash({ onDone }: { onDone: () => void }) {
     if (doneRef.current) return
     doneRef.current = true
     setLeaving(true)
-    setTimeout(onDone, 700) // 涓?CSS 娣″嚭鏃堕暱涓€鑷?  }
+    setTimeout(onDone, 700) // 与 CSS 淡出时长一致
+  }
 
   return (
     <div
       className={'pc-splash' + (leaving ? ' leaving' : '')}
       role="dialog"
-      aria-label="鎷╂牎閫?
+      aria-label="择校通"
     >
       <div className="pc-splash-stage">
-        {/* 鈥斺€?Logo锛氬崟绗旀墜缁樺浣嶅附锛堜笌鎵嬫満鐗堝悓娆捐矾寰勶級鈥斺€?*/}
+        {/* —— Logo：单笔手绘学位帽（与手机版同款路径）—— */}
         <svg
           width="230"
           height="145"
@@ -112,7 +113,7 @@ export default function PcSplash({ onDone }: { onDone: () => void }) {
           />
         </svg>
 
-        {/* 琛嚎涓绘爣棰?*/}
+        {/* 衬线主标题 */}
         <h1
           className="pc-title"
           style={{
@@ -122,9 +123,10 @@ export default function PcSplash({ onDone }: { onDone: () => void }) {
               'opacity 0.7s ease, transform 0.7s cubic-bezier(0.16, 1, 0.3, 1)'
           }}
         >
-          鎷╂牎閫?        </h1>
+          择校通
+        </h1>
 
-        {/* 绛夊 eyebrow */}
+        {/* 等宽 eyebrow */}
         <div
           className="pc-eyebrow"
           style={{
@@ -137,7 +139,7 @@ export default function PcSplash({ onDone }: { onDone: () => void }) {
           GRADUATION, SIMPLIFIED.
         </div>
 
-        {/* 鐭绾?*/}
+        {/* 短橙线 */}
         <div
           className="pc-line"
           style={{
@@ -148,7 +150,7 @@ export default function PcSplash({ onDone }: { onDone: () => void }) {
           }}
         />
 
-        {/* 杩涘叆鎸夐挳锛堢洿瑙掗粦搴曪級 */}
+        {/* 进入按钮（直角黑底） */}
         <button
           className="pc-enter"
           onClick={finish}
@@ -162,10 +164,11 @@ export default function PcSplash({ onDone }: { onDone: () => void }) {
               'opacity 0.65s ease, transform 0.65s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.65s ease, background 0.2s ease'
           }}
         >
-          杩涘叆鎷╂牎閫?鈫?        </button>
+          进入择校通 →
+        </button>
       </div>
 
-      {/* Footer锛氭笎闅?+ 绛夊灏忓瓧 */}
+      {/* Footer：渐隐 + 等宽小字 */}
       <div
         className="pc-foot"
         style={{ opacity: foot ? 1 : 0, transition: 'opacity 0.8s ease' }}
