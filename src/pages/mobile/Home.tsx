@@ -47,10 +47,14 @@ export default function Home() {
           <Search size={18} className="text-gray-400" />
           <input className="bg-transparent outline-none text-sm flex-1" placeholder="搜索任务 / 二手 / 帖子" value={kw} onChange={e => setKw(e.target.value)} />
         </div>
-        <button onClick={() => nav('/notifications')} className="relative w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center">
-          <Bell size={18} className="text-gray-600" />
-          {unread > 0 && <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">{unread}</span>}
-        </button>
+        {me && !me.phone ? (
+          <button onClick={() => nav('/login')} className="shrink-0 px-3 h-10 rounded-xl bg-brand-500 text-white text-sm font-medium active:scale-95 transition">登录</button>
+        ) : (
+          <button onClick={() => nav('/notifications')} className="relative w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center">
+            <Bell size={18} className="text-gray-600" />
+            {unread > 0 && <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">{unread}</span>}
+          </button>
+        )}
       </div>
 
       {/* 分类 Tab */}

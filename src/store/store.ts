@@ -160,7 +160,7 @@ export const useStore = create<State>((set, get) => ({
 
   // ─── 用户 ───
   login: async (phone, role?: Role) => {
-    const me = await db.getCurrentUser(role)
+    const me = await db.loginUser(phone, role)
     set({ me })
   },
 

@@ -96,6 +96,41 @@ export function logoutUser() {
   localStorage.removeItem(STORAGE_KEY)
 }
 
+// 真正的登录：把用户填的手机号写入 profile（匿名游客默认 phone 为空，登录后才算「已登录」）
+// 用于区分「游客」与「已登录用户」——UI 以 me.phone 是否非空判断。
+export async function loginUser(phone: string, roleOverride?: Role): Promise<Profile> {
+  const id = ensureUserId()
+  const base = localGuest(id)
+  const nickname = phone ? phone.slice(0, 3) + '****' + phone.slice(7) : base.nickname
+  const prof: Profile = { ...base, phone, nickname, role: roleOverride ?? base.role }
+  if (!supabase) return prof
+
+  try {
+    const { data, error } = await withTimeout(
+      supabase.from('profiles').select('*').eq('id', id).single(),
+      6000, 'loginSelect'
+    )
+    if (!error && data) {
+      // 已有档案：补登手机号 + 角色
+      const upd: Partial<Profile> = { phone }
+      if (roleOverride) upd.role = roleOverride
+      const { data: u } = await withTimeout(
+        supabase.from('profiles').update(upd).eq('id', id).select().single(),
+        6000, 'loginUpdate'
+      ).catch(() => ({ data: null as any }))
+      return (u as Profile) || { ...(data as Profile), ...upd }
+    }
+    // 没有档案：插入（带手机号）
+    const ins = await withTimeout(
+      supabase.from('profiles').insert(prof).select().single(),
+      6000, 'loginInsert'
+    ).catch(() => ({ data: null as any }))
+    return (ins?.data as Profile) || prof
+  } catch {
+    return prof
+  }
+}
+
 // ─── 任务 ───────────────────────────────────────────────────────
 
 export async function fetchTasks(status?: TaskStatus): Promise<Task[]> {

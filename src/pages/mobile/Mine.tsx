@@ -22,6 +22,7 @@ export default function Mine() {
   const unread = useStore(s => s.notifications.filter(n => n.user_id === me.id && !n.read).length)
   const switchRole = useStore(s => s.switchRole)
   const logout = useStore(s => s.logout)
+  const isGuest = !me.phone
 
   const rows = [
     { icon: ListOrdered, label: '我的发布', val: myPosted, onClick: () => nav('/my-tasks?role=poster') },
@@ -34,14 +35,25 @@ export default function Mine() {
   return (
     <div className="px-4 pt-3 pb-10">
       {/* 头部 */}
-      <div className="flex items-center gap-4 py-4">
-        <img src={me.avatar} className="w-16 h-16 rounded-full bg-gray-100" alt="" />
-        <div className="flex-1">
-          <div className="font-black text-lg">{me.nickname}</div>
-          <div className="text-xs text-gray-400">{me.phone} · {me.status === 'banned' ? '已封禁' : '正常'}</div>
+      {isGuest ? (
+        <button onClick={() => nav('/login')} className="w-full flex items-center gap-4 py-4 text-left active:bg-gray-50 rounded-xl">
+          <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center text-2xl">👤</div>
+          <div className="flex-1">
+            <div className="font-black text-lg">未登录</div>
+            <div className="text-xs text-brand-600 mt-0.5">点击登录 / 注册，解锁发任务、接单、钱包</div>
+          </div>
+          <ChevronRight size={18} className="text-gray-300" />
+        </button>
+      ) : (
+        <div className="flex items-center gap-4 py-4">
+          <img src={me.avatar} className="w-16 h-16 rounded-full bg-gray-100" alt="" />
+          <div className="flex-1">
+            <div className="font-black text-lg">{me.nickname}</div>
+            <div className="text-xs text-gray-400">{me.phone} · {me.status === 'banned' ? '已封禁' : '正常'}</div>
+          </div>
+          <button onClick={() => nav('/wallet')} className="flex items-center gap-1 text-brand-600 text-sm"><WalletIcon size={16} /> 钱包</button>
         </div>
-        <button onClick={() => nav('/wallet')} className="flex items-center gap-1 text-brand-600 text-sm"><WalletIcon size={16} /> 钱包</button>
-      </div>
+      )}
 
       {/* 我的模块 */}
       <div className="card divide-y divide-gray-50">
@@ -76,7 +88,9 @@ export default function Mine() {
         <button onClick={() => { switchRole(); nav('/admin') }} className="w-full flex items-center gap-3 px-4 py-3.5 text-left"><Shield size={20} className="text-gray-500" /><span className="flex-1 text-sm">进入管理后台</span><ChevronRight size={16} className="text-gray-300" /></button>
       </div>
 
-      <button onClick={() => { logout(); nav('/splash') }} className="w-full mt-4 py-3 text-gray-400 text-sm flex items-center justify-center gap-1"><LogOut size={16} /> 退出登录</button>
+      {!isGuest && (
+        <button onClick={() => { logout(); nav('/splash') }} className="w-full mt-4 py-3 text-gray-400 text-sm flex items-center justify-center gap-1"><LogOut size={16} /> 退出登录</button>
+      )}
       <p className="text-center text-xs text-gray-300 mt-6">择校通 · 校园综合服务</p>
     </div>
   )
