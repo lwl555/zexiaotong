@@ -1,11 +1,20 @@
 import { ReactNode, useState, useEffect, useRef } from 'react'
 import { NavLink, useNavigate, Outlet, useLocation } from 'react-router-dom'
 import HistoryDrawer from './HistoryDrawer'
+import PcSplash from './PcSplash'
 import { primaryNav, moreNav, type NavDef } from '../lib/nav'
 import { Clock } from 'lucide-react'
 
 export default function Layout() {
   const [drawerOpen, setDrawerOpen] = useState(false)
+  // PC 鍏ュ満 Splash锛氭瘡涓細璇濓紙tab锛夐娆″姞杞芥挱涓€娆★紝閬垮厤姣忔璺敱鍒囨崲閮藉脊
+  const [showSplash, setShowSplash] = useState<boolean>(() => {
+    try { return !sessionStorage.getItem('zex:pcSplash') } catch { return true }
+  })
+  const handleSplashDone = () => {
+    try { sessionStorage.setItem('zex:pcSplash', '1') } catch {}
+    setShowSplash(false)
+  }
   const [moreOpen, setMoreOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const moreRef = useRef<HTMLDivElement>(null)
@@ -14,7 +23,7 @@ export default function Layout() {
   const loc = useLocation()
   const isTangdou = loc.pathname === '/ai-tangdou'
 
-  // 点外面关掉「更多」下拉
+  // 鐐瑰闈㈠叧鎺夈€屾洿澶氥€嶄笅鎷?
   useEffect(() => {
     if (!moreOpen) return
     const onDoc = (e: MouseEvent) => {
@@ -24,7 +33,7 @@ export default function Layout() {
     return () => document.removeEventListener('mousedown', onDoc)
   }, [moreOpen])
 
-  // 点外面关掉移动端汉堡菜单
+  // 鐐瑰闈㈠叧鎺夌Щ鍔ㄧ姹夊牎鑿滃崟
   useEffect(() => {
     if (!menuOpen) return
     const onDoc = (e: MouseEvent) => {
@@ -36,16 +45,17 @@ export default function Layout() {
   }, [menuOpen])
 
   return (
-    <div className="shell">
+    <>
+      <div className="shell">
       <header className="topbar">
         <div className="topbar-inner">
-          {/* 左：极简紫色 logo */}
+          {/* 宸︼細鏋佺畝绱壊 logo */}
           <NavLink to="/" className="brand" end>
-            <span className="brand-mark">择</span>
-            <span className="brand-text">择校通</span>
+            <span className="brand-mark">鎷?/span>
+            <span className="brand-text">鎷╂牎閫?/span>
           </NavLink>
 
-          {/* 中：4 个主链接 + 「更多」下拉（仅在桌面显示，窄屏由汉堡菜单接管） */}
+          {/* 涓細4 涓富閾炬帴 + 銆屾洿澶氥€嶄笅鎷夛紙浠呭湪妗岄潰鏄剧ず锛岀獎灞忕敱姹夊牎鑿滃崟鎺ョ锛?*/}
           <nav className="nav desktop-nav">
             {primaryNav.map((n) => (
               <NavLink
@@ -56,7 +66,7 @@ export default function Layout() {
               >
                 {n.icon && <span className="nav-link-ico"><n.icon size={18} strokeWidth={1.9} /></span>}
                 <span className="nav-link-lbl">{n.label}</span>
-                {n.live && <span className="live-dot" title="AI 实时联网" />}
+                {n.live && <span className="live-dot" title="AI 瀹炴椂鑱旂綉" />}
               </NavLink>
             ))}
 
@@ -67,8 +77,8 @@ export default function Layout() {
                 aria-haspopup="true"
                 aria-expanded={moreOpen}
               >
-                <span className="nav-link-ico">⋯</span>
-                <span className="nav-link-lbl">更多</span>
+                <span className="nav-link-ico">鈰?/span>
+                <span className="nav-link-lbl">鏇村</span>
               </button>
               {moreOpen && (
                 <div className="nav-more-pop">
@@ -88,22 +98,22 @@ export default function Layout() {
             </div>
           </nav>
 
-          {/* 右：克制 — 历史按钮 + 头像下拉（含 uid）+ 汉堡（仅窄屏显示） */}
+          {/* 鍙筹細鍏嬪埗 鈥?鍘嗗彶鎸夐挳 + 澶村儚涓嬫媺锛堝惈 uid锛? 姹夊牎锛堜粎绐勫睆鏄剧ず锛?*/}
           <div className="topbar-right">
             <button
               className="ghost-btn"
               onClick={() => setDrawerOpen(true)}
-              title="历史对话与查询记录"
+              title="鍘嗗彶瀵硅瘽涓庢煡璇㈣褰?
             >
-              <span className="ico"><Clock size={16} strokeWidth={1.9} /></span>历史
+              <span className="ico"><Clock size={16} strokeWidth={1.9} /></span>鍘嗗彶
             </button>
-            <div className="avatar" onClick={() => nav('/about')} title="关于本站">
-              兄
+            <div className="avatar" onClick={() => nav('/about')} title="鍏充簬鏈珯">
+              鍏?
             </div>
             <button
               className={'hamburger' + (menuOpen ? ' open' : '')}
               onClick={() => setMenuOpen((v) => !v)}
-              aria-label="打开菜单"
+              aria-label="鎵撳紑鑿滃崟"
               aria-expanded={menuOpen}
             >
               <span />
@@ -113,7 +123,7 @@ export default function Layout() {
           </div>
         </div>
 
-        {/* 移动端下拉菜单：收纳全部导航（主 + 更多），窄屏替代桌面横排 */}
+        {/* 绉诲姩绔笅鎷夎彍鍗曪細鏀剁撼鍏ㄩ儴瀵艰埅锛堜富 + 鏇村锛夛紝绐勫睆鏇夸唬妗岄潰妯帓 */}
         {menuOpen && (
           <div className="mobile-menu" ref={menuRef}>
             {[...primaryNav, ...moreNav].map((n) => (
@@ -133,7 +143,7 @@ export default function Layout() {
         )}
       </header>
 
-      {/* 糖豆页面：footer 隐藏，去掉 container padding，让糖豆 fixed 容器完美占满 */}
+      {/* 绯栬眴椤甸潰锛歠ooter 闅愯棌锛屽幓鎺?container padding锛岃绯栬眴 fixed 瀹瑰櫒瀹岀編鍗犳弧 */}
       {isTangdou ? (
         <main style={{ flex: 1, minHeight: 0, position: 'relative' }}>
           <Outlet />
@@ -144,11 +154,14 @@ export default function Layout() {
 
       {!isTangdou && (
         <footer className="footer">
-          <b>择校通</b> · 真实 · 直接 · 不客气 — AI 只说大实话，不粉饰、不回避、不绕弯子。
+          <b>鎷╂牎閫?/b> 路 鐪熷疄 路 鐩存帴 路 涓嶅姘?鈥?AI 鍙澶у疄璇濓紝涓嶇矇楗般€佷笉鍥為伩銆佷笉缁曞集瀛愩€?
         </footer>
       )}
 
       <HistoryDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </div>
-  )
-}
+
+    {/* PC 鍏ュ満 Splash锛氱洊鍦ㄥ竷灞€涔嬩笂鐨勪竴娆℃€у叏灞忓姩鐢伙紙浠?PC 澶栧３娓叉煋锛屾墜鏈虹増璧拌嚜宸辩殑 /splash锛?*/}
+    {showSplash && <PcSplash onDone={handleSplashDone} />}
+  </>
+)}
