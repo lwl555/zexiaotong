@@ -23,14 +23,16 @@ export default function AdminLayout() {
   const cfg = useStore(s => s.config)
   const me = useMe()
 
-  // 角色校验：非管理员禁止进入后台
-  if (me && me.role !== 'admin') {
+  // 角色校验：未登录或非管理员禁止进入后台。
+  // 注意用 !me 而非 me &&：me 在 init() 完成前可能为 null，
+  // 若写成 `me && me.role!=='admin'` 会在那一瞬跳过守卫、闪出空后台。
+  if (!me || me.role !== 'admin') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
         <div className="text-center">
           <Lock size={48} className="text-gray-300 mx-auto mb-4" />
           <h1 className="text-xl font-bold text-ink mb-2">无权访问</h1>
-          <p className="text-gray-500 text-sm mb-6">管理后台仅对管理员开放，当前账号无权限。</p>
+          <p className="text-gray-500 text-sm mb-6">管理后台仅对管理员开放，请使用管理员账号登录。</p>
           <button className="btn-primary" onClick={() => nav('/')}>返回首页</button>
         </div>
       </div>

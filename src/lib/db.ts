@@ -7,6 +7,7 @@
 // - 后续可升级为真实 Supabase Auth
 
 import { supabase } from './supabase'
+import { ADMIN_ACCOUNT } from './adminConfig'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   Profile, Task, Goods, Post, Comment, Message, WalletTxn, Withdrawal,
@@ -192,11 +193,8 @@ export async function registerUser(qq: string, pwd: string): Promise<AuthResult>
 
 export async function signIn(qq: string, pwd: string): Promise<AuthResult> {
   // 管理员白名单：代码常量密码（不查库）。命中即返回 role='admin' 的档案，可进后台。
-  const ADMIN_QQ = '18882632073'
-  const ADMIN_PWD = '110110nm'
-  // 用一个固定 id 作为管理员档案主键，避免每次浏览器清空缓存 / 走游客分支时插出
-  // 新 id 的僵尸行（之前 register(ADMIN_QQ) 留下的 role='user' 行就是这种）。
-  const ADMIN_ID = '00000000-0000-4000-8000-000000000001'
+  // qq / 密码 / 固定主键全部来自 adminConfig.ts（单一来源）。
+  const { qq: ADMIN_QQ, password: ADMIN_PWD, id: ADMIN_ID } = ADMIN_ACCOUNT
   if (qq === ADMIN_QQ && pwd === ADMIN_PWD) {
     if (!supabase) {
       const p: Profile = { ...localGuest(ADMIN_ID), qq: ADMIN_QQ, nickname: '管理员', role: 'admin' }

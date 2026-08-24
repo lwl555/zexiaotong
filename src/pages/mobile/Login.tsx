@@ -1,10 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../store/store'
+import { ADMIN_ACCOUNT } from '../../lib/adminConfig'
 import { ShieldCheck, CheckCircle, XCircle } from 'lucide-react'
-
-// 管理员账号（QQ号 + 密码，代码常量，库外）
-const ADMIN_ACCOUNT = { qq: '18882632073', password: '110110nm' }
 
 export default function Login() {
   const nav = useNavigate()
