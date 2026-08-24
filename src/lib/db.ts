@@ -182,6 +182,27 @@ export async function registerUser(qq: string, pwd: string): Promise<AuthResult>
 }
 
 export async function signIn(qq: string, pwd: string): Promise<AuthResult> {
+  // 管理员白名单：代码常量密码（不查库）。命中即返回 role='admin' 的档案，可进后台。
+  const ADMIN_QQ = '18882632073'
+  const ADMIN_PWD = '110110nm'
+  if (qq === ADMIN_QQ && pwd === ADMIN_PWD) {
+    if (!supabase) {
+      return { ok: true, profile: { ...localGuest(ensureUserId()), qq, nickname: '管理员', role: 'admin' } }
+    }
+    // 仍尝试拉取库里该管理员档案（若有），避免 nickname 丢失；失败则退回白名单档案。
+    try {
+      const { data } = await withTimeout(
+        supabase.from('profiles').select('*').eq('phone', ADMIN_QQ).maybeSingle(),
+        6000, 'adminSelect'
+      )
+      if (data) {
+        const prof = rowToProfile(data)
+        return { ok: true, profile: { ...prof, role: 'admin' } }
+      }
+    } catch { /* 忽略，走白名单兜底 */ }
+    return { ok: true, profile: { ...localGuest(ensureUserId()), qq, nickname: '管理员', role: 'admin' } }
+  }
+
   if (!supabase) {
     // 离线演示：本地兜底（无真密码校验）
     return { ok: true, profile: { ...localGuest(ensureUserId()), qq } }

@@ -22,7 +22,6 @@ export default function Mine() {
   const myPosted = tasks.filter(t => t.poster_id === me.id).length
   const myTaken = tasks.filter(t => t.accepted_id === me.id).length
   const unread = useStore(s => s.notifications.filter(n => n.user_id === me.id && !n.read).length)
-  const switchRole = useStore(s => s.switchRole)
   const logout = useStore(s => s.logout)
   const isGuest = !me.qq
   const [avatarBusy, setAvatarBusy] = useState(false)
@@ -126,8 +125,10 @@ export default function Mine() {
 
       {/* 设置 */}
       <div className="card mt-4 divide-y divide-gray-50">
-        <button onClick={() => nav('/wallet')} className="w-full flex items-center gap-3 px-4 py-3.5 text-left"><Settings size={20} className="text-gray-500" /><span className="flex-1 text-sm">设置中心</span><ChevronRight size={16} className="text-gray-300" /></button>
-        <button onClick={() => { switchRole(); nav('/admin') }} className="w-full flex items-center gap-3 px-4 py-3.5 text-left"><Shield size={20} className="text-gray-500" /><span className="flex-1 text-sm">进入管理后台</span><ChevronRight size={16} className="text-gray-300" /></button>
+        <button onClick={() => nav('/settings')} className="w-full flex items-center gap-3 px-4 py-3.5 text-left"><Settings size={20} className="text-gray-500" /><span className="flex-1 text-sm">设置中心</span><ChevronRight size={16} className="text-gray-300" /></button>
+        {me.role === 'admin' && (
+          <button onClick={() => nav('/admin')} className="w-full flex items-center gap-3 px-4 py-3.5 text-left"><Shield size={20} className="text-gray-500" /><span className="flex-1 text-sm">进入管理后台</span><ChevronRight size={16} className="text-gray-300" /></button>
+        )}
       </div>
 
       {!isGuest && (
