@@ -158,20 +158,20 @@ create table if not exists platform_config (
 -- ============================================================
 -- 索引（加速查询）
 -- ============================================================
-create index idx_tasks_status on tasks(status);
-create index idx_tasks_poster on tasks(poster_id);
-create index idx_tasks_accepted on tasks(accepted_id);
-create index idx_goods_seller on goods(seller_id);
-create index idx_goods_status on goods(status);
-create index idx_posts_author on posts(author_id);
-create index idx_posts_status on posts(status);
-create index idx_messages_conv on messages(conv_id);
-create index idx_messages_receiver on messages(receiver_id);
-create index idx_txns_user on txns(user_id);
-create index idx_withdrawals_user on withdrawals(user_id);
-create index idx_withdrawals_status on withdrawals(status);
-create index idx_notifications_user on notifications(user_id);
-create index idx_arbitrations_status on arbitrations(status);
+create index if not exists idx_tasks_status on tasks(status);
+create index if not exists idx_tasks_poster on tasks(poster_id);
+create index if not exists idx_tasks_accepted on tasks(accepted_id);
+create index if not exists idx_goods_seller on goods(seller_id);
+create index if not exists idx_goods_status on goods(status);
+create index if not exists idx_posts_author on posts(author_id);
+create index if not exists idx_posts_status on posts(status);
+create index if not exists idx_messages_conv on messages(conv_id);
+create index if not exists idx_messages_receiver on messages(receiver_id);
+create index if not exists idx_txns_user on txns(user_id);
+create index if not exists idx_withdrawals_user on withdrawals(user_id);
+create index if not exists idx_withdrawals_status on withdrawals(status);
+create index if not exists idx_notifications_user on notifications(user_id);
+create index if not exists idx_arbitrations_status on arbitrations(status);
 
 -- ============================================================
 -- 启用 RLS（Row Level Security）
@@ -194,82 +194,111 @@ alter table platform_config enable row level security;
 -- ============================================================
 
 -- profiles：所有人可读，本人可写
+drop policy if exists "profiles_select" on profiles;
 create policy "profiles_select" on profiles for select using (true);
+drop policy if exists "profiles_insert" on profiles;
 create policy "profiles_insert" on profiles for insert with check (true);
+drop policy if exists "profiles_update" on profiles;
 create policy "profiles_update" on profiles for update using (
   auth.uid()::text = id::text or auth.role() = 'admin'
 );
+drop policy if exists "profiles_admin" on profiles;
 create policy "profiles_admin" on profiles for all using (auth.role() = 'admin');
 
 -- tasks：所有人可读，本人/管理员可写
+drop policy if exists "tasks_select" on tasks;
 create policy "tasks_select" on tasks for select using (true);
+drop policy if exists "tasks_insert" on tasks;
 create policy "tasks_insert" on tasks for insert with check (
   auth.uid()::text = poster_id::text
 );
+drop policy if exists "tasks_update_owner" on tasks;
 create policy "tasks_update_owner" on tasks for update using (
   auth.uid()::text = poster_id::text or auth.uid()::text = accepted_id::text
 );
+drop policy if exists "tasks_admin" on tasks;
 create policy "tasks_admin" on tasks for all using (auth.role() = 'admin');
 
 -- goods：所有人可读，本人可写
+drop policy if exists "goods_select" on goods;
 create policy "goods_select" on goods for select using (true);
+drop policy if exists "goods_insert" on goods;
 create policy "goods_insert" on goods for insert with check (
   auth.uid()::text = seller_id::text
 );
+drop policy if exists "goods_update" on goods;
 create policy "goods_update" on goods for update using (
   auth.uid()::text = seller_id::text
 );
+drop policy if exists "goods_admin" on goods;
 create policy "goods_admin" on goods for all using (auth.role() = 'admin');
 
 -- posts：所有人可读，本人可写
+drop policy if exists "posts_select" on posts;
 create policy "posts_select" on posts for select using (true);
+drop policy if exists "posts_insert" on posts;
 create policy "posts_insert" on posts for insert with check (
   auth.uid()::text = author_id::text
 );
+drop policy if exists "posts_update" on posts;
 create policy "posts_update" on posts for update using (
   auth.uid()::text = author_id::text
 );
+drop policy if exists "posts_admin" on posts;
 create policy "posts_admin" on posts for all using (auth.role() = 'admin');
 
 -- messages：参与者可读，发送者可写
+drop policy if exists "messages_select" on messages;
 create policy "messages_select" on messages for select using (
   auth.uid()::text = sender_id::text or auth.uid()::text = receiver_id::text
 );
+drop policy if exists "messages_insert" on messages;
 create policy "messages_insert" on messages for insert with check (
   auth.uid()::text = sender_id::text
 );
 
 -- txns：本人可读
+drop policy if exists "txns_select" on txns;
 create policy "txns_select" on txns for select using (
   auth.uid()::text = user_id::text
 );
 
 -- withdrawals：本人可读，管理员可写
+drop policy if exists "withdrawals_select" on withdrawals;
 create policy "withdrawals_select" on withdrawals for select using (
   auth.uid()::text = user_id::text
 );
+drop policy if exists "withdrawals_insert" on withdrawals;
 create policy "withdrawals_insert" on withdrawals for insert with check (
   auth.uid()::text = user_id::text
 );
+drop policy if exists "withdrawals_admin" on withdrawals;
 create policy "withdrawals_admin" on withdrawals for all using (auth.role() = 'admin');
 
 -- arbitrations：参与者可读，管理员可写
+drop policy if exists "arbitrations_select" on arbitrations;
 create policy "arbitrations_select" on arbitrations for select using (
   auth.uid()::text = plaintiff_id::text or auth.uid()::text = defendant_id::text
 );
+drop policy if exists "arbitrations_admin" on arbitrations;
 create policy "arbitrations_admin" on arbitrations for all using (auth.role() = 'admin');
 
 -- notifications：本人可读
+drop policy if exists "notifications_select" on notifications;
 create policy "notifications_select" on notifications for select using (
   auth.uid()::text = user_id::text
 );
+drop policy if exists "notifications_insert" on notifications;
 create policy "notifications_insert" on notifications for insert with check (
   auth.uid()::text = user_id::text
 );
 
 -- categories / banners / platform_config：所有人可读，管理员可写
+drop policy if exists "categories_select" on categories;
 create policy "categories_select" on categories for select using (true);
+drop policy if exists "banners_select" on banners;
 create policy "banners_select" on banners for select using (true);
+drop policy if exists "platform_config_select" on platform_config;
 create policy "platform_config_select" on platform_config for select using (true);
 
 -- ============================================================

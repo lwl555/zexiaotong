@@ -13,16 +13,19 @@ create table if not exists comments (
   created_at timestamptz default now()
 );
 
-create index idx_comments_target on comments(target_type, target_id);
-create index idx_comments_author on comments(author_id);
+create index if not exists idx_comments_target on comments(target_type, target_id);
+create index if not exists idx_comments_author on comments(author_id);
 
 alter table comments enable row level security;
 
 -- 所有人可读
+drop policy if exists "comments_select" on comments;
 create policy "comments_select" on comments for select using (true);
 -- 任何人可写（演示环境；真实环境应限制已登录用户）
+drop policy if exists "comments_insert" on comments;
 create policy "comments_insert" on comments for insert with check (true);
 -- 作者本人可删除
+drop policy if exists "comments_delete" on comments;
 create policy "comments_delete" on comments for delete using (
   author_id::text = auth.uid()::text or auth.role() = 'admin'
 );
