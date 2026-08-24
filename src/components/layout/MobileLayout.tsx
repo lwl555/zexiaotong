@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { Home as HomeIcon, PlusCircle, ShoppingBag, MessageSquare, User, Bell } from 'lucide-react'
+import { MessageCircle, UserPlus, Compass, User, Bell } from 'lucide-react'
 import { useStore } from '../../store/store'
 
+// 微信式底部 4 Tab：微信 / 通讯录 / 发现 / 我
 const tabs = [
-  { to: '/', label: '首页', icon: HomeIcon, end: true },
-  { to: '/publish', label: '发布', icon: PlusCircle, end: false },
-  { to: '/goods', label: '二手', icon: ShoppingBag, end: false },
-  { to: '/community', label: '社区', icon: MessageSquare, end: false },
-  { to: '/mine', label: '我的', icon: User, end: false }
+  { to: '/', label: '微信', icon: MessageCircle, end: true },
+  { to: '/contacts', label: '通讯录', icon: UserPlus, end: false },
+  { to: '/discover', label: '发现', icon: Compass, end: false },
+  { to: '/mine', label: '我', icon: User, end: false },
 ]
 
 // 微信内置浏览器 / 弱网 / 隐私模式下 Supabase 偶尔会卡住。
@@ -90,15 +90,15 @@ export default function MobileLayout() {
       <div className="flex-1 overflow-y-auto no-scrollbar" style={{ paddingBottom: 48 }}>
         <Outlet />
       </div>
-      {/* 底部固定导航（永远展开，不再提供▼ 折叠按钮；栏高 48 + 图标 18 + 文字 10px，更贴底） */}
+      {/* 微信式底部固定导航：4 Tab */}
       <nav
-        className="fixed bottom-0 inset-x-0 mx-auto w-full max-w-[480px] h-12 bg-white border-t border-gray-100 flex items-center px-2 z-30"
+        className="fixed bottom-0 inset-x-0 mx-auto w-full max-w-[480px] h-14 bg-[#f7f7f7] border-t border-[#e5e5e5] flex items-stretch px-0 z-30"
         style={{ transform: 'translateY(0)' }}>
         {tabs.map(t => (
           <NavLink key={t.to} to={t.to} end={t.end}
-            className={({ isActive }) => 'flex-1 flex flex-col items-center gap-0 py-1 ' + (isActive ? 'text-brand-600' : 'text-gray-400')}>
-            <t.icon size={18} strokeWidth={1.9} />
-            <span className="text-[10px] leading-none mt-0.5">{t.label}</span>
+            className={({ isActive }) => 'flex-1 flex flex-col items-center justify-center gap-0.5 ' + (isActive ? 'wx-tab-active' : 'wx-tab-idle')}>
+            <t.icon size={22} strokeWidth={1.6} />
+            <span className="text-[10px] leading-none">{t.label}</span>
           </NavLink>
         ))}
       </nav>

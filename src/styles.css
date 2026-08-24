@@ -1096,3 +1096,123 @@ textarea { resize: vertical; min-height: 88px; }
   transition: background .15s ease;
 }
 .link-copy:hover { background: var(--accent-soft, var(--accent-soft)); }
+
+/* ===================== 微信式手机首页 ===================== */
+.wx-page {
+  background: #fff;
+  min-height: 100vh;
+  padding-bottom: 56px;
+}
+/* header */
+.wx-header {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between;
+  height: 44px; padding: 0 12px;
+  background: #ededed; color: #111;
+}
+.wx-title { font-size: 17px; font-weight: 600; }
+.wx-h-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; color: #333; background: transparent; border: 0;
+}
+.wx-h-right { display: flex; align-items: center; gap: 4px; }
+/* 轻提示 banner */
+.wx-banner {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 14px; font-size: 13px; color: #666; background: #ececec;
+}
+.wx-banner-dot { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid #999; flex: none; }
+/* 顶部快捷卡片横排 */
+.wx-quick {
+  display: flex; gap: 14px; overflow-x: auto; padding: 14px 14px 16px;
+  scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
+  border-bottom: 1px solid #f2f2f2;
+}
+.wx-quick::-webkit-scrollbar { display: none; }
+.wx-quick-item {
+  flex: none; width: 56px; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  background: transparent; border: 0; scroll-snap-align: start;
+}
+.wx-quick-avatar {
+  width: 50px; height: 50px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 20px; font-weight: 600;
+}
+.wx-quick-label { font-size: 11px; color: #333; line-height: 1; }
+/* 会话列表 */
+.wx-list { background: #fff; }
+.wx-row {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 10px 14px; background: #fff; border: 0; text-align: left;
+  border-bottom: 1px solid #f2f2f2;
+}
+.wx-row:active { background: #f2f2f2; }
+.wx-row-avatar { position: relative; flex: none; }
+.wx-avatar {
+  width: 46px; height: 46px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 19px; font-weight: 600;
+}
+.wx-app {
+  background: #07c160 !important; /* 微信绿应用消息 */
+}
+.wx-badge {
+  position: absolute; top: -5px; right: -5px;
+  min-width: 17px; height: 17px; padding: 0 4px;
+  border-radius: 9px; background: #fa5151; color: #fff;
+  font-size: 11px; line-height: 17px; text-align: center;
+  border: 1.5px solid #fff; box-sizing: content-box;
+}
+.wx-row-main { flex: 1; min-width: 0; }
+.wx-row-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.wx-row-name { font-size: 16px; color: #111; font-weight: 500; }
+.wx-row-time { font-size: 12px; color: #b2b2b2; flex: none; }
+.wx-row-preview {
+  font-size: 13px; color: #999; margin-top: 3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+}
+.wx-fold {
+  text-align: center; font-size: 12px; color: #b2b2b2;
+  padding: 12px 0 16px;
+}
+/* 底 Tab 微信式 */
+.wx-tab-active { color: #07c160; }
+.wx-tab-idle { color: #8a8a8a; }
+.wx-tab-active svg { color: #07c160; }
+.wx-tab-idle svg { color: #8a8a8a; }
+/* 通讯录 */
+.wx-search-bar {
+  display: flex; align-items: center; gap: 8px;
+  margin: 8px 12px; padding: 8px 12px;
+  background: #ededed; border-radius: 6px;
+}
+.wx-contact-group { background: #fff; }
+.wx-letter {
+  padding: 4px 14px; font-size: 13px; color: #888; background: #f7f7f7;
+}
+.wx-contact-row {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 9px 14px; background: #fff; border: 0; text-align: left;
+  border-bottom: 1px solid #f2f2f2;
+}
+.wx-contact-row:active { background: #f2f2f2; }
+.wx-contact-avatar, .wx-discover-avatar {
+  width: 40px; height: 40px; border-radius: 6px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 17px; font-weight: 600;
+}
+.wx-contact-text { display: flex; flex-direction: column; }
+.wx-contact-name { font-size: 16px; color: #111; }
+.wx-contact-desc { font-size: 12px; color: #999; margin-top: 2px; }
+/* 发现 */
+.wx-discover { background: #fff; }
+.wx-discover-row {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 10px 14px; background: #fff; border: 0; text-align: left;
+  border-bottom: 1px solid #f2f2f2;
+}
+.wx-discover-row:active { background: #f2f2f2; }
+.wx-discover-text { flex: 1; display: flex; flex-direction: column; }
+.wx-discover-name { font-size: 16px; color: #111; }
+.wx-discover-desc { font-size: 12px; color: #999; margin-top: 2px; }
+.wx-discover-arrow { color: #c8c8c8; font-size: 20px; }
