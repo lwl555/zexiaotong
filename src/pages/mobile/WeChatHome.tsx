@@ -135,8 +135,8 @@ export default function WeChatHome() {
         ))}
       </div>
 
-      {/* 列表底部留白，避免被 4 Tab 导航遮住 */}
-      <div className="h-4 bg-[#ededed]" />
+      {/* 列表底部留白，避免被 4 Tab 导航(h-12=48px)遮住：给到 80px = Tab 高 + 32px 呼吸 */}
+      <div className="h-20 bg-[#ededed]" />
     </div>
   )
 }
