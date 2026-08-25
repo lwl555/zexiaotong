@@ -70,10 +70,10 @@ function ResponsiveShell() {
   return isMobile ? <MobileLayout /> : <Layout />
 }
 
-// 手机端首页默认糖豆助手，PC 端首页保持原样
+// 手机端首页为 MobileHome（搜索+AI工具卡+任务/二手/社区），PC 端为原 Home
 function DeviceHome() {
   const isMobile = useIsMobile()
-  return isMobile ? <AITangdou /> : <Home />
+  return isMobile ? <MobileHome /> : <Home />
 }
 
 export default function App() {
