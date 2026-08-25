@@ -2,8 +2,16 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, Search, Plus, User } from 'lucide-react'
 import { useStore } from '../../store/store'
 
+// ===== 配色（得物式：黑白灰主调 + 活力橙唯一强调色）=====
+// 微信绿仅保留在底栏 4 Tab（微信骨架约定），本页强调色统一为活力橙。
+const INK = '#1a1a1a'
+const MUTED = '#6b7280'
+const ACCENT = '#e8622c' // 活力橙（烧橙）：登录链接 / 活跃态 / 新内容标记
+const LINE = 'rgba(0,0,0,0.06)'
+const ACTIVE = 'rgba(232,98,44,0.05)' // 行按压极淡橙
+const UNREAD = '#fa5151' // 微信原生未读红，保留不改为 AI 套路
+
 // ===== 功能分组：每行一个"聊天对象"= 一个平台功能（纯文字，无图标） =====
-// 副标题一律"静态事实描述"，不写"?"、不写"聊"、不写命令句、避免 LLM 营销味
 type Channel = {
   id: string
   name: string
@@ -40,10 +48,14 @@ const ACCOUNT: Channel[] = [
 
 // ===== 列表分组（顺序固定）=====
 const GROUPS: { title: string; subtitle: string; items: Channel[] }[] = [
-  { title: '智能助手', subtitle: 'ASSISTANTS', items: ASSISTANTS },
-  { title: '社区与交易', subtitle: 'COMMUNITY', items: COMMUNITY },
-  { title: '账户与工具', subtitle: 'ACCOUNT',   items: ACCOUNT },
+  { title: '智能助手', subtitle: 'Assistants', items: ASSISTANTS },
+  { title: '社区与交易', subtitle: 'Community', items: COMMUNITY },
+  { title: '账户与工具', subtitle: 'Account',   items: ACCOUNT },
 ]
+
+// 噪点纹理（3% 透明度 overlay，打破 AI 式完美平面感；参考 925studios / dev.to）
+const NOISE_BG =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")"
 
 export default function WeChatHome() {
   const nav = useNavigate()
@@ -51,43 +63,67 @@ export default function WeChatHome() {
   const isGuest = !me?.qq
 
   return (
-    <div style={{ background: '#ededed', minHeight: '100%' }}>
-      {/* ===== 顶部导航 ===== */}
-      {/* 顶栏右侧「登录」改为微信原生的小绿文字链接（替代之前的大绿块），视觉重心让位给「择校通」 */}
+    <div style={{ background: '#f4f4f5', minHeight: '100%', color: INK }}>
+      {/* 噪点 overlay：覆盖全屏、不可点击、极淡 */}
       <div
-        className="sticky top-0 z-20 flex items-center justify-between px-2 h-12 border-b border-gray-200"
-        style={{ background: '#ededed' }}
+        aria-hidden
+        style={{
+          position: 'fixed',
+          inset: 0,
+          pointerEvents: 'none',
+          opacity: 0.035,
+          zIndex: 9999,
+          backgroundImage: NOISE_BG,
+          backgroundSize: '120px 120px',
+        }}
+      />
+
+      {/* ===== 顶部导航 ===== */}
+      <div
+        className="sticky top-0 z-20 flex items-center justify-between px-2 h-12 border-b"
+        style={{ background: '#f4f4f5', borderColor: LINE }}
       >
         {isGuest ? (
           <button
             aria-label="折叠"
-            className="w-9 h-9 flex items-center justify-center text-gray-500 active:bg-gray-200 rounded-full"
+            className="w-9 h-9 flex items-center justify-center active:bg-black/5 rounded-full"
+            style={{ color: MUTED }}
             onClick={() => nav('/splash')}>
             <span className="text-lg leading-none">«</span>
           </button>
         ) : (
           <button
             aria-label="我的"
-            className="w-9 h-9 flex items-center justify-center text-gray-500 active:bg-gray-200 rounded-full"
+            className="w-9 h-9 flex items-center justify-center active:bg-black/5 rounded-full"
+            style={{ color: MUTED }}
             onClick={() => nav('/mine')}>
             <User size={20} />
           </button>
         )}
-        <div className="text-base font-semibold text-gray-900 absolute left-1/2 -translate-x-1/2">择校通</div>
+        {/* 标题放大紧排（得物式大字号），保留微信居中约定 */}
+        <div
+          className="absolute left-1/2 -translate-x-1/2 font-bold"
+          style={{ fontSize: 19, letterSpacing: '-0.02em', color: INK }}
+        >
+          择校通
+        </div>
         <div className="flex items-center gap-0.5">
           {isGuest && (
             <button
               onClick={() => nav('/login')}
-              className="px-2 h-7 text-[13px] font-medium active:opacity-60"
-              style={{ color: '#07c160' }}>
+              className="px-2 h-7 text-[13px] font-semibold active:opacity-60"
+              style={{ color: ACCENT }}
+            >
               登录
             </button>
           )}
-          <button aria-label="搜索" className="w-9 h-9 flex items-center justify-center text-gray-500 active:bg-gray-200 rounded-full"
+          <button aria-label="搜索" className="w-9 h-9 flex items-center justify-center active:bg-black/5 rounded-full"
+            style={{ color: MUTED }}
             onClick={() => nav('/ai-search')}>
             <Search size={20} />
           </button>
-          <button aria-label="添加" className="w-9 h-9 flex items-center justify-center text-gray-500 active:bg-gray-200 rounded-full"
+          <button aria-label="添加" className="w-9 h-9 flex items-center justify-center active:bg-black/5 rounded-full"
+            style={{ color: MUTED }}
             onClick={() => nav('/community')}>
             <Plus size={22} />
           </button>
@@ -95,15 +131,18 @@ export default function WeChatHome() {
       </div>
 
       {/* ===== 聊天会话列表（纯文字，无图标；行高 64px，组内 0.5px 极淡分隔） ===== */}
-      <div className="bg-white">
+      <div style={{ background: '#ffffff' }}>
         {GROUPS.map((g, gi) => (
           <div key={g.title}>
-            {/* 组标题：等宽 eyebrow + 中文 */}
+            {/* 组标题：手写感衬线斜体英文 eyebrow + 放大加粗中文（增温度） */}
             <div className="flex items-baseline gap-2 px-4 pt-3 pb-1">
-              <span className="text-[10px] tracking-[0.18em] text-gray-400 font-mono">
+              <span
+                className="text-[11px] italic tracking-[0.12em]"
+                style={{ fontFamily: 'Georgia, "Times New Roman", serif', color: ACCENT }}
+              >
                 {g.subtitle}
               </span>
-              <span className="text-[12px] text-gray-700 font-medium">
+              <span className="text-[13px] font-bold" style={{ color: INK, letterSpacing: '-0.01em' }}>
                 {g.title}
               </span>
             </div>
@@ -112,17 +151,31 @@ export default function WeChatHome() {
               <button
                 key={c.id}
                 onClick={() => nav(c.to)}
-                /* 行高 64px（py-3）+ 极淡分隔 border-gray-50（接近 0.5px 视觉），时间上 10px / 红点下错位 */
-                className="w-full flex items-center gap-3 px-4 py-3 border-b border-gray-50 active:bg-gray-50 text-left"
+                /* 行高 64px（py-3）+ 极淡分隔 + 标题 17px 紧排粗体；按压极淡橙底 */
+                className="w-full flex items-center gap-3 px-4 py-3 border-b text-left active:scale-[0.99] transition-transform"
+                style={{ borderColor: LINE, background: 'transparent' }}
+                onMouseDown={(e) => (e.currentTarget.style.background = ACTIVE)}
+                onMouseUp={(e) => (e.currentTarget.style.background = 'transparent')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
               >
                 <div className="flex-1 min-w-0 pr-2">
-                  <div className="text-[16px] text-gray-900 font-medium truncate">{c.name}</div>
-                  <div className="text-[13px] text-gray-500 truncate mt-1">{c.lastMsg}</div>
+                  <div
+                    className="text-[17px] font-semibold truncate"
+                    style={{ color: INK, letterSpacing: '-0.015em' }}
+                  >
+                    {c.name}
+                  </div>
+                  <div className="text-[13px] truncate mt-1" style={{ color: MUTED }}>
+                    {c.lastMsg}
+                  </div>
                 </div>
                 <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                  <span className="text-[10px] text-gray-400">{c.time}</span>
+                  <span className="text-[10px]" style={{ color: '#9ca3af' }}>{c.time}</span>
                   {c.unread > 0 && (
-                    <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-[11px] flex items-center justify-center font-medium leading-none">
+                    <span
+                      className="min-w-[20px] h-5 px-1.5 rounded-full text-white text-[11px] flex items-center justify-center font-medium leading-none"
+                      style={{ background: UNREAD }}
+                    >
                       {c.unread > 99 ? '99+' : c.unread}
                     </span>
                   )}
@@ -131,13 +184,13 @@ export default function WeChatHome() {
             ))}
 
             {/* 段尾呼吸白条，最后一段去掉 */}
-            {gi < GROUPS.length - 1 && <div className="h-3 bg-[#ededed]" />}
+            {gi < GROUPS.length - 1 && <div className="h-3" style={{ background: '#f4f4f5' }} />}
           </div>
         ))}
       </div>
 
-      {/* 列表底部留白，避免被 4 Tab 导航(h-12=48px)遮住：给到 80px = Tab 高 + 32px 呼吸 */}
-      <div className="h-20 bg-[#ededed]" />
+      {/* 列表底部留白，避免被 4 Tab 导航(h-12=48px)遮住 */}
+      <div className="h-20" style={{ background: '#f4f4f5' }} />
     </div>
   )
 }
