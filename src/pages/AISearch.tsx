@@ -87,6 +87,7 @@ export default function AISearch() {
 
       <AIChat
         title={cur.label}
+        appName="AI百事通"
         systemPrompt={cur.prompt}
         placeholder={cur.placeholder}
         autoSearch

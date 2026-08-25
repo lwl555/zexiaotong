@@ -1,5 +1,10 @@
 import { useState, useRef, useEffect, type SyntheticEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { ChevronLeft } from 'lucide-react'
 import { agnesChat, ChatMsg, SearchMeta, LinkInfo } from '../lib/agnes'
+import { useIsMobile } from '../lib/useIsMobile'
+import WxAvatar from './mobile/WxAvatar'
+import { avatarOf } from '../lib/avatarMeta'
 import {
   Conversation,
   StoredMsg,
@@ -119,6 +124,8 @@ interface Props {
   examples?: readonly string[]
   /** AI 回复后展示的追问建议（点击作为下一条提问，沿用上下文） */
   followups?: readonly string[]
+  /** 顶栏显示的应用名（默认取 title）；移动端会渲染微信风聊天顶栏 */
+  appName?: string
 }
 
 interface Msg {
@@ -149,8 +156,12 @@ export default function AIChat({
   exportName,
   exportTitle,
   examples,
-  followups
+  followups,
+  appName
 }: Props) {
+  const nav = useNavigate()
+  const isMobile = useIsMobile()
+  const av = avatarOf('/' + pageKey)
   const convId = `${pageKey}:${channel}`
   const [messages, setMessages] = useState<Msg[]>(() => {
     const c = getConversation(convId)
@@ -396,7 +407,16 @@ export default function AIChat({
   const roleLabel = (r: 'user' | 'ai') => (r === 'user' ? '你' : 'AI')
 
   return (
-    <div className={`panel theme-${theme}`}>
+    <div className={`panel theme-${theme}${isMobile ? ' wx' : ''}`}>
+      {isMobile && (
+        <div className="wx-chat-bar">
+          <button aria-label="返回" className="wx-chat-back" onClick={() => nav('/')}>
+            <ChevronLeft size={22} strokeWidth={1.8} />
+          </button>
+          <WxAvatar {...av} size={30} />
+          <span className="wx-chat-title">{appName || title}</span>
+        </div>
+      )}
       <div className="panel-head">
         <span className="who">{title}</span>
         <button className="head-btn" onClick={newChat} title="清空当前对话，重新开始">

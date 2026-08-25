@@ -1039,7 +1039,7 @@ export default function AITangdou() {
         }}>
           {m.role === 'ai' && (
             <div style={{
-              width: isMobile ? 26 : 30, height: isMobile ? 26 : 30, borderRadius: '50%', background: '#1c1814',
+              width: isMobile ? 26 : 30, height: isMobile ? 26 : 30, borderRadius: '50%', background: '#5b7c99',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               flexShrink: 0, marginRight: 6
             }}><Sparkles size={isMobile ? 13 : 16} color="#fff" strokeWidth={2} /></div>
@@ -1048,8 +1048,8 @@ export default function AITangdou() {
             maxWidth: isMobile ? '82%' : '70%',
             padding: m.image ? 0 : (isMobile ? '8px 11px' : '10px 14px'),
             borderRadius: 14,
-            background: m.role === 'user' ? '#c2410c' : (m.error ? '#fef2f2' : '#f5f5f5'),
-            border: m.error ? '1px solid #fecaca' : undefined,
+            background: m.role === 'user' ? '#07c160' : (m.error ? '#fef2f2' : '#ffffff'),
+            border: m.error ? '1px solid #fecaca' : '1px solid rgba(0,0,0,0.06)',
             color: m.role === 'user' ? '#fff' : (m.error ? '#b42318' : '#1c1814'),
             fontSize: isMobile ? 13.5 : 14,
             lineHeight: isMobile ? 1.55 : 1.7,

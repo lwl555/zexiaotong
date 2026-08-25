@@ -1,7 +1,37 @@
 import { useEffect, useState } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { Home as HomeIcon, PlusCircle, ShoppingBag, MessageSquare, User, Bell, Users, Compass, Contact } from 'lucide-react'
+import { Home as HomeIcon, PlusCircle, ShoppingBag, MessageSquare, User, Bell, Users, Compass, Contact, ChevronLeft } from 'lucide-react'
 import { useStore } from '../../store/store'
+import WxAvatar from '../mobile/WxAvatar'
+import { avatarOf } from '../../lib/avatarMeta'
+
+// 各路由对应的微信风顶栏标题（与首页功能块保持一致）
+const ROUTE_TITLE: Record<string, string> = {
+  '/ai-tangdou': '糖豆·学习搭子',
+  '/ai-tutor': '学习导师',
+  '/document-workshop': '文档工坊',
+  '/warnings': '避雷清单',
+  '/community': '择校社区',
+  '/goods': '二手市场',
+  '/publish': '发布任务',
+  '/publish-goods': '发布闲置',
+  '/publish-post': '发布帖子',
+  '/money': '搞钱项目',
+  '/messages': '消息中心',
+  '/notifications': '通知',
+  '/ai-history': 'AI 历史',
+  '/wallet': '我的钱包',
+  '/mine': '个人中心',
+  '/about': '关于择校通',
+  '/my-tasks': '我的任务'
+}
+function titleOf(path: string): string {
+  if (ROUTE_TITLE[path]) return ROUTE_TITLE[path]
+  if (path.startsWith('/post')) return '帖子详情'
+  if (path.startsWith('/task')) return '任务详情'
+  if (path.startsWith('/goods/')) return '商品详情'
+  return '择校通'
+}
 
 // 微信风格底部 4 Tab（微信绿 #07c160）
 const WECHAT_GREEN = '#07c160'
@@ -86,9 +116,30 @@ export default function MobileLayout() {
     )
   }
 
+  // 微信风顶栏：除首页 / 登录 / 引导页 / AI百事通(自带聊天顶栏) 外，所有功能页统一显示
+  // 「返回 + 首字头像 + 标题」，保证「点进去像微信聊天」的进入一致性。
+  const path = loc.pathname
+  const showTopBar = !['/', '/splash', '/login', '/ai-search'].includes(path)
+
   return (
     <div className="app-shell flex flex-col" style={{ minHeight: '100vh' }}>
       <div className="flex-1 overflow-y-auto no-scrollbar" style={{ paddingBottom: 48 }}>
+        {showTopBar && (
+          <div
+            className="sticky top-0 z-20 flex items-center gap-2 px-2 h-12 border-b bg-white"
+            style={{ borderColor: 'rgba(0,0,0,0.06)' }}
+          >
+            <button
+              aria-label="返回"
+              className="w-9 h-9 flex items-center justify-center text-gray-500 active:bg-black/5 rounded-full"
+              onClick={() => (path === '/mine' || window.history.length > 1 ? nav(-1) : nav('/'))}
+            >
+              <ChevronLeft size={22} strokeWidth={1.8} />
+            </button>
+            <WxAvatar {...avatarOf(path)} size={30} />
+            <span className="text-[16px] font-semibold text-gray-900 truncate">{titleOf(path)}</span>
+          </div>
+        )}
         <Outlet />
       </div>
       {/* 底部固定导航：微信风格 4 Tab（微信绿高亮） */}

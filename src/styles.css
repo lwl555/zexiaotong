@@ -1049,3 +1049,40 @@ textarea { resize: vertical; min-height: 88px; }
   transition: background .15s ease;
 }
 .link-copy:hover { background: var(--accent-soft, var(--accent-soft)); }
+
+/* ---------- 微信风移动端聊天顶栏 + 气泡 ---------- */
+.wx-chat-bar {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 8px;
+  height: 48px; padding: 0 8px;
+  background: #fff; border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+.wx-chat-back {
+  width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+  color: #6b7280; border-radius: 999px;
+}
+.wx-chat-back:active { background: rgba(0,0,0,0.05); }
+.wx-chat-title { font-size: 16px; font-weight: 600; color: #1a1a1a; }
+
+/* 移动端 AIChat 微信气泡：用户绿底白字靠右，AI 白底靠左；隐藏原 panel-head 与角色标签 */
+.wx .panel-head { display: none; }
+.wx .panel { border: 0; box-shadow: none; background: transparent; border-radius: 0; overflow: visible; }
+.wx .panel-body { padding: 12px 12px 8px; }
+.wx .msg { margin-bottom: 14px; }
+.wx .msg.user { justify-content: flex-end; }
+.wx .msg.user .bubble {
+  background: #07c160; color: #fff; border: 0; border-radius: 14px 14px 4px 14px;
+  padding: 10px 13px; max-width: 80%;
+}
+.wx .msg.ai .bubble {
+  background: #ffffff; border: 1px solid rgba(0,0,0,0.06); border-radius: 14px 14px 14px 4px;
+  padding: 12px 14px; max-width: 88%;
+}
+.wx .bubble .role { display: none; }
+
+/* 移动端：全局微信顶栏已显示标题，隐藏页面自带大标题 h2，仅保留描述 */
+.app-shell .page-head { margin-bottom: 14px; }
+@media (max-width: 768px) {
+  .app-shell .page-head h2 { display: none; }
+  .app-shell .page-head { margin-bottom: 10px; }
+}

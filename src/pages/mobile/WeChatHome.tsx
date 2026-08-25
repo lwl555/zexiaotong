@@ -1,6 +1,8 @@
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, Search, Plus, User } from 'lucide-react'
 import { useStore } from '../../store/store'
+import WxAvatar from '../../components/mobile/WxAvatar'
+import { avatarOf } from '../../lib/avatarMeta'
 
 // ===== 配色（得物式：黑白灰主调 + 活力橙唯一强调色）=====
 // 微信绿仅保留在底栏 4 Tab（微信骨架约定），本页强调色统一为活力橙。
@@ -158,7 +160,9 @@ export default function WeChatHome() {
                 onMouseUp={(e) => (e.currentTarget.style.background = 'transparent')}
                 onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
               >
-                <div className="flex-1 min-w-0 pr-2">
+                {/* 微信风首字头像：按功能分类取克制色，避免 emoji / 彩色 AI 模板感 */}
+                <WxAvatar {...avatarOf(c.to)} size={46} />
+                <div className="flex-1 min-w-0 pr-2 pl-1">
                   <div
                     className="text-[17px] font-semibold truncate"
                     style={{ color: INK, letterSpacing: '-0.015em' }}
