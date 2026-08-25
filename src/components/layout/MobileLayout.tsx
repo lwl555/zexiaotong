@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { MessageCircle, UserPlus, Compass, User } from 'lucide-react'
+import { Home as HomeIcon, PlusCircle, ShoppingBag, MessageSquare, User, Bell } from 'lucide-react'
 import { useStore } from '../../store/store'
 
-// 微信式底部 4 Tab：首页 / 通讯录 / 发现 / 我
 const tabs = [
-  { to: '/', label: '首页', icon: MessageCircle, end: true },
-  { to: '/contacts', label: '通讯录', icon: UserPlus, end: false },
-  { to: '/discover', label: '发现', icon: Compass, end: false },
-  { to: '/mine', label: '我', icon: User, end: false },
+  { to: '/', label: '首页', icon: HomeIcon, end: true },
+  { to: '/publish', label: '发布', icon: PlusCircle, end: false },
+  { to: '/goods', label: '二手', icon: ShoppingBag, end: false },
+  { to: '/community', label: '社区', icon: MessageSquare, end: false },
+  { to: '/mine', label: '我的', icon: User, end: false }
 ]
 
 // 微信内置浏览器 / 弱网 / 隐私模式下 Supabase 偶尔会卡住。
@@ -36,6 +36,7 @@ export default function MobileLayout() {
   const loading = useStore(s => s.loading)
   const error = useStore(s => s.error)
   const init = useStore(s => s.init)
+  const unread = useStore(s => me ? s.notifications.filter(n => n.user_id === me.id && !n.read).length : 0)
   const [showSkip, setShowSkip] = useState(false)
 
   // 启动数据拉取（profiles / tasks / goods / posts / config 等）
@@ -89,18 +90,24 @@ export default function MobileLayout() {
       <div className="flex-1 overflow-y-auto no-scrollbar" style={{ paddingBottom: 48 }}>
         <Outlet />
       </div>
-      {/* 微信式底部固定导航：4 Tab */}
+      {/* 底部固定导航（永远展开，不再提供▼ 折叠按钮；栏高 48 + 图标 18 + 文字 10px，更贴底） */}
       <nav
-        className="fixed bottom-0 inset-x-0 mx-auto w-full max-w-[480px] h-14 bg-[#f7f7f7] border-t border-[#e5e5e5] flex items-stretch px-0 z-30"
+        className="fixed bottom-0 inset-x-0 mx-auto w-full max-w-[480px] h-12 bg-white border-t border-gray-100 flex items-center px-2 z-30"
         style={{ transform: 'translateY(0)' }}>
         {tabs.map(t => (
           <NavLink key={t.to} to={t.to} end={t.end}
-            className={({ isActive }) => 'flex-1 flex flex-col items-center justify-center gap-0.5 ' + (isActive ? 'wx-tab-active' : 'wx-tab-idle')}>
-            <t.icon size={22} strokeWidth={1.6} />
-            <span className="text-[10px] leading-none">{t.label}</span>
+            className={({ isActive }) => 'flex-1 flex flex-col items-center gap-0 py-1 ' + (isActive ? 'text-brand-600' : 'text-gray-400')}>
+            <t.icon size={18} strokeWidth={1.9} />
+            <span className="text-[10px] leading-none mt-0.5">{t.label}</span>
           </NavLink>
         ))}
       </nav>
+      {/* 浮动通知入口（贴着底部导航栏之上） */}
+      <button onClick={() => nav('/notifications')} className="fixed z-30 w-10 h-10 rounded-full bg-white shadow-card flex items-center justify-center text-brand-600"
+        style={{ bottom: 56, left: 12 }}>
+        <Bell size={18} strokeWidth={1.9} />
+        {unread > 0 && <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">{unread}</span>}
+      </button>
     </div>
   )
 }

@@ -34,7 +34,7 @@ import Money from './pages/Money'
 import About from './pages/About'
 
 // 手机 H5 模块（同一套 URL，由 ResponsiveShell 按设备决定套哪个壳）
-import MobileWechatHome from './pages/mobile/MobileWechatHome'
+import MobileHome from './pages/mobile/Home'
 import Splash from './pages/mobile/Splash'
 import Login from './pages/mobile/Login'
 import PublishTask from './pages/mobile/PublishTask'
@@ -51,10 +51,6 @@ import MyTasks from './pages/mobile/MyTasks'
 import AIHistory from './pages/mobile/AIHistory'
 import Wallet from './pages/mobile/Wallet'
 import Mine from './pages/mobile/Mine'
-import Contacts from './pages/mobile/Contacts'
-import Discover from './pages/mobile/Discover'
-import Chat from './pages/mobile/Chat'
-import Settings from './pages/mobile/Settings'
 
 // PC 管理后台（同一平台内的模块，自身响应式）
 import Dashboard from './pages/admin/Dashboard'
@@ -74,10 +70,10 @@ function ResponsiveShell() {
   return isMobile ? <MobileLayout /> : <Layout />
 }
 
-// 手机端首页改成微信式列表（每个功能做成一条会话）；PC 端首页保持原样
+// 手机端首页默认糖豆助手，PC 端首页保持原样
 function DeviceHome() {
   const isMobile = useIsMobile()
-  return isMobile ? <MobileWechatHome /> : <Home />
+  return isMobile ? <AITangdou /> : <Home />
 }
 
 export default function App() {
@@ -126,10 +122,6 @@ export default function App() {
       {/* 统一前台：同一套 URL，设备自适应切换手机壳 / 桌面壳 */}
       <Route element={<ResponsiveShell />}>
         <Route index element={<DeviceHome />} />
-        <Route path="contacts" element={<Contacts />} />
-        <Route path="discover" element={<Discover />} />
-        <Route path="settings" element={<Settings />} />
-        <Route path="chat/:type" element={<Chat />} />
         <Route path="splash" element={<Splash />} />
         <Route path="login" element={<Login />} />
         <Route path="publish" element={<PublishTask />} />

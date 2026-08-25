@@ -7,7 +7,6 @@
 // - 后续可升级为真实 Supabase Auth
 
 import { supabase } from './supabase'
-import { ADMIN_ACCOUNT } from './adminConfig'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   Profile, Task, Goods, Post, Comment, Message, WalletTxn, Withdrawal,
@@ -43,13 +42,6 @@ function ensureUserId(): string {
   return id
 }
 
-// 登录/注册成功后，把真实档案 id 写回 localStorage，使刷新/重进能恢复登录态。
-// 这是修复「明明登录了却每次都要重新登录」的关键：getCurrentUser 以 STORAGE_KEY
-// 为主键，若 key 仍是旧的游客 id，下次 init 就拉不到已登录用户。
-function persistUserId(id: string) {
-  try { localStorage.setItem(STORAGE_KEY, id) } catch { /* 隐私模式忽略 */ }
-}
-
 // 数据层映射：profiles 表的登录标识列历史命名为 phone（unique not null），
 // 应用层统一用 qq 表示「QQ 号」。仅在 db 层做转换，避免改动数据库结构。
 function rowToProfile(row: any): Profile {
@@ -63,23 +55,6 @@ function profileToRow(p: Partial<Profile>): Record<string, any> {
     delete row.qq
   }
   return row
-}
-
-// ===== 密码哈希（前端 SHA-256 + 随机盐，适合 Supabase 免费档无 pgcrypto 的现状）=====
-// 注意：这是「防明文泄露」级别，不是抗 GPU 暴力破解级别（无服务端 KDF）。
-// 真要上强度需 Supabase Auth / Argon2，当前演示级足够。
-function bufToHex(buf: ArrayBuffer): string {
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
-}
-function randomSalt(): string {
-  const arr = new Uint8Array(16)
-  crypto.getRandomValues(arr)
-  return bufToHex(arr.buffer)
-}
-export async function hashPassword(pwd: string, salt: string): Promise<string> {
-  const enc = new TextEncoder().encode(pwd + ':' + salt)
-  const digest = await crypto.subtle.digest('SHA-256', enc)
-  return bufToHex(digest)
 }
 
 // 本地兜底用户：网络彻底不通时也要让 UI 跑起来，不能一直卡在「加载中...」转圈
@@ -136,115 +111,38 @@ export function logoutUser() {
   localStorage.removeItem(STORAGE_KEY)
 }
 
-// 更新头像：前端已压缩成小尺寸 data URL，这里只负责写库并回传最新档案。
-// 写入失败（超时/网络）时返回 null，UI 端保留本地预览、不破坏登录态。
-export async function updateAvatar(userId: string, dataUrl: string): Promise<Profile | null> {
-  if (!supabase) return null
-  try {
-    const { data, error } = await withTimeout(
-      supabase.from('profiles').update({ avatar: dataUrl }).eq('id', userId).select().single(),
-      6000,
-      'updateAvatar'
-    )
-    if (error) return null
-    return rowToProfile(data)
-  } catch {
-    return null
-  }
-}
-
-// ===== 注册 / 登录（真密码系统，前端 SHA-256 + 盐）=====
-// 区分「游客」（qq 空、无密码）与「已注册用户」（qq 非空、有 pwd_hash）。
-//
-// registerUser: 普通用户注册。检 QQ 唯一 → 生成盐 → 存哈希。返回新档案。
-// signIn:       普通用户登录。查档案 → 验哈希。管理员（白名单）走代码常量密码分支，不查库。
-// 任何网络异常都回退本地兜底，UI 不卡死。
-
-export type AuthResult = { ok: true; profile: Profile } | { ok: false; error: string }
-
-export async function registerUser(qq: string, pwd: string): Promise<AuthResult> {
+// 真正的登录：把用户填的 QQ 号写入 profile（匿名游客默认 qq 为空，登录后才算「已登录」）
+// 用于区分「游客」与「已登录用户」——UI 以 me.qq 是否非空判断。
+export async function loginUser(qq: string, roleOverride?: Role): Promise<Profile> {
   const id = ensureUserId()
-  const salt = randomSalt()
-  const pwd_hash = await hashPassword(pwd, salt)
-  const nickname = qq.slice(0, 3) + '****' + qq.slice(-2)
-  const prof: Profile = { ...localGuest(id), qq, nickname, salt, pwd_hash, role: 'user' }
-  if (!supabase) return { ok: true, profile: prof } // 离线演示：本地存
+  const base = localGuest(id)
+  const nickname = qq ? qq.slice(0, 3) + '****' + qq.slice(-2) : base.nickname
+  const prof: Profile = { ...base, qq, nickname, role: roleOverride ?? base.role }
+  if (!supabase) return prof
 
   try {
-    // 查 QQ 是否已注册（profiles.phone unique）
-    const { data: exist } = await withTimeout(
-      supabase.from('profiles').select('id').eq('phone', qq).maybeSingle(),
-      6000, 'regCheck'
-    )
-    if (exist) return { ok: false, error: '该 QQ 号已注册，请直接登录' }
-
     const { data, error } = await withTimeout(
+      supabase.from('profiles').select('*').eq('id', id).single(),
+      6000, 'loginSelect'
+    )
+    if (!error && data) {
+      // 已有档案：补登 QQ 号 + 角色
+      const upd: Record<string, any> = { phone: qq }
+      if (roleOverride) upd.role = roleOverride
+      const { data: u } = await withTimeout(
+        supabase.from('profiles').update(upd).eq('id', id).select().single(),
+        6000, 'loginUpdate'
+      ).catch(() => ({ data: null as any }))
+      return u ? rowToProfile(u) : { ...rowToProfile(data), ...(roleOverride ? { role: roleOverride } : {}) }
+    }
+    // 没有档案：插入（带 QQ 号）
+    const ins = await withTimeout(
       supabase.from('profiles').insert(profileToRow(prof)).select().single(),
-      6000, 'regInsert'
-    )
-    if (error) return { ok: false, error: error.message || '注册失败，请重试' }
-    const profile = rowToProfile(data)
-    persistUserId(profile.id)   // 注册成功 → 写回 id，保持登录态
-    return { ok: true, profile }
-  } catch (e: any) {
-    return { ok: false, error: (e?.message || '注册超时，请重试') }
-  }
-}
-
-export async function signIn(qq: string, pwd: string): Promise<AuthResult> {
-  // 管理员白名单：代码常量密码（不查库）。命中即返回 role='admin' 的档案，可进后台。
-  // qq / 密码 / 固定主键全部来自 adminConfig.ts（单一来源）。
-  const { qq: ADMIN_QQ, password: ADMIN_PWD, id: ADMIN_ID } = ADMIN_ACCOUNT
-  if (qq === ADMIN_QQ && pwd === ADMIN_PWD) {
-    if (!supabase) {
-      const p: Profile = { ...localGuest(ADMIN_ID), qq: ADMIN_QQ, nickname: '管理员', role: 'admin' }
-      persistUserId(ADMIN_ID)
-      return { ok: true, profile: p }
-    }
-    // upsert 一条以 ADMIN_ID 为主键、phone=ADMIN_QQ 的管理员档案
-    // 这样无论之前 register 留下什么 id、role 是 user/admin，都会被刷新成 admin
-    try {
-      const prof: Profile = { ...localGuest(ADMIN_ID), qq: ADMIN_QQ, nickname: '管理员', role: 'admin' }
-      const { data, error } = await withTimeout(
-        supabase.from('profiles')
-          .upsert(profileToRow(prof), { onConflict: 'id' })
-          .select()
-          .single(),
-        6000, 'adminUpsert'
-      )
-      if (!error && data) {
-        const out = { ...rowToProfile(data), role: 'admin' } as Profile
-        persistUserId(out.id)
-        return { ok: true, profile: out }
-      }
-      // upsert 失败 / 网络问题：降级返回本地档案（依然 role='admin'）
-      persistUserId(ADMIN_ID)
-      return { ok: true, profile: { ...prof } }
-    } catch {
-      persistUserId(ADMIN_ID)
-      return { ok: true, profile: { ...localGuest(ADMIN_ID), qq: ADMIN_QQ, nickname: '管理员', role: 'admin' } as Profile }
-    }
-  }
-
-  if (!supabase) {
-    // 离线演示：本地兜底（无真密码校验）
-    return { ok: true, profile: { ...localGuest(ensureUserId()), qq } }
-  }
-  try {
-    const { data, error } = await withTimeout(
-      supabase.from('profiles').select('*').eq('phone', qq).maybeSingle(),
-      6000, 'signInSelect'
-    )
-    if (error || !data) return { ok: false, error: '账号不存在，请先注册' }
-    const prof = rowToProfile(data)
-    // 老账号 / 游客（pwd_hash 空）：放行（兼容历史数据，后续引导设密码）
-    if (!prof.pwd_hash) { persistUserId(prof.id); return { ok: true, profile: prof } }
-    const h = await hashPassword(pwd, prof.salt)
-    if (h !== prof.pwd_hash) return { ok: false, error: '密码错误' }
-    persistUserId(prof.id)   // 登录成功 → 写回 id，保持登录态
-    return { ok: true, profile: prof }
-  } catch (e: any) {
-    return { ok: false, error: (e?.message || '登录超时，请重试') }
+      6000, 'loginInsert'
+    ).catch(() => ({ data: null as any }))
+    return ins?.data ? rowToProfile(ins.data) : prof
+  } catch {
+    return prof
   }
 }
 

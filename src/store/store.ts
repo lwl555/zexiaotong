@@ -6,41 +6,6 @@ import type {
 } from '../lib/types'
 import * as db from '../lib/db'
 
-// 前端图片压缩：读取用户选中的图片文件，用 Canvas 缩到 maxSize 内，输出 JPEG data URL。
-// 目的：头像/上传图不直接把原图（几 MB）塞进数据库 text 列，压到 ≤ quality 体积。
-// 返回 null 表示非图片或读取失败，调用方应回退到原图或提示。
-export async function compressImageToDataUrl(
-  file: File,
-  maxSize = 256,
-  quality = 0.82
-): Promise<string | null> {
-  if (!file || !file.type.startsWith('image/')) return null
-  try {
-    const bitmap = await createImageBitmap(file)
-    let { width, height } = bitmap
-    const scale = Math.min(1, maxSize / Math.max(width, height))
-    width = Math.max(1, Math.round(width * scale))
-    height = Math.max(1, Math.round(height * scale))
-    const canvas = document.createElement('canvas')
-    canvas.width = width
-    canvas.height = height
-    const ctx = canvas.getContext('2d')
-    if (!ctx) { bitmap.close?.(); return null }
-    ctx.drawImage(bitmap, 0, 0, width, height)
-    bitmap.close?.()
-    // 循环降质直到体积可控（data URL 长度 ≈ 字节数 * 1.37）
-    let q = quality
-    let out = canvas.toDataURL('image/jpeg', q)
-    while (out.length > 42000 && q > 0.4) {
-      q -= 0.1
-      out = canvas.toDataURL('image/jpeg', q)
-    }
-    return out
-  } catch {
-    return null
-  }
-}
-
 const now = () => new Date().toISOString()
 const round = (n: number) => Math.round(n * 100) / 100
 
@@ -70,11 +35,8 @@ interface State {
   init: () => Promise<void>
 
   // 用户
-  register: (qq: string, pwd: string) => Promise<{ ok: boolean; msg: string }>
-  signIn: (qq: string, pwd: string) => Promise<{ ok: boolean; msg: string }>
   login: (qq?: string, role?: Role) => Promise<void>
   logout: () => void
-  updateProfile: (patch: Partial<Profile>) => Promise<void>
   switchRole: () => void
   getUser: (id: string) => Profile | undefined
   // 紧急兜底：网络长时间卡住时，用户手动把 me 切成本地游客，避免「加载中...」无限转
@@ -197,39 +159,14 @@ export const useStore = create<State>((set, get) => ({
   },
 
   // ─── 用户 ───
-  register: async (qq: string, pwd: string) => {
-    const res = await db.registerUser(qq, pwd)
-    if (res.ok) set({ me: res.profile })
-    return { ok: res.ok, msg: res.ok ? '注册成功' : res.error }
-  },
-
-  signIn: async (qq: string, pwd: string) => {
-    const res = await db.signIn(qq, pwd)
-    if (res.ok) set({ me: res.profile })
-    return { ok: res.ok, msg: res.ok ? '登录成功' : res.error }
-  },
-
-  // 兼容旧调用（管理员分支仍走这里：直接以白名单密码设置角色）
   login: async (qq = '', role?: Role) => {
-    const me = await db.registerUser(qq, 'legacy-no-pwd').then(r => r.ok ? r.profile : null)
-    if (me) set({ me: { ...me, role: role ?? me.role } })
+    const me = await db.loginUser(qq, role)
+    set({ me })
   },
 
   logout: () => {
     db.logoutUser()
     set({ me: null })
-  },
-
-  // 更新当前用户档案（如头像）。先乐观更新本地 me，再异步写库，失败不回滚（保留预览）。
-  updateProfile: async (patch) => {
-    const me = get().me
-    if (!me) return
-    const next = { ...me, ...patch }
-    set({ me: next })
-    if (patch.avatar !== undefined && me.id) {
-      const updated = await db.updateAvatar(me.id, patch.avatar)
-      if (updated) set({ me: { ...next, ...updated } })
-    }
   },
 
   // 网络长时间卡住 / Supabase 故障时，让用户手动跳出"加载中..."

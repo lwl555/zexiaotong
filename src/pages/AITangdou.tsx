@@ -448,12 +448,11 @@ export default function AITangdou() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const isMobile = useIsMobile()
 
-  // 启动时尝试恢复最近一条对话
+  // 启动时只刷新侧栏（历史可点开），不再自动 loadConv(convs[0])。
+  // 原因：用户每次退出再进，都想从清爽的欢迎页开始；若自动恢复历史，
+  // 旧的「抱歉，没有联网检索功能」之类的失败回复会被强塞出来，体验很差。
+  // 想继续上次对话的话，可以在欢迎页顶部的「继续上次对话」一键恢复。
   useEffect(() => {
-    const convs = getConversations().filter(c => c.pageKey === PAGE_KEY)
-    if (convs.length > 0) {
-      loadConv(convs[0])
-    }
     refreshSidebar()
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
   }, [])
@@ -922,6 +921,38 @@ export default function AITangdou() {
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           minHeight: '100%', padding: isMobile ? '40px 20px' : '40px 20px'
         }}>
+          {/* 继续上次对话：仅当存在历史且当前是空白态时显示（一键 loadConv）。 */}
+          {sidebarConvs.length > 0 && (() => {
+            const last = sidebarConvs[0]
+            const preview = last.messages.find(m => m.role === 'user')?.content?.slice(0, 18) || last.title || '上次对话'
+            return (
+              <button
+                onClick={() => loadConv(last)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: isMobile ? '7px 12px' : '8px 14px',
+                  marginBottom: isMobile ? 20 : 24,
+                  borderRadius: 999,
+                  border: '1px solid #e8e8e8',
+                  background: '#fff',
+                  fontSize: isMobile ? 12.5 : 13,
+                  color: '#1c1814',
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 2px rgba(0,0,0,.03)',
+                  transition: 'all .15s'
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = '#c2410c'; e.currentTarget.style.background = '#fafafa' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = '#e8e8e8'; e.currentTarget.style.background = '#fff' }}
+                onMouseDown={e => e.currentTarget.style.transform = 'scale(.97)'}
+                onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
+                onMouseLeaveCapture={e => e.currentTarget.style.transform = 'scale(1)'}
+              >
+                <MessageSquare size={isMobile ? 13 : 14} strokeWidth={1.9} color="#666" />
+                <span>继续上次对话：<span style={{ color: '#666' }}>{preview}…</span></span>
+                <span style={{ color: '#999', fontSize: isMobile ? 11 : 12 }}>· {new Date(last.updatedAt).toLocaleDateString('zh-CN')}</span>
+              </button>
+            )
+          })()}
           {!isMobile ? (
             /* PC端：豆包风 —— 大标题 + 双 tab + 推荐气泡 */
             <>

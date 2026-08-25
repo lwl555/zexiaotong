@@ -13,8 +13,6 @@ export interface Profile {
   frozen: number           // 冻结金额（发布任务冻结）
   status: UserStatus
   created_at: string
-  salt: string             // 密码盐（注册时生成，SHA-256(密码+salt) 存 pwd_hash）
-  pwd_hash: string         // 密码哈希（空串表示未设密码的游客/老账号）
 }
 
 // 任务状态机：open(待接单) -> accepted(已接单待交付) -> doing(进行中) -> review(待验收) -> done(完成)
