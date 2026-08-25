@@ -117,12 +117,11 @@ export default function MobileLayout() {
     )
   }
 
-  // 微信风顶栏：除首页 / 登录 / 引导页 外，所有功能页统一显示
-  // 「返回 + 首字头像 + 标题」，保证「点进去像微信聊天」的进入一致性。
-  // AI 聊天页（百事通/糖豆/导师/文档/避雷）也走这个全局顶栏，避免每个聊天页各自渲染一个顶栏
-  // 导致它出现在「描述+子频道」之后、位置不在最顶。
+  // 微信风顶栏：除首页 / 登录 / 引导页 / 糖豆（自带固定顶栏 z:50，会盖住全局）外，
+  // 所有功能页统一显示「返回 + 首字头像 + 标题」，保证「点进去像微信聊天」的进入一致性。
+  // AI 百事通走全局顶栏；糖豆改用自身的微信风顶栏（‹ 返回 | 糖豆 | ☰ 历史）。
   const path = loc.pathname
-  const showTopBar = !['/', '/splash', '/login'].includes(path)
+  const showTopBar = !['/', '/splash', '/login', '/ai-tangdou'].includes(path)
 
   return (
     <div className="app-shell flex flex-col" style={{ minHeight: '100vh' }}>

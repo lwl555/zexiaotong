@@ -6,11 +6,12 @@ import {
   MessageSquare, Search, PenLine, Table2, Globe, Image as ImageIcon,
   Clapperboard, Plus, User, Sparkles, Wand, Code2, Calculator,
   Lightbulb, Languages, Home, Bot, SquarePen, Square, X, Trash2,
-  Link2, Menu, ChevronDown
+  Link2, Menu, ChevronDown, ChevronLeft
 } from 'lucide-react'
 import {
   Conversation, StoredMsg, getConversations, upsertConversation, deleteConversation, newId
 } from '../lib/history'
+import { useNavigate } from 'react-router-dom'
 
 // ─── 提示词 ─────────────────────────────────────────────────────
 
@@ -447,6 +448,7 @@ export default function AITangdou() {
   const startRef = useRef<number>(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const isMobile = useIsMobile()
+  const nav = useNavigate()
 
   // 启动时只刷新侧栏（历史可点开），不再自动 loadConv(convs[0])。
   // 原因：用户每次退出再进，都想从清爽的欢迎页开始；若自动恢复历史，
@@ -1499,7 +1501,7 @@ export default function AITangdou() {
       background: isMobile ? '#f6f6f7' : '#fff',
       position: 'relative'  // 给 mobile 浮顶按钮条做定位锚
     }}>
-      {/* mobile：顶部状态栏 — 左 ☰ 历史 / 中 当前对话名（可点编辑）/ 右 留空 */}
+      {/* mobile：微信风顶栏 — 左 ‹ 返回首页 / 中 当前对话名（可点编辑）/ 右 ☰ 历史 */}
       {isMobile && (
         <div style={{
           position: 'absolute', top: 0, left: 0, right: 0, height: 44,
@@ -1507,13 +1509,13 @@ export default function AITangdou() {
           background: '#fff', borderBottom: '1px solid #f0f0f0',
           zIndex: 8, paddingLeft: 4, paddingRight: 4
         }}>
-          <button onClick={() => setHistoryOpen(true)} title="历史对话" style={{
+          <button onClick={() => nav('/')} title="返回首页" style={{
             border: 'none', background: 'transparent', cursor: 'pointer',
             width: 44, height: 44, color: '#1c1814',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             transition: 'transform .1s cubic-bezier(.4,0,.2,1)',
             transform: 'scale(1)'
-          }} onMouseDown={e => e.currentTarget.style.transform = 'scale(.9)'} onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}><Menu size={22} strokeWidth={2} /></button>
+          }} onMouseDown={e => e.currentTarget.style.transform = 'scale(.9)'} onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}><ChevronLeft size={22} strokeWidth={2} /></button>
           <div style={{
             flex: 1, minWidth: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center'
@@ -1535,7 +1537,7 @@ export default function AITangdou() {
                   }
                   if (e.key === 'Escape') setMobileTitleEditing(false)
                 }}
-                placeholder="新对话"
+                placeholder="糖豆"
                 style={{
                   width: '100%', maxWidth: 220, border: '1px solid #c2410c',
                   borderRadius: 6, padding: '4px 10px', fontSize: 14,
@@ -1549,7 +1551,7 @@ export default function AITangdou() {
                   setMobileTitleDraft(currentTitle)
                   setMobileTitleEditing(true)
                 }}
-                title={currentConvId ? '点击修改对话名' : '请先发起一次对话'}
+                title={currentConvId ? '点击修改对话名' : '糖豆'}
                 style={{
                   maxWidth: 240, fontSize: 14, fontWeight: 600, color: '#1c1814',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -1560,14 +1562,18 @@ export default function AITangdou() {
                 }}
                 onMouseEnter={e => { if (currentConvId) { e.currentTarget.style.background = '#f8f8f8'; e.currentTarget.style.borderColor = '#e8e8e8' } }}
                 onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent' }}>
-                {currentTitle || '新对话'}
+                {currentTitle || '糖豆'}
               </div>
             )}
           </div>
-          {/* 右侧 44px 占位（保持状态栏对称，符合 iOS/Android 原生导航栏） */}
-          <div style={{ width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {/* 暂不放任何按钮（避免重蹈"上方什么都不要有"的反复） */}
-          </div>
+          {/* 右侧：☰ 历史对话（移到右侧，符合微信「左返回、右功能」约定） */}
+          <button onClick={() => setHistoryOpen(true)} title="历史对话" style={{
+            border: 'none', background: 'transparent', cursor: 'pointer',
+            width: 44, height: 44, color: '#1c1814',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'transform .1s cubic-bezier(.4,0,.2,1)',
+            transform: 'scale(1)'
+          }} onMouseDown={e => e.currentTarget.style.transform = 'scale(.9)'} onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}><Menu size={22} strokeWidth={2} /></button>
         </div>
       )}
 
