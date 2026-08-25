@@ -408,15 +408,7 @@ export default function AIChat({
 
   return (
     <div className={`panel theme-${theme}${isMobile ? ' wx' : ''}`}>
-      {isMobile && (
-        <div className="wx-chat-bar">
-          <button aria-label="返回" className="wx-chat-back" onClick={() => nav('/')}>
-            <ChevronLeft size={22} strokeWidth={1.8} />
-          </button>
-          <WxAvatar {...av} size={30} />
-          <span className="wx-chat-title">{appName || title}</span>
-        </div>
-      )}
+      {/* 移动端微信风聊天顶栏由外层 MobileLayout 统一提供（保证在最顶部） */}
       <div className="panel-head">
         <span className="who">{title}</span>
         <button className="head-btn" onClick={newChat} title="清空当前对话，重新开始">

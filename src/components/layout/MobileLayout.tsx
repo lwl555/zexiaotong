@@ -7,6 +7,7 @@ import { avatarOf } from '../../lib/avatarMeta'
 
 // 各路由对应的微信风顶栏标题（与首页功能块保持一致）
 const ROUTE_TITLE: Record<string, string> = {
+  '/ai-search': 'AI百事通',
   '/ai-tangdou': '糖豆·学习搭子',
   '/ai-tutor': '学习导师',
   '/document-workshop': '文档工坊',
@@ -116,10 +117,12 @@ export default function MobileLayout() {
     )
   }
 
-  // 微信风顶栏：除首页 / 登录 / 引导页 / AI百事通(自带聊天顶栏) 外，所有功能页统一显示
+  // 微信风顶栏：除首页 / 登录 / 引导页 外，所有功能页统一显示
   // 「返回 + 首字头像 + 标题」，保证「点进去像微信聊天」的进入一致性。
+  // AI 聊天页（百事通/糖豆/导师/文档/避雷）也走这个全局顶栏，避免每个聊天页各自渲染一个顶栏
+  // 导致它出现在「描述+子频道」之后、位置不在最顶。
   const path = loc.pathname
-  const showTopBar = !['/', '/splash', '/login', '/ai-search'].includes(path)
+  const showTopBar = !['/', '/splash', '/login'].includes(path)
 
   return (
     <div className="app-shell flex flex-col" style={{ minHeight: '100vh' }}>
