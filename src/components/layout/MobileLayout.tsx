@@ -7,7 +7,7 @@ import { avatarOf } from '../../lib/avatarMeta'
 
 // 各路由对应的微信风顶栏标题（与首页功能块保持一致）
 const ROUTE_TITLE: Record<string, string> = {
-  '/ai-search': 'AI百事通',
+  '/ai-search': '百事通',
   '/ai-tangdou': '糖豆·学习搭子',
   '/ai-tutor': '学习导师',
   '/document-workshop': '文档工坊',

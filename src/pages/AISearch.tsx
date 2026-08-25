@@ -73,7 +73,7 @@ export default function AISearch() {
   return (
     <>
       <div className="page-head">
-        <h2>AI百事通</h2>
+        <h2>百事通</h2>
         <p>指定院校、城市或公司，AI 多维度拆解真实信息，优点 / 缺点 / 亮点 / 重点 用不同颜色标记，辅助你理性决策。对话会自动保存，可随时接着聊。</p>
       </div>
 
@@ -87,7 +87,7 @@ export default function AISearch() {
 
       <AIChat
         title={cur.label}
-        appName="AI百事通"
+        appName="百事通"
         systemPrompt={cur.prompt}
         placeholder={cur.placeholder}
         autoSearch

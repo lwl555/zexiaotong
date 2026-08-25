@@ -96,19 +96,58 @@ export default function Warnings() {
           ) : items.length === 0 ? (
             <div className="empty">还没有避雷记录，左边加第一条。</div>
           ) : (
-            <div className="list">
+            <div className="list" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {items.map((i) => (
-                <div key={i.id} className="item">
-                  <div className="top">
-                    <h4>{i.title}</h4>
-                    <span className="tag">{i.target_type === 'school' ? '院校' : '公司'}</span>
+                <div key={i.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  <div
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 10,
+                      background: '#9a7b5b',
+                      color: '#fff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 700,
+                      flexShrink: 0,
+                      fontSize: 16
+                    }}
+                  >
+                    ⚠
                   </div>
-                  <div className="body">{i.content}</div>
-                  <div className="foot">
-                    <span>{i.tags || '无标签'}</span>
-                    <span>·</span>
-                    <span>{new Date(i.created_at).toLocaleDateString()}</span>
-                    <span className="link-danger" onClick={() => del(i.id)}>删除</span>
+                  <div
+                    style={{
+                      flex: 1,
+                      background: '#fff',
+                      border: '1px solid rgba(0,0,0,.06)',
+                      borderRadius: 12,
+                      padding: '10px 12px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <span style={{ fontWeight: 600, color: '#1a1a1a' }}>{i.title}</span>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: '#9a7b5b',
+                          border: '1px solid rgba(154,123,91,.4)',
+                          borderRadius: 6,
+                          padding: '1px 6px'
+                        }}
+                      >
+                        {i.target_type === 'school' ? '院校' : '公司'}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 14, color: '#444', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{i.content}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 12, color: '#9ca3af' }}>
+                      <span>{i.tags || '无标签'}</span>
+                      <span>·</span>
+                      <span>{new Date(i.created_at).toLocaleDateString()}</span>
+                      <span style={{ marginLeft: 'auto', color: '#ef4444', cursor: 'pointer' }} onClick={() => del(i.id)}>
+                        删除
+                      </span>
+                    </div>
                   </div>
                 </div>
               ))}
