@@ -3,6 +3,7 @@ import { NavLink, useNavigate, Outlet, useLocation } from 'react-router-dom'
 import HistoryDrawer from './HistoryDrawer'
 import { primaryNav, moreNav, type NavDef } from '../lib/nav'
 import { Clock } from 'lucide-react'
+import { useStore } from '../store/store'
 
 export default function Layout() {
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -13,6 +14,12 @@ export default function Layout() {
   const nav = useNavigate()
   const loc = useLocation()
   const isTangdou = loc.pathname === '/ai-tangdou'
+
+  // PC 端也要拉用户态（手机端由 MobileLayout 拉，这里补上，否则 me 永远是 null → 永远无登录入口）
+  const me = useStore(s => s.me)
+  const init = useStore(s => s.init)
+  const isGuest = !me?.qq
+  useEffect(() => { init() }, [init])
 
   // 点外面关掉「更多」下拉
   useEffect(() => {
@@ -97,9 +104,20 @@ export default function Layout() {
             >
               <span className="ico"><Clock size={16} strokeWidth={1.9} /></span>历史
             </button>
-            <div className="avatar" onClick={() => nav('/about')} title="关于本站">
-              兄
-            </div>
+            {isGuest ? (
+              <button className="ghost-btn" onClick={() => nav('/login')}>
+                登录
+              </button>
+            ) : (
+              <div
+                className="avatar"
+                onClick={() => nav('/mine')}
+                title={me?.qq ? `QQ ${me.qq}` : '个人中心'}
+                style={{ cursor: 'pointer' }}
+              >
+                {(me?.nickname || me?.qq || '我').toString().slice(0, 1)}
+              </div>
+            )}
             <button
               className={'hamburger' + (menuOpen ? ' open' : '')}
               onClick={() => setMenuOpen((v) => !v)}

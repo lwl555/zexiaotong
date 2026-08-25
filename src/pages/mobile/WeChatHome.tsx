@@ -2,27 +2,41 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, Search, Plus, User } from 'lucide-react'
 import { useStore } from '../../store/store'
 
-// ===== 聊天列表（应用消息先用静态 mock，UI 骨架先到位） =====
-// 真实 AI 会话可以从 localStorage['zxt_conv_v1'] 读，按 channel 聚合到对应行；
-// 真实应用消息（资讯台/文档工坊/避雷/搞钱项目/择校社区）后端可补一个"频道订阅"表。
+// ===== 聊天列表：把平台「所有功能」以聊天行样式排在这里 =====
+// 头像统一黑白纯 UI（近黑底 + 白字），不再用彩色块。
+// 真实 AI 会话接入时，可把 localStorage['zxt_conv_v1'] 按 channel 聚合到对应行的最新消息。
 const channels: Array<{
   id: string
   name: string
   ch: string
-  bg: string
   lastMsg: string
   time: string
   unread: number
   to: string
 }> = [
-  { id: 'community',  name: '择校社区',   ch: '校', bg: '#c43a2a', lastMsg: '护考姐妹：26护考大纲已上传，点开看>>', time: '16:26', unread: 86, to: '/community' },
-  { id: 'baishitong', name: 'AI 百事通',  ch: '百', bg: '#3a8a3e', lastMsg: '百事通：查到上海交大2026招生章程，要发…',     time: '14:48', unread: 0,  to: '/ai-search' },
-  { id: 'tangdou',    name: '糖豆·学习搭子', ch: '豆', bg: '#6a4a8a', lastMsg: '糖豆：再来一组今天的复习卡？',                 time: '13:00', unread: 2,  to: '/ai-tangdou' },
-  { id: 'news',       name: '实时资讯台', ch: '讯', bg: '#c43a2a', lastMsg: '[应用消息] 今日3条快讯 · 志愿填报新动态',   time: '12:39', unread: 1,  to: '/community' },
-  { id: 'docs',       name: '文档工坊',   ch: '档', bg: '#1a5fa8', lastMsg: '[应用消息] 上次的志愿报告已生成',             time: '昨天', unread: 0,  to: '/document-workshop' },
-  { id: 'warnings',   name: '避雷清单',   ch: '!', bg: '#e89a3a', lastMsg: '[应用消息] 新增1所预警院校',                  time: '周五', unread: 0,  to: '/warnings' },
-  { id: 'money',      name: '搞钱项目',   ch: '钱', bg: '#c43a2a', lastMsg: '[应用消息] 今日第3单佣金已到账',              time: '周一', unread: 0,  to: '/money' },
+  // —— 智能助手（可对话的 AI）——
+  { id: 'baishitong', name: 'AI 百事通',    ch: '百', lastMsg: '查院校 · 问政策，随时开聊',        time: '14:48', unread: 0, to: '/ai-search' },
+  { id: 'tangdou',    name: '糖豆·学习搭子', ch: '豆', lastMsg: '复习卡已就绪，今天继续？',          time: '13:00', unread: 2, to: '/ai-tangdou' },
+  { id: 'tutor',      name: '学习导师',      ch: '导', lastMsg: '定制你的 1v1 学习路径',           time: '昨天',  unread: 0, to: '/ai-tutor' },
+  { id: 'docs',       name: '文档工坊',      ch: '档', lastMsg: '志愿报告已生成，可下载',            time: '昨天',  unread: 0, to: '/document-workshop' },
+  { id: 'warnings',   name: '避雷清单',      ch: '雷', lastMsg: '新增 1 所预警院校',                time: '周五',  unread: 0, to: '/warnings' },
+  { id: 'news',       name: '实时资讯台',    ch: '讯', lastMsg: '今日 3 条快讯 · 志愿新动态',        time: '12:39', unread: 1, to: '/community' },
+  // —— 社区与交易 ——
+  { id: 'community',  name: '择校社区',      ch: '校', lastMsg: '护考姐妹：26护考大纲已上传>>',       time: '16:26', unread: 86, to: '/community' },
+  { id: 'goods',      name: '二手市场',      ch: '旧', lastMsg: '最新闲置教材在售',                time: '11:20', unread: 0, to: '/goods' },
+  { id: 'tasks',      name: '任务大厅',      ch: '务', lastMsg: '新任务待认领，最高 ¥200',           time: '10:05', unread: 0, to: '/publish' },
+  // —— 账户与工具 ——
+  { id: 'money',      name: '搞钱项目',      ch: '钱', lastMsg: '今日第 3 单佣金已到账',             time: '周一',  unread: 0, to: '/money' },
+  { id: 'messages',   name: '消息中心',      ch: '信', lastMsg: '你有 3 条新私信',                  time: '09:30', unread: 3, to: '/messages' },
+  { id: 'notifications', name: '通知',       ch: '铃', lastMsg: '系统：志愿填报通道已开放',           time: '08:12', unread: 0, to: '/notifications' },
+  { id: 'ai-history', name: 'AI 历史',       ch: '历', lastMsg: '查看历史对话与查询记录',            time: '昨天',  unread: 0, to: '/ai-history' },
+  { id: 'wallet',     name: '我的钱包',      ch: '包', lastMsg: '余额 ¥328.50',                    time: '周一',  unread: 0, to: '/wallet' },
+  { id: 'mine',       name: '个人中心',      ch: '我', lastMsg: '管理账号 · 设置 · 登录',            time: '—',    unread: 0, to: '/mine' },
+  { id: 'about',      name: '关于择校通',    ch: '?', lastMsg: '真实 · 直接 · 不客气',               time: '—',    unread: 0, to: '/about' },
 ]
+
+// 黑白纯 UI 头像底色（统一，无彩色）
+const AVATAR_BG = '#1a1a1a'
 
 export default function WeChatHome() {
   const nav = useNavigate()
@@ -71,13 +85,13 @@ export default function WeChatHome() {
         </div>
       </div>
 
-      {/* 聊天会话列表（白底卡） */}
+      {/* 聊天会话列表（白底卡，全部功能按此样式排列） */}
       <div className="bg-white mt-1">
         {channels.map(c => (
           <button key={c.id} onClick={() => nav(c.to)}
             className="w-full flex items-center gap-3 px-3 py-2.5 border-b border-gray-100 active:bg-gray-50 text-left">
             <div className="relative w-12 h-12 rounded-lg flex items-center justify-center text-white text-lg font-bold flex-shrink-0"
-              style={{ background: c.bg }}>
+              style={{ background: AVATAR_BG }}>
               {c.ch}
               {c.unread > 0 && (
                 <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center font-medium">
