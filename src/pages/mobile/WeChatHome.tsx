@@ -172,7 +172,7 @@ export default function WeChatHome() {
             {g.items.map(c => (
               <button
                 key={c.id}
-                onClick={() => nav(c.to)}
+                onClick={() => nav('/m/notify/' + c.id)}
                 /* 行高 64px（py-3）+ 极淡分隔 + 标题 17px 紧排粗体；按压极淡橙底 */
                 className="w-full flex items-center gap-3 px-4 py-3 border-b text-left active:scale-[0.99] transition-transform"
                 style={{ borderColor: LINE, background: 'transparent' }}

@@ -3,7 +3,9 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { Home as HomeIcon, PlusCircle, ShoppingBag, MessageSquare, User, Bell, Users, Compass, Contact, ChevronLeft } from 'lucide-react'
 import { useStore } from '../../store/store'
 import WxAvatar from '../mobile/WxAvatar'
+import WxIcon from '../mobile/WxIcon'
 import { avatarOf } from '../../lib/avatarMeta'
+import { FEATURES } from '../../lib/featureChat'
 
 // 各路由对应的微信风顶栏标题（与首页功能块保持一致）
 const ROUTE_TITLE: Record<string, string> = {
@@ -122,6 +124,9 @@ export default function MobileLayout() {
   // AI 百事通走全局顶栏；糖豆改用自身的微信风顶栏（‹ 返回 | 糖豆 | ☰ 历史）。
   const path = loc.pathname
   const showTopBar = !['/', '/splash', '/login', '/ai-tangdou'].includes(path)
+  // 功能通知聊天页：顶栏显示该功能图标 + 名称（而非首字头像 + 路由标题）
+  const notifyMatch = path.match(/^\/m\/notify\/(.+)$/)
+  const notifyMeta = notifyMatch ? FEATURES[notifyMatch[1]] : undefined
 
   return (
     <div className="app-shell flex flex-col" style={{ minHeight: '100vh' }}>
@@ -138,8 +143,14 @@ export default function MobileLayout() {
             >
               <ChevronLeft size={22} strokeWidth={1.8} />
             </button>
-            <WxAvatar {...avatarOf(path)} size={30} />
-            <span className="text-[16px] font-semibold text-gray-900 truncate">{titleOf(path)}</span>
+            {notifyMeta ? (
+              <WxIcon icon={notifyMeta.icon} color={notifyMeta.color} size={30} />
+            ) : (
+              <WxAvatar {...avatarOf(path)} size={30} />
+            )}
+            <span className="text-[16px] font-semibold text-gray-900 truncate">
+              {notifyMeta ? notifyMeta.name : titleOf(path)}
+            </span>
           </div>
         )}
         <Outlet />

@@ -1,7 +1,7 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, ListChecks, ShoppingBag, MessageSquare, Gavel,
-  Wallet, Settings2, Shield, ArrowLeft, Lock
+  Wallet, Settings2, Shield, ArrowLeft, Lock, Bell
 } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { useMe } from '../../store/useMe'
@@ -14,6 +14,7 @@ const menu = [
   { to: '/admin/posts', label: '帖子审核', icon: MessageSquare },
   { to: '/admin/arbitration', label: '订单与仲裁', icon: Gavel },
   { to: '/admin/withdraw', label: '提现审核', icon: Wallet },
+  { to: '/admin/feature-chats', label: '功能反馈', icon: Bell },
   { to: '/admin/config', label: '运营配置', icon: Settings2 },
   { to: '/admin/system', label: '系统安全', icon: Shield }
 ]

@@ -51,6 +51,7 @@ import MyTasks from './pages/mobile/MyTasks'
 import AIHistory from './pages/mobile/AIHistory'
 import Wallet from './pages/mobile/Wallet'
 import Mine from './pages/mobile/Mine'
+import FeatureNotify from './pages/mobile/FeatureNotify'
 
 // PC 管理后台（同一平台内的模块，自身响应式）
 import Dashboard from './pages/admin/Dashboard'
@@ -62,6 +63,7 @@ import Arbitration from './pages/admin/Arbitration'
 import Withdraw from './pages/admin/Withdraw'
 import Config from './pages/admin/Config'
 import System from './pages/admin/System'
+import FeatureChats from './pages/admin/FeatureChats'
 
 // 设备自适应壳：检测到手机就套 H5 手机壳（底栏），否则套桌面壳（顶栏）。
 // 同一套 URL、同一套功能，只是外壳不同——这就是「一个平台」。
@@ -116,6 +118,7 @@ export default function App() {
         <Route path="arbitration" element={<Arbitration />} />
         <Route path="withdraw" element={<Withdraw />} />
         <Route path="config" element={<Config />} />
+        <Route path="feature-chats" element={<FeatureChats />} />
         <Route path="system" element={<System />} />
       </Route>
 
@@ -138,6 +141,8 @@ export default function App() {
         <Route path="ai-history" element={<AIHistory />} />
         <Route path="wallet" element={<Wallet />} />
         <Route path="mine" element={<Mine />} />
+        {/* 功能通知聊天层：首页每个功能块点进去先到这里，再「打开完整功能」 */}
+        <Route path="m/notify/:id" element={<FeatureNotify />} />
         {/* 原桌面 AI 功能：手机端也走同一 URL，在手机壳里渲染 */}
         <Route path="ai-search" element={<AISearch />} />
         <Route path="ai-tangdou" element={<AITangdou />} />
