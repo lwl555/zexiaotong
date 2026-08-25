@@ -1,8 +1,28 @@
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, Search, Plus, User } from 'lucide-react'
 import { useStore } from '../../store/store'
-import WxAvatar from '../../components/mobile/WxAvatar'
+import WxIcon from '../../components/mobile/WxIcon'
 import { avatarOf } from '../../lib/avatarMeta'
+
+// 块 id → 纯 UI 矢量图标（与 WxIcon 注册表对应；首页作用范围限定）
+const HOME_ICON: Record<string, string> = {
+  baishitong: 'search',
+  tangdou: 'chat',
+  tutor: 'cap',
+  docs: 'doc',
+  warnings: 'bolt',
+  news: 'news',
+  community: 'users',
+  goods: 'bag',
+  tasks: 'clipboard',
+  money: 'yuan',
+  messages: 'mail',
+  notifications: 'bell',
+  'ai-history': 'clock',
+  wallet: 'wallet',
+  mine: 'user',
+  about: 'info',
+}
 
 // ===== 配色（得物式：黑白灰主调 + 活力橙唯一强调色）=====
 // 微信绿仅保留在底栏 4 Tab（微信骨架约定），本页强调色统一为活力橙。
@@ -160,8 +180,8 @@ export default function WeChatHome() {
                 onMouseUp={(e) => (e.currentTarget.style.background = 'transparent')}
                 onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
               >
-                {/* 微信风首字头像：按功能分类取克制色，避免 emoji / 彩色 AI 模板感 */}
-                <WxAvatar {...avatarOf(c.to)} size={46} />
+                {/* 纯 UI 矢量图标：分类色圆角方块 + 白色线性图标（零外链、无生成不确定性） */}
+                <WxIcon icon={HOME_ICON[c.id] ?? 'search'} color={avatarOf(c.to).color} size={46} />
                 <div className="flex-1 min-w-0 pr-2 pl-1">
                   <div
                     className="text-[17px] font-semibold truncate"
