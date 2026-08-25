@@ -2,15 +2,6 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, Search, Plus, User } from 'lucide-react'
 import { useStore } from '../../store/store'
 
-// ===== 顶部 5 个 AI 工具卡（横滑；点击跳对应模块） =====
-const tools = [
-  { id: 'baishitong', label: '百事通', ch: '百', bg: '#3a8a3e', to: '/ai-search' },
-  { id: 'tangdou',    label: '糖豆',   ch: '豆', bg: '#6a4a8a', to: '/ai-tangdou' },
-  { id: 'news',       label: '资讯台', ch: '讯', bg: '#1a5fa8', to: '/community' },
-  { id: 'docs',       label: '文档工坊', ch: '档', bg: '#8a4a6a', to: '/document-workshop' },
-  { id: 'warnings',   label: '避雷',   ch: '!', bg: '#c43a2a', to: '/warnings' },
-]
-
 // ===== 聊天列表（应用消息先用静态 mock，UI 骨架先到位） =====
 // 真实 AI 会话可以从 localStorage['zxt_conv_v1'] 读，按 channel 聚合到对应行；
 // 真实应用消息（资讯台/文档工坊/避雷/搞钱项目/择校社区）后端可补一个"频道订阅"表。
@@ -80,35 +71,8 @@ export default function WeChatHome() {
         </div>
       </div>
 
-      {/* 副标题：状态指示 + 文案 */}
-      <div className="px-4 pt-2 pb-1 flex items-center gap-1.5 text-[11px] text-gray-500">
-        <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#3a8a3e' }} />
-        <span>学习季·AI已更新2026招生数据</span>
-      </div>
-
-      {/* AI 工具横滑 */}
-      <div className="px-2 py-2 overflow-x-auto no-scrollbar">
-        <div className="flex gap-2">
-          {tools.map(t => (
-            <button key={t.id} onClick={() => nav(t.to)}
-              className="flex-shrink-0 w-14 flex flex-col items-center gap-1 active:scale-95 transition">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white text-base font-bold shadow-sm"
-                style={{ background: t.bg }}>
-                {t.ch}
-              </div>
-              <span className="text-[11px] text-gray-700">{t.label}</span>
-            </button>
-          ))}
-          <button onClick={() => nav('/about')} className="flex-shrink-0 w-14 flex flex-col items-center gap-1 active:scale-95 transition">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white text-2xl font-light shadow-sm"
-              style={{ background: '#e89a3a' }}>+</div>
-            <span className="text-[11px] text-gray-700">更多</span>
-          </button>
-        </div>
-      </div>
-
       {/* 聊天会话列表（白底卡） */}
-      <div className="bg-white">
+      <div className="bg-white mt-1">
         {channels.map(c => (
           <button key={c.id} onClick={() => nav(c.to)}
             className="w-full flex items-center gap-3 px-3 py-2.5 border-b border-gray-100 active:bg-gray-50 text-left">
