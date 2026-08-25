@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Search, Plus } from 'lucide-react'
+import { ChevronLeft, Search, Plus, User } from 'lucide-react'
+import { useStore } from '../../store/store'
 
 // ===== 顶部 5 个 AI 工具卡（横滑；点击跳对应模块） =====
 const tools = [
@@ -34,19 +35,40 @@ const channels: Array<{
 
 export default function WeChatHome() {
   const nav = useNavigate()
+  const me = useStore(s => s.me)
+  const isGuest = !me?.qq
 
   return (
     <div style={{ background: '#ededed', minHeight: '100%' }}>
       {/* 顶部导航 */}
       <div className="sticky top-0 z-20 flex items-center justify-between px-3 h-12 border-b border-gray-200" style={{ background: '#ededed' }}>
-        <button
-          aria-label="折叠"
-          className="w-9 h-9 flex items-center justify-center text-gray-500 active:bg-gray-200 rounded-full"
-          onClick={() => nav('/splash')}>
-          <span className="text-lg leading-none">«</span>
-        </button>
+        {/* 左：游客→返回引导页(可登录)；已登录→我的 */}
+        {isGuest ? (
+          <button
+            aria-label="折叠"
+            className="w-9 h-9 flex items-center justify-center text-gray-500 active:bg-gray-200 rounded-full"
+            onClick={() => nav('/splash')}>
+            <span className="text-lg leading-none">«</span>
+          </button>
+        ) : (
+          <button
+            aria-label="我的"
+            className="w-9 h-9 flex items-center justify-center text-gray-500 active:bg-gray-200 rounded-full"
+            onClick={() => nav('/mine')}>
+            <User size={20} />
+          </button>
+        )}
         <div className="text-base font-semibold text-gray-900">择校通</div>
         <div className="flex items-center gap-1">
+          {/* 游客态显示登录入口（微信绿），与之前信息流首页一致 */}
+          {isGuest && (
+            <button
+              onClick={() => nav('/login')}
+              className="px-3 h-8 rounded-full text-[13px] font-medium text-white active:scale-95 transition"
+              style={{ background: '#07c160' }}>
+              登录
+            </button>
+          )}
           <button aria-label="搜索" className="w-9 h-9 flex items-center justify-center text-gray-500 active:bg-gray-200 rounded-full"
             onClick={() => nav('/ai-search')}>
             <Search size={20} />
