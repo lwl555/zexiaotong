@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { Home as HomeIcon, PlusCircle, ShoppingBag, MessageSquare, User, Bell } from 'lucide-react'
+import { Home as HomeIcon, PlusCircle, ShoppingBag, MessageSquare, User, Bell, Users, Compass, Contact } from 'lucide-react'
 import { useStore } from '../../store/store'
 
+// 微信风格底部 4 Tab（微信绿 #07c160）
+const WECHAT_GREEN = '#07c160'
 const tabs = [
-  { to: '/', label: '首页', icon: HomeIcon, end: true },
-  { to: '/publish', label: '发布', icon: PlusCircle, end: false },
-  { to: '/goods', label: '二手', icon: ShoppingBag, end: false },
-  { to: '/community', label: '社区', icon: MessageSquare, end: false },
-  { to: '/mine', label: '我的', icon: User, end: false }
+  { to: '/', label: '微信', icon: MessageSquare, end: true },
+  { to: '/community', label: '通讯录', icon: Users, end: false },
+  { to: '/money', label: '发现', icon: Compass, end: false },
+  { to: '/mine', label: '我', icon: User, end: false }
 ]
 
 // 微信内置浏览器 / 弱网 / 隐私模式下 Supabase 偶尔会卡住。
@@ -90,24 +91,26 @@ export default function MobileLayout() {
       <div className="flex-1 overflow-y-auto no-scrollbar" style={{ paddingBottom: 48 }}>
         <Outlet />
       </div>
-      {/* 底部固定导航（永远展开，不再提供▼ 折叠按钮；栏高 48 + 图标 18 + 文字 10px，更贴底） */}
+      {/* 底部固定导航：微信风格 4 Tab（微信绿高亮） */}
       <nav
         className="fixed bottom-0 inset-x-0 mx-auto w-full max-w-[480px] h-12 bg-white border-t border-gray-100 flex items-center px-2 z-30"
         style={{ transform: 'translateY(0)' }}>
         {tabs.map(t => (
           <NavLink key={t.to} to={t.to} end={t.end}
-            className={({ isActive }) => 'flex-1 flex flex-col items-center gap-0 py-1 ' + (isActive ? 'text-brand-600' : 'text-gray-400')}>
-            <t.icon size={18} strokeWidth={1.9} />
+            className={({ isActive }) => 'flex-1 flex flex-col items-center gap-0 py-1 ' + (isActive ? 'text-[#07c160]' : 'text-gray-400')}>
+            <t.icon size={20} strokeWidth={1.6} />
             <span className="text-[10px] leading-none mt-0.5">{t.label}</span>
           </NavLink>
         ))}
       </nav>
-      {/* 浮动通知入口（贴着底部导航栏之上） */}
-      <button onClick={() => nav('/notifications')} className="fixed z-30 w-10 h-10 rounded-full bg-white shadow-card flex items-center justify-center text-brand-600"
-        style={{ bottom: 56, left: 12 }}>
-        <Bell size={18} strokeWidth={1.9} />
-        {unread > 0 && <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">{unread}</span>}
-      </button>
+      {/* 浮动通知入口（贴着底部导航栏之上右侧，避免与 Tab 重叠） */}
+      {unread > 0 && (
+        <button onClick={() => nav('/notifications')} className="fixed z-30 w-10 h-10 rounded-full bg-white shadow-card flex items-center justify-center text-[#07c160]"
+          style={{ bottom: 56, right: 12 }}>
+          <Bell size={18} strokeWidth={1.9} />
+          <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">{unread}</span>
+        </button>
+      )}
     </div>
   )
 }

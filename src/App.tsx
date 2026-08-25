@@ -34,7 +34,7 @@ import Money from './pages/Money'
 import About from './pages/About'
 
 // 手机 H5 模块（同一套 URL，由 ResponsiveShell 按设备决定套哪个壳）
-import MobileHome from './pages/mobile/Home'
+import WeChatHome from './pages/mobile/WeChatHome'
 import Splash from './pages/mobile/Splash'
 import Login from './pages/mobile/Login'
 import PublishTask from './pages/mobile/PublishTask'
@@ -70,10 +70,10 @@ function ResponsiveShell() {
   return isMobile ? <MobileLayout /> : <Layout />
 }
 
-// 手机端首页为 MobileHome（搜索+AI工具卡+任务/二手/社区），PC 端为原 Home
+// 手机端首页用微信聊天列表界面，PC 端首页保持原样
 function DeviceHome() {
   const isMobile = useIsMobile()
-  return isMobile ? <MobileHome /> : <Home />
+  return isMobile ? <WeChatHome /> : <Home />
 }
 
 export default function App() {
