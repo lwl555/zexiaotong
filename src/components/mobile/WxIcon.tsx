@@ -1,5 +1,5 @@
-// 纯 UI 矢量图标：每个功能一个线性图标，白色描边置于分类色圆角方块内。
-// 与 WxAvatar 共用圆角方块形态，区别是内部用图标替代首字 —— 视觉更完整、零外链、无生成不确定性。
+// 纯原生 UI 矢量图标：每个功能一个线性图标，置于纯白圆角方块内、深色线框（中性 #1f1f1f）。
+// 不依赖分类色，去掉 AI 套路化的彩色方块；加一道极淡描边以在白行中区分。
 // 仅在首页功能块使用（作用范围限定为首页，见决策记录）。
 import type { ReactNode } from 'react'
 
@@ -120,18 +120,17 @@ const ICONS: Record<string, ReactNode> = {
     <>
       <circle cx="12" cy="12" r="9" />
       <line x1="12" y1="11" x2="12" y2="16" />
-      <circle cx="12" cy="8" r="0.9" fill="#fff" stroke="none" />
+      <circle cx="12" cy="8" r="0.9" fill="#1f1f1f" stroke="none" />
     </>
   ),
 }
 
 interface Props {
   icon: string
-  color: string
   size?: number
 }
 
-export default function WxIcon({ icon, color, size = 44 }: Props) {
+export default function WxIcon({ icon, size = 44 }: Props) {
   const pad = Math.round(size * 0.27)
   return (
     <div
@@ -139,8 +138,9 @@ export default function WxIcon({ icon, color, size = 44 }: Props) {
       style={{
         width: size,
         height: size,
-        background: color,
-        borderRadius: Math.round(size * 0.18),
+        background: '#ffffff',
+        border: '1px solid rgba(0,0,0,0.08)',
+        borderRadius: Math.round(size * 0.2),
       }}
     >
       <svg
@@ -148,7 +148,7 @@ export default function WxIcon({ icon, color, size = 44 }: Props) {
         height={size - pad * 2}
         viewBox="0 0 24 24"
         fill="none"
-        stroke="#fff"
+        stroke="#1f1f1f"
         strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"

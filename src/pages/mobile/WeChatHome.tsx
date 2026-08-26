@@ -1,8 +1,7 @@
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Search, Plus, User } from 'lucide-react'
+import { Search, Plus, User } from 'lucide-react'
 import { useStore } from '../../store/store'
 import WxIcon from '../../components/mobile/WxIcon'
-import { avatarOf } from '../../lib/avatarMeta'
 
 // 块 id → 纯 UI 矢量图标（与 WxIcon 注册表对应；首页作用范围限定）
 const HOME_ICON: Record<string, string> = {
@@ -180,8 +179,8 @@ export default function WeChatHome() {
                 onMouseUp={(e) => (e.currentTarget.style.background = 'transparent')}
                 onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
               >
-                {/* 纯 UI 矢量图标：分类色圆角方块 + 白色线性图标（零外链、无生成不确定性） */}
-                <WxIcon icon={HOME_ICON[c.id] ?? 'search'} color={avatarOf(c.to).color} size={46} />
+                {/* 纯原生 UI 图标：纯白圆角方块 + 中性深色线框图标（非 AI 彩色方块） */}
+                <WxIcon icon={HOME_ICON[c.id] ?? 'search'} size={46} />
                 <div className="flex-1 min-w-0 pr-2 pl-1">
                   <div
                     className="text-[17px] font-semibold truncate"
