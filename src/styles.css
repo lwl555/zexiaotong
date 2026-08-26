@@ -1066,7 +1066,7 @@ textarea { resize: vertical; min-height: 88px; }
 
 /* 移动端 AIChat 微信气泡：用户绿底白字靠右，AI 白底靠左；隐藏原 panel-head 与角色标签 */
 .wx .panel-head { display: none; }
-.wx .panel { border: 0; box-shadow: none; background: transparent; border-radius: 0; overflow: visible; }
+.wx.panel, .panel.wx { border: 0; box-shadow: none; background: transparent; border-radius: 0; overflow: visible; }
 .wx .panel-body { padding: 12px 12px 8px; }
 .wx .msg { margin-bottom: 14px; }
 .wx .msg.user { justify-content: flex-end; }
