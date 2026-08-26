@@ -1086,3 +1086,9 @@ textarea { resize: vertical; min-height: 88px; }
   .app-shell .page-head h2 { display: none; }
   .app-shell .page-head { margin-bottom: 10px; }
 }
+
+/* 移动端聊天初始提示块 / 示例胶囊：降调为中性灰，去 AI bot 彩色感，贴近微信系统提示 */
+.wx .note { background: #f2f2f2; border-color: rgba(0,0,0,0.08); color: #666; }
+.wx .note-sub { color: #999; }
+.wx .chip { background: #f2f2f2; color: #333; border-color: rgba(0,0,0,0.08); }
+.wx .chip:hover { background: #ebebeb; }

@@ -1497,8 +1497,8 @@ export default function AITangdou() {
     <div style={{
       flex: 1, display: 'flex', flexDirection: 'column',
       minWidth: 0, height: '100%',
-      // mobile：整页浅灰底（对齐豆包/元宝空状态），彻底去掉"顶部一排白"；PC 维持白底
-      background: isMobile ? '#f6f6f7' : '#fff',
+      // mobile：整页微信原生浅灰底（对齐微信聊天背景），彻底去掉"顶部一排白"；PC 维持白底
+      background: isMobile ? '#ededed' : '#fff',
       position: 'relative'  // 给 mobile 浮顶按钮条做定位锚
     }}>
       {/* mobile：微信风顶栏 — 左 ‹ 返回首页 / 中 当前对话名（可点编辑）/ 右 ☰ 历史 */}
@@ -1602,7 +1602,7 @@ export default function AITangdou() {
       bottom: isMobile ? 40 : 0,
       display: 'flex',
       flexDirection: isMobile ? 'column' : 'row',
-      background: isMobile ? '#f6f6f7' : '#fff',
+      background: isMobile ? '#ededed' : '#fff',
       zIndex: isMobile ? 50 : 100,
       overflow: 'hidden'
     }}>

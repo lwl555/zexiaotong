@@ -39,7 +39,7 @@ function titleOf(path: string): string {
 // 微信风格底部 4 Tab（微信绿 #07c160）
 const WECHAT_GREEN = '#07c160'
 const tabs = [
-  { to: '/', label: '微信', icon: MessageSquare, end: true },
+  { to: '/', label: '首页', icon: MessageSquare, end: true },
   { to: '/community', label: '通讯录', icon: Users, end: false },
   { to: '/money', label: '发现', icon: Compass, end: false },
   { to: '/mine', label: '我', icon: User, end: false }
@@ -129,7 +129,7 @@ export default function MobileLayout() {
   const notifyMeta = notifyMatch ? FEATURES[notifyMatch[1]] : undefined
 
   return (
-    <div className="app-shell flex flex-col" style={{ minHeight: '100vh' }}>
+    <div className="app-shell flex flex-col" style={{ minHeight: '100vh', background: '#ededed' }}>
       <div className="flex-1 overflow-y-auto no-scrollbar" style={{ paddingBottom: 48 }}>
         {showTopBar && (
           <div

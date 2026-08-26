@@ -103,7 +103,7 @@ export default function WeChatHome() {
       {/* ===== 顶部导航 ===== */}
       <div
         className="sticky top-0 z-20 flex items-center justify-between px-2 h-12 border-b"
-        style={{ background: '#f4f4f5', borderColor: LINE }}
+        style={{ background: '#ededed', borderColor: LINE }}
       >
         {isGuest ? (
           <button
@@ -208,13 +208,13 @@ export default function WeChatHome() {
             ))}
 
             {/* 段尾呼吸白条，最后一段去掉 */}
-            {gi < GROUPS.length - 1 && <div className="h-3" style={{ background: '#f4f4f5' }} />}
+            {gi < GROUPS.length - 1 && <div className="h-3" style={{ background: '#ededed' }} />}
           </div>
         ))}
       </div>
 
       {/* 列表底部留白，避免被 4 Tab 导航(h-12=48px)遮住 */}
-      <div className="h-20" style={{ background: '#f4f4f5' }} />
+      <div className="h-20" style={{ background: '#ededed' }} />
     </div>
   )
 }
