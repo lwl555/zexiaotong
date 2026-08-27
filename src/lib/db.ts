@@ -657,3 +657,44 @@ export async function reviewPass(taskId: string) {
     content: `「${task.title}」已结算，收入 ¥${net}`
   })
 }
+
+// ─── 管理员用户操作（真实删除 / 冻结 / 解冻 / 列出）────────────────────
+// 走 admin-users Edge Function（service_role 绕过 RLS，后端校验操作者 admin 身份）。
+// 任何失败都会抛出可读错误，由调用方（UI）捕获后 toast 提示。
+
+type AdminAction = 'list' | 'freeze' | 'unfreeze' | 'delete'
+
+async function adminInvoke(action: AdminAction, payload: Record<string, any> = {}) {
+  if (!supabase) throw new Error('未连接到数据库')
+  const { data, error } = await withTimeout(
+    supabase.functions.invoke('admin-users', { body: { action, ...payload } }),
+    12000,
+    'adminUsers'
+  )
+  if (error) throw new Error(error.message || '管理员操作请求失败')
+  if (data && (data as any).error) throw new Error((data as any).error)
+  return data as any
+}
+
+// 列出用户（分页，page 从 0 开始）
+export async function adminListUsers(page = 0): Promise<Profile[]> {
+  const data = await adminInvoke('list', { page })
+  const rows = (data?.users || []) as any[]
+  // function 直接返回 PG 行（phone 即 QQ 号），这里映射到应用层 qq 字段
+  return rows.map((r) => ({ ...r, qq: r.phone || '', password_hash: undefined })) as Profile[]
+}
+
+// 冻结账号（status -> 'banned'）
+export async function adminFreezeUser(operatorId: string, targetId: string): Promise<void> {
+  await adminInvoke('freeze', { operator_id: operatorId, target_id: targetId })
+}
+
+// 解冻账号（status -> 'active'）
+export async function adminUnfreezeUser(operatorId: string, targetId: string): Promise<void> {
+  await adminInvoke('unfreeze', { operator_id: operatorId, target_id: targetId })
+}
+
+// 真实删除账号（连同其任务/商品/帖子/消息/流水等一并删除）
+export async function adminDeleteUser(operatorId: string, targetId: string): Promise<void> {
+  await adminInvoke('delete', { operator_id: operatorId, target_id: targetId })
+}
