@@ -46,7 +46,7 @@ export default function Messages() {
   if (!peerId) {
     return (
       <div className="px-4 pt-3 pb-10">
-        <h1 className="text-xl font-black text-ink mb-4">私信</h1>
+        <h1 className="text-[18px] font-bold text-ink mb-4">私信</h1>
         <div className="space-y-1">
           {convs.length === 0 && <div className="text-center text-gray-400 text-sm py-16">暂无会话</div>}
           {convs.map(c => {

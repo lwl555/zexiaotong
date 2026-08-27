@@ -46,11 +46,11 @@ export default function Wallet() {
         </div>
       )}
 
-      <h1 className="text-xl font-black text-ink mb-4">我的钱包</h1>
+      <h1 className="text-[18px] font-bold text-ink mb-4">我的钱包</h1>
 
       <div className="card p-5 bg-gradient-to-br from-brand-500 to-brand-700 text-white">
         <div className="text-sm opacity-80">账户余额</div>
-        <div className="text-3xl font-black mt-1">¥{me.balance.toFixed(2)}</div>
+        <div className="text-2xl font-black mt-1">¥{me.balance.toFixed(2)}</div>
         <div className="flex justify-between text-xs opacity-80 mt-4">
           <span>冻结 ¥{me.frozen.toFixed(2)}</span>
           <span>可用 ¥{usable.toFixed(2)}</span>

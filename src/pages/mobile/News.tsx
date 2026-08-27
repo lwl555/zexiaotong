@@ -13,7 +13,7 @@ export default function News() {
   return (
     <div className="px-4 pt-3 pb-4">
       <div className="flex items-center justify-between mb-3">
-        <h1 className="text-xl font-black text-ink">实时资讯台</h1>
+        <h1 className="text-[18px] font-bold text-ink">实时资讯台</h1>
         <button onClick={() => nav('/community')} className="text-sm text-brand-600 bg-brand-50 px-3 py-1.5 rounded-full">
           去社区 ›
         </button>
@@ -25,7 +25,7 @@ export default function News() {
         {list.map(p => (
           <div key={p.id} className="card p-4">
             {p.images?.[0] && (
-              <img src={p.images[0]} className="w-full h-40 object-cover rounded-xl mb-3 bg-gray-100" alt="" />
+              <img src={p.images[0]} className="w-full h-32 object-cover rounded-xl mb-3 bg-gray-100" alt="" />
             )}
             <div
               className="font-black text-[15px] text-ink leading-snug"

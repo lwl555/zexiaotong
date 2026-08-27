@@ -60,10 +60,10 @@ export default function TaskDetail() {
     <div className="px-4 pt-3 pb-10">
       <button onClick={() => nav(-1)} className="text-gray-400 mb-2">‹ 返回</button>
 
-      {task.images[0] && <img src={task.images[0]} className="w-full h-44 object-cover rounded-2xl mb-3" alt="" />}
+      {task.images[0] && <img src={task.images[0]} className="w-full h-36 object-cover rounded-2xl mb-3" alt="" />}
 
       <div className="flex items-start justify-between gap-2">
-        <h1 className="text-xl font-black text-ink leading-snug">{task.title}</h1>
+        <h1 className="text-[18px] font-bold text-ink leading-snug">{task.title}</h1>
         {task.top_until && <span className="tag bg-clay/10 text-clay shrink-0"><Pin size={11} /> 置顶</span>}
       </div>
 
@@ -73,7 +73,7 @@ export default function TaskDetail() {
         <span className="text-xs text-gray-400 flex items-center gap-1"><Clock size={12} /> {task.deadline ? new Date(task.deadline).toLocaleString('zh-CN') : ''}</span>
       </div>
 
-      <div className="text-brand-600 font-black text-2xl my-4">¥{task.amount}
+      <div className="text-brand-600 font-black text-xl my-4">¥{task.amount}
         <span className="text-xs text-gray-400 font-normal ml-2">{(() => { const c = useStore.getState().config; return c ? `平台抽佣 ${Math.round(c.commission_rate * 100)}%` : '' })()}</span>
       </div>
 

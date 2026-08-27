@@ -172,23 +172,23 @@ export default function WeChatHome() {
               <button
                 key={c.id}
                 onClick={() => nav('/m/notify/' + c.id)}
-                /* 行高 64px（py-3）+ 极淡分隔 + 标题 17px 紧排粗体；按压极淡橙底 */
-                className="w-full flex items-center gap-3 px-4 py-3 border-b text-left active:scale-[0.99] transition-transform"
+                /* 行高约 60px（py-2.5）+ 极淡分隔 + 标题 16px 紧排粗体；按压极淡橙底 */
+                className="w-full flex items-center gap-3 px-4 py-2.5 border-b text-left active:scale-[0.99] transition-transform"
                 style={{ borderColor: LINE, background: 'transparent' }}
                 onMouseDown={(e) => (e.currentTarget.style.background = ACTIVE)}
                 onMouseUp={(e) => (e.currentTarget.style.background = 'transparent')}
                 onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
               >
                 {/* 纯原生 UI 图标：纯白圆角方块 + 中性深色线框图标（非 AI 彩色方块） */}
-                <WxIcon icon={HOME_ICON[c.id] ?? 'search'} size={46} />
+                <WxIcon icon={HOME_ICON[c.id] ?? 'search'} size={40} />
                 <div className="flex-1 min-w-0 pr-2 pl-1">
                   <div
-                    className="text-[17px] font-semibold truncate"
+                    className="text-[16px] font-semibold truncate"
                     style={{ color: INK, letterSpacing: '-0.015em' }}
                   >
                     {c.name}
                   </div>
-                  <div className="text-[13px] truncate mt-1" style={{ color: MUTED }}>
+                  <div className="text-[12.5px] truncate mt-1" style={{ color: MUTED }}>
                     {c.lastMsg}
                   </div>
                 </div>

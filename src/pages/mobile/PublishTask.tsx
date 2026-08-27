@@ -38,7 +38,7 @@ export default function PublishTask() {
   return (
     <div className="px-4 pt-3 pb-10">
       <button onClick={() => nav(-1)} className="text-gray-400 mb-2">‹ 返回</button>
-      <h1 className="text-xl font-black text-ink mb-1">发布悬赏任务</h1>
+      <h1 className="text-[18px] font-bold text-ink mb-1">发布悬赏任务</h1>
       <p className="text-xs text-gray-500 mb-4">{(() => { const c = useStore.getState().config; return c ? `发布即冻结金额，任务完成自动解冻并分账（平台抽佣 ${Math.round(c.commission_rate * 100)}%）` : '发布即冻结金额，任务完成自动解冻并分账' })()}</p>
 
       <label className="text-sm text-gray-600">任务标题</label>
@@ -69,12 +69,12 @@ export default function PublishTask() {
       <label className="text-sm text-gray-600 mt-4 block">图片 / 附件（{images.length}）</label>
       <div className="flex gap-2 mt-2 flex-wrap">
         {images.map((s, i) => (
-          <div key={i} className="relative w-20 h-20">
-            <img src={s} className="w-20 h-20 rounded-xl object-cover" alt="" />
+          <div key={i} className="relative w-16 h-16">
+            <img src={s} className="w-16 h-16 rounded-xl object-cover" alt="" />
             <button onClick={() => rmImg(i)} className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center"><X size={12} /></button>
           </div>
         ))}
-        <button onClick={addImg} className="w-20 h-20 rounded-xl border-2 border-dashed border-gray-300 text-gray-400 flex flex-col items-center justify-center gap-1">
+        <button onClick={addImg} className="w-16 h-16 rounded-xl border-2 border-dashed border-gray-300 text-gray-400 flex flex-col items-center justify-center gap-1">
           <ImagePlus size={20} /><span className="text-xs">添加</span>
         </button>
       </div>

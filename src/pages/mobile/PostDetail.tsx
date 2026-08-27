@@ -62,8 +62,8 @@ export default function PostDetail() {
     <div className="px-4 pt-3 pb-10">
       <button onClick={() => nav(-1)} className="text-gray-400 mb-2 flex items-center"><ChevronLeft size={16} /> 返回</button>
 
-      {post.images[0] && <img src={post.images[0]} className="w-full h-48 object-cover rounded-2xl mb-3 bg-gray-100" alt="" />}
-      <h1 className="text-xl font-black text-ink leading-snug">{post.title}</h1>
+      {post.images[0] && <img src={post.images[0]} className="w-full h-36 object-cover rounded-2xl mb-3 bg-gray-100" alt="" />}
+      <h1 className="text-[18px] font-bold text-ink leading-snug">{post.title}</h1>
       <div className="flex items-center gap-2 mt-2 text-xs text-gray-400">
         <img src={post.author_avatar} className="w-6 h-6 rounded-full" alt="" />{post.author_name}
       </div>

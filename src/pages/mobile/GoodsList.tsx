@@ -24,7 +24,7 @@ export default function GoodsList() {
   return (
     <div className="px-4 pt-3 pb-4">
       <div className="flex items-center justify-between mb-3">
-        <h1 className="text-xl font-black text-ink">二手集市</h1>
+        <h1 className="text-[18px] font-bold text-ink">二手集市</h1>
         <button onClick={() => nav('/publish-goods')} className="flex items-center gap-1 text-sm text-brand-600 bg-brand-50 px-3 py-1.5 rounded-full">
           <Plus size={15} /> 发布
         </button>

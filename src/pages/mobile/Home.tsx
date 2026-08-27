@@ -92,7 +92,7 @@ export default function Home() {
           if (tab === '二手') {
             return (
               <div key={x.id} onClick={() => nav('/goods/' + x.id)} className="card p-3 flex gap-3 active:scale-[.99] transition">
-                <img src={x.images[0] || ''} className="w-20 h-20 rounded-xl bg-gray-100 object-cover" alt="" />
+                <img src={x.images[0] || ''} className="w-16 h-16 rounded-xl bg-gray-100 object-cover" alt="" />
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">{x.title}</div>
                   <div className="text-brand-600 font-black mt-1">¥{x.price}</div>
