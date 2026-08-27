@@ -2,8 +2,12 @@ import { ReactNode, useState, useEffect, useRef } from 'react'
 import { NavLink, useNavigate, Outlet, useLocation } from 'react-router-dom'
 import HistoryDrawer from './HistoryDrawer'
 import { primaryNav, moreNav, type NavDef } from '../lib/nav'
-import { Clock } from 'lucide-react'
+import { Clock, User as UserIcon } from 'lucide-react'
 import { useStore } from '../store/store'
+import WxAvatar from './mobile/WxAvatar'
+
+// 复用手机壳 16 块功能块的"择"字头像，保持两套壳视觉一致
+const WX_BRAND_COLOR = '#1c1c1c'
 
 export default function Layout() {
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -46,9 +50,9 @@ export default function Layout() {
     <div className="shell">
       <header className="topbar">
         <div className="topbar-inner">
-          {/* 左：极简紫色 logo */}
+          {/* 左：微信风头像 + 平台名（与手机壳顶栏一致） */}
           <NavLink to="/" className="brand" end>
-            <span className="brand-mark">择</span>
+            <WxAvatar ch="择" color={WX_BRAND_COLOR} size={28} />
             <span className="brand-text">择校通</span>
           </NavLink>
 
@@ -95,18 +99,21 @@ export default function Layout() {
             </div>
           </nav>
 
-          {/* 右：克制 — 历史按钮 + 头像下拉（含 uid）+ 汉堡（仅窄屏显示） */}
+          {/* 右：图标按钮（历史 + 头像）+ 汉堡（窄屏） */}
           <div className="topbar-right">
             <button
               className="ghost-btn"
               onClick={() => setDrawerOpen(true)}
               title="历史对话与查询记录"
+              aria-label="历史"
             >
-              <span className="ico"><Clock size={16} strokeWidth={1.9} /></span>历史
+              <span className="ico"><Clock size={16} strokeWidth={1.9} /></span>
+              <span className="lbl">历史</span>
             </button>
             {isGuest ? (
               <button className="ghost-btn" onClick={() => nav('/login')}>
-                登录
+                <span className="ico"><UserIcon size={16} strokeWidth={1.9} /></span>
+                <span className="lbl">登录</span>
               </button>
             ) : (
               <div
