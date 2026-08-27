@@ -13,6 +13,7 @@ export interface Profile {
   frozen: number           // 冻结金额（发布任务冻结）
   status: UserStatus
   created_at: string
+  password_hash?: string  // 密码哈希（前端 SHA-256(qq:password)），可空表示未设置密码
 }
 
 // 任务状态机：open(待接单) -> accepted(已接单待交付) -> doing(进行中) -> review(待验收) -> done(完成)

@@ -1093,3 +1093,37 @@ textarea { resize: vertical; min-height: 88px; }
 .wx .note-sub { color: #999; }
 .wx .chip { background: #f2f2f2; color: #333; border-color: rgba(0,0,0,0.08); }
 .wx .chip:hover { background: #ebebeb; }
+
+/* ---------- PC 专属登录/注册居中卡片 ---------- */
+.pc-login {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #f4f4f5 0%, #e8e8ec 100%);
+  padding: 20px;
+}
+.pc-login-card {
+  width: 100%; max-width: 400px;
+  background: #fff; border-radius: 18px;
+  box-shadow: 0 18px 50px rgba(0,0,0,0.12);
+  padding: 34px 34px 26px;
+}
+.pc-login-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+.pc-login-logo {
+  width: 46px; height: 46px; border-radius: 13px;
+  background: #1c1c1c; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; font-weight: 700;
+}
+.pc-login-title { font-size: 20px; font-weight: 700; color: #1c1c1c; }
+.pc-login-sub { font-size: 12px; color: #9aa0a6; margin-top: 2px; }
+.pc-login-foot { margin-top: 18px; text-align: center; font-size: 12px; color: #c4c8cc; }
+
+/* 登录/注册 tab 切换 */
+.auth-tabs { display: flex; background: #f2f2f3; border-radius: 10px; padding: 4px; gap: 4px; }
+.auth-tabs button {
+  flex: 1; padding: 9px 0; border: 0; border-radius: 7px;
+  font-size: 14px; font-weight: 600; color: #8a8f96; background: transparent; cursor: pointer;
+  transition: all .15s ease;
+}
+.auth-tabs button.active { background: #fff; color: #1c1c1c; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.auth-hint { font-size: 12px; color: #9aa0a6; margin-top: 8px; line-height: 1.5; }

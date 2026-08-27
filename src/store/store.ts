@@ -36,6 +36,8 @@ interface State {
 
   // 用户
   login: (qq?: string, role?: Role) => Promise<void>
+  register: (qq: string, password: string) => Promise<void>
+  loginPwd: (qq: string, password: string) => Promise<void>
   logout: () => void
   switchRole: () => void
   getUser: (id: string) => Profile | undefined
@@ -161,6 +163,16 @@ export const useStore = create<State>((set, get) => ({
   // ─── 用户 ───
   login: async (qq = '', role?: Role) => {
     const me = await db.loginUser(qq, role)
+    set({ me })
+  },
+
+  register: async (qq, password) => {
+    const me = await db.registerUser(qq, password)
+    set({ me })
+  },
+
+  loginPwd: async (qq, password) => {
+    const me = await db.loginUserWithPassword(qq, password)
     set({ me })
   },
 

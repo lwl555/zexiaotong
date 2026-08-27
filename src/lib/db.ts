@@ -7,6 +7,7 @@
 // - 后续可升级为真实 Supabase Auth
 
 import { supabase } from './supabase'
+import { sha256Hex } from './hash'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   Profile, Task, Goods, Post, Comment, Message, WalletTxn, Withdrawal,
@@ -46,7 +47,9 @@ function ensureUserId(): string {
 // 应用层统一用 qq 表示「QQ 号」。仅在 db 层做转换，避免改动数据库结构。
 function rowToProfile(row: any): Profile {
   if (!row) return row
-  return { ...row, qq: (row.qq ?? row.phone ?? '') } as Profile
+  // 剔除密码哈希，避免进入前端内存/UI
+  const { password_hash, ...rest } = row
+  return { ...rest, qq: (row.qq ?? row.phone ?? '') } as Profile
 }
 function profileToRow(p: Partial<Profile>): Record<string, any> {
   const row: Record<string, any> = { ...p }
@@ -144,6 +147,93 @@ export async function loginUser(qq: string, roleOverride?: Role): Promise<Profil
   } catch {
     return prof
   }
+}
+
+// ─── 注册 / 密码登录 ─────────────────────────────────────────
+// 真正注册：写入 QQ + 密码哈希（前端 SHA-256(qq:password)）。
+// 走 insert（RLS 允许 anyone insert），完全避开 update 的 RLS 限制。
+export async function registerUser(qq: string, password: string): Promise<Profile> {
+  const hash = await sha256Hex(`${qq}:${password}`)
+  const nickname = qq.slice(0, 3) + '****' + qq.slice(-2)
+
+  if (!supabase) {
+    // 无 supabase：本地兜底（不持久化密码，仅本次会话）
+    const id = (crypto as any)?.randomUUID?.() || `u-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+    const prof: Profile = { id, qq, nickname, avatar: '', role: 'user', balance: 0, frozen: 0, status: 'active' }
+    try { localStorage.setItem(STORAGE_KEY, id) } catch {}
+    return prof
+  }
+
+  // 1) 是否已注册该 QQ
+  const { data: exist } = await withTimeout(
+    supabase.from('profiles').select('id, password_hash').eq('phone', qq).maybeSingle(),
+    6000, 'regCheck'
+  ).catch(() => ({ data: null as any }))
+
+  if (exist) {
+    if (exist.password_hash) throw new Error('该 QQ 已注册，请直接登录')
+    // 老游客账号（有 phone 无密码）：尝试补密码；若 RLS 拒绝则提示换 QQ
+    const upd = await withTimeout(
+      supabase.from('profiles').update({ password_hash: hash }).eq('id', exist.id),
+      6000, 'regBackfill'
+    ).catch(() => ({ error: { message: 'update denied' } as any }))
+    if (upd?.error) throw new Error('该 QQ 已存在但未设置密码，请使用其他 QQ 注册')
+    const { data } = await withTimeout(
+      supabase.from('profiles').select('*').eq('id', exist.id).single(),
+      6000, 'regBackfillGet'
+    ).catch(() => ({ data: null as any }))
+    if (data) {
+      const prof = rowToProfile(data)
+      try { localStorage.setItem(STORAGE_KEY, prof.id) } catch {}
+      return prof
+    }
+  }
+
+  // 2) 全新注册：用新 uuid 插入（不与游客 localStorage id 冲突）
+  const id = (crypto as any)?.randomUUID?.() || `u-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+  const payload: Record<string, any> = {
+    id, phone: qq, nickname, avatar: '', role: 'user', balance: 0, frozen: 0, status: 'active', password_hash: hash
+  }
+  const { data, error } = await withTimeout(
+    supabase.from('profiles').insert(profileToRow(payload)).select().single(),
+    6000, 'regInsert'
+  )
+  if (error) throw new Error('注册失败：' + (error.message || '未知错误'))
+  const prof = rowToProfile(data)
+  try { localStorage.setItem(STORAGE_KEY, prof.id) } catch {}
+  return prof
+}
+
+// 真正登录：按 QQ 查账号，比对密码哈希。select 受 RLS using(true) 放行。
+export async function loginUserWithPassword(qq: string, password: string): Promise<Profile> {
+  if (!supabase) throw new Error('网络未连接，无法登录')
+  let data: any = null, error: any = null
+  try {
+    const r = await withTimeout(
+      supabase.from('profiles')
+        .select('id, phone, nickname, avatar, role, balance, frozen, status, created_at, password_hash')
+        .eq('phone', qq)
+        .maybeSingle(),
+      6000, 'loginSelect'
+    )
+    data = r.data; error = r.error
+  } catch (e: any) {
+    error = e
+  }
+  if (error) {
+    const msg = String(error?.message || '')
+    if (error?.code === 'PGRST204' || msg.includes('password_hash') || msg.includes('column')) {
+      throw new Error('数据库尚未升级，请先执行密码字段迁移 SQL（详见部署说明）')
+    }
+    throw new Error('登录失败：' + msg)
+  }
+  if (!data) throw new Error('账号不存在，请先注册')
+  if (!data.password_hash) throw new Error('该账号未设置密码，请先注册')
+  const hash = await sha256Hex(`${qq}:${password}`)
+  if (hash !== data.password_hash) throw new Error('密码错误')
+  const prof = rowToProfile(data)
+  try { localStorage.setItem(STORAGE_KEY, prof.id) } catch {}
+  return prof
 }
 
 // ─── 任务 ───────────────────────────────────────────────────────
