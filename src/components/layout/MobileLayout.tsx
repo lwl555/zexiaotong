@@ -23,6 +23,7 @@ const ROUTE_TITLE: Record<string, string> = {
   '/messages': '消息中心',
   '/notifications': '通知',
   '/ai-history': 'AI 历史',
+  '/news': '实时资讯台',
   '/wallet': '我的钱包',
   '/mine': '个人中心',
   '/about': '关于择校通',
@@ -144,7 +145,7 @@ export default function MobileLayout() {
               <ChevronLeft size={22} strokeWidth={1.8} />
             </button>
             {notifyMeta ? (
-              <WxIcon icon={notifyMeta.icon} color={notifyMeta.color} size={30} />
+              <WxIcon icon={notifyMeta.icon} size={30} />
             ) : (
               <WxAvatar {...avatarOf(path)} size={30} />
             )}

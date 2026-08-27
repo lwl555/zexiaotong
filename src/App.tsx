@@ -52,6 +52,7 @@ import AIHistory from './pages/mobile/AIHistory'
 import Wallet from './pages/mobile/Wallet'
 import Mine from './pages/mobile/Mine'
 import FeatureNotify from './pages/mobile/FeatureNotify'
+import News from './pages/mobile/News'
 
 // PC 管理后台（同一平台内的模块，自身响应式）
 import Dashboard from './pages/admin/Dashboard'
@@ -153,6 +154,7 @@ export default function App() {
         <Route path="mine" element={<Mine />} />
         {/* 功能通知聊天层：首页每个功能块点进去先到这里，再「打开完整功能」 */}
         <Route path="m/notify/:id" element={<FeatureNotify />} />
+        <Route path="news" element={<News />} />
         {/* 原桌面 AI 功能：手机端也走同一 URL，在手机壳里渲染 */}
         <Route path="ai-search" element={<AISearch />} />
         <Route path="ai-tangdou" element={<AITangdou />} />

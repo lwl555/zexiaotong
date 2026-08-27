@@ -49,6 +49,13 @@ export default function FeatureChats() {
     if (!error) { setDraft(''); load() }
   }
 
+  const deleteMsg = async (msgId: string) => {
+    if (!supabase) return
+    if (!window.confirm('确定删除这条消息？删除后不可恢复。')) return
+    const { error } = await supabase.from('feature_chats').delete().eq('id', msgId)
+    if (!error) load()
+  }
+
   const filtered = filter === 'all' ? rows : rows.filter(r => r.feature === filter)
 
   return (
@@ -119,6 +126,9 @@ export default function FeatureChats() {
                   <span className="text-[11px] text-gray-300 ml-auto">{timeAgo(r.created_at)}</span>
                 </div>
                 <div className="text-sm text-gray-700 whitespace-pre-wrap break-words">{r.content}</div>
+                <div className="flex justify-end mt-1">
+                  <button onClick={() => deleteMsg(r.id)} className="text-[11px] text-gray-400 hover:text-red-500 active:opacity-60">删除</button>
+                </div>
               </div>
             )
           })}

@@ -48,7 +48,7 @@ const ASSISTANTS: Channel[] = [
   { id: 'tutor',      name: '学习导师',       lastMsg: 'AI 1v1 学习路径规划',           time: '昨天',  unread: 0, to: '/ai-tutor' },
   { id: 'docs',       name: '文档工坊',       lastMsg: '志愿报告 PDF 已生成',           time: '昨天',  unread: 0, to: '/document-workshop' },
   { id: 'warnings',   name: '避雷清单',       lastMsg: '新增 1 所高风险院校',           time: '周五',  unread: 0, to: '/warnings' },
-  { id: 'news',       name: '实时资讯台',     lastMsg: '今日 3 条招生快讯',             time: '12:39', unread: 1, to: '/community' },
+  { id: 'news',       name: '实时资讯台',     lastMsg: '今日 3 条招生快讯',             time: '12:39', unread: 1, to: '/news' },
 ]
 
 const COMMUNITY: Channel[] = [
@@ -84,7 +84,7 @@ export default function WeChatHome() {
   const isGuest = !me?.qq
 
   return (
-    <div style={{ background: '#f4f4f5', minHeight: '100%', color: INK }}>
+    <div style={{ background: '#ededed', minHeight: '100%', color: INK }}>
       {/* 噪点 overlay：覆盖全屏、不可点击、极淡 */}
       <div
         aria-hidden

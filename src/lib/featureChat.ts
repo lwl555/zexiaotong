@@ -36,8 +36,8 @@ export interface FeatureMeta {
   notifications: string[] // 系统自动通知文案（服务号风格：直接、有观点）
 }
 
-// 与首页 HOME_ICON 的 key 一一对应
-export const FEATURES: Record<string, FeatureMeta> = {
+// 与首页 HOME_ICON 的 key 一一对应（color 在下方循环补全，故这里用 Omit 避免类型冗余）
+const RAW: Record<string, Omit<FeatureMeta, 'color'>> = {
   baishitong: {
     id: 'baishitong', name: 'AI 百事通', to: '/ai-search', icon: 'search',
     notifications: [
@@ -74,7 +74,7 @@ export const FEATURES: Record<string, FeatureMeta> = {
     ],
   },
   news: {
-    id: 'news', name: '实时资讯台', to: '/community', icon: 'news',
+    id: 'news', name: '实时资讯台', to: '/news', icon: 'news',
     notifications: [
       '实时资讯台聚合招生快讯与政策变动。',
       '每天 3 条精选，打开看完整时间线。',
@@ -153,6 +153,7 @@ export const FEATURES: Record<string, FeatureMeta> = {
 }
 
 // 给注册表补全 color（统一走 avatarMeta 分类色，避免散落硬编码）
+export const FEATURES: Record<string, FeatureMeta> = RAW as Record<string, FeatureMeta>
 for (const k of Object.keys(FEATURES)) {
   FEATURES[k].color = avatarOf(FEATURES[k].to).color
 }
@@ -173,10 +174,11 @@ export async function fetchFeatureChat(feature: string): Promise<FeatureChatMsg[
   return (data || []) as FeatureChatMsg[]
 }
 
-export async function postFeatureChat(msg: Omit<FeatureChatMsg, 'id' | 'created_at'>): Promise<void> {
-  if (!supabase) return
+export async function postFeatureChat(msg: Omit<FeatureChatMsg, 'id' | 'created_at'>): Promise<boolean> {
+  if (!supabase) return false
   const { error } = await supabase.from(TABLE).insert(msg)
-  if (error) console.error('[featureChat] post', error)
+  if (error) { console.error('[featureChat] post', error); return false }
+  return true
 }
 
 // 首次打开某功能时，把预设系统通知写入（仅当该 feature 还没有 system 消息，避免重复播种）

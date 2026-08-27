@@ -17,6 +17,7 @@ export const AVATAR: Record<string, { ch: string; cat: Cat }> = {
   'document-workshop': { ch: '档', cat: 'assistant' },
   'warnings': { ch: '避', cat: 'assistant' },
   'community': { ch: '社', cat: 'community' },
+  'news': { ch: '讯', cat: 'community' },
   'goods': { ch: '二', cat: 'community' },
   'publish': { ch: '任', cat: 'community' },
   'money': { ch: '钱', cat: 'account' },

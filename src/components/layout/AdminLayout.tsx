@@ -24,8 +24,17 @@ export default function AdminLayout() {
   const cfg = useStore(s => s.config)
   const me = useMe()
 
+  // 未登录 / 数据未就绪：先等一拍（main.tsx 已全局 init，me 会在兜底后就绪）
+  if (!me) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="w-8 h-8 border-4 border-brand-200 border-t-brand-600 rounded-full animate-spin" />
+      </div>
+    )
+  }
+
   // 角色校验：非管理员禁止进入后台
-  if (me && me.role !== 'admin') {
+  if (me.role !== 'admin') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
         <div className="text-center">
