@@ -53,6 +53,7 @@ import Wallet from './pages/mobile/Wallet'
 import Mine from './pages/mobile/Mine'
 import FeatureNotify from './pages/mobile/FeatureNotify'
 import News from './pages/mobile/News'
+import MobileMoney from './pages/mobile/Money'
 
 // PC 管理后台（同一平台内的模块，自身响应式）
 import Dashboard from './pages/admin/Dashboard'
@@ -77,6 +78,12 @@ function ResponsiveShell() {
 function DeviceHome() {
   const isMobile = useIsMobile()
   return isMobile ? <WeChatHome /> : <Home />
+}
+
+// 搞钱项目：桌面端走宽屏版 Money，手机端走紧凑 H5 版（避免桌面双栏页被塞进手机壳）
+function DeviceMoney() {
+  const isMobile = useIsMobile()
+  return isMobile ? <MobileMoney /> : <Money />
 }
 
 export default function App() {
@@ -161,7 +168,7 @@ export default function App() {
         <Route path="ai-tutor" element={<AITutor />} />
         <Route path="document-workshop" element={<DocWorkshop />} />
         <Route path="warnings" element={<Warnings />} />
-        <Route path="money" element={<Money />} />
+        <Route path="money" element={<DeviceMoney />} />
         <Route path="about" element={<About />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
