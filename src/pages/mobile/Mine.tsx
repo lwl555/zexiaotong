@@ -20,7 +20,6 @@ export default function Mine() {
   const myPosted = tasks.filter(t => t.poster_id === me.id).length
   const myTaken = tasks.filter(t => t.accepted_id === me.id).length
   const unread = useStore(s => s.notifications.filter(n => n.user_id === me.id && !n.read).length)
-  const switchRole = useStore(s => s.switchRole)
   const logout = useStore(s => s.logout)
   const isGuest = !me.qq
 
@@ -84,7 +83,9 @@ export default function Mine() {
       {/* 设置 */}
       <div className="card mt-4 divide-y divide-gray-50">
         <button className="w-full flex items-center px-4 py-3 text-left"><span className="flex-1 text-[14px] text-gray-800">设置中心</span><ChevronRight size={16} className="text-gray-300" /></button>
-        <button onClick={() => { switchRole(); nav('/admin') }} className="w-full flex items-center px-4 py-3 text-left"><span className="flex-1 text-[14px] text-gray-800">进入管理后台</span><ChevronRight size={16} className="text-gray-300" /></button>
+        {me.role === 'admin' && (
+          <button onClick={() => nav('/admin')} className="w-full flex items-center px-4 py-3 text-left"><span className="flex-1 text-[14px] text-gray-800">进入管理后台</span><ChevronRight size={16} className="text-gray-300" /></button>
+        )}
       </div>
 
       {!isGuest && (

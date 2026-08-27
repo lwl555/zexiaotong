@@ -4,15 +4,13 @@ import { useStore } from '../../store/store'
 import { CheckCircle, XCircle } from 'lucide-react'
 import { useIsMobile } from '../../lib/useIsMobile'
 
-// 管理员内部账号：仍走硬编码密码分支（不入库哈希，保持原行为）
-const ADMIN_ACCOUNT = { qq: '18882632073', password: '110110nm' }
+// 管理员不再硬编码：登录走统一 loginPwd，系统按 profiles.role 字段识别 admin
 const QQ_RE = /^[1-9]\d{4,10}$/
 // 密码两层验证 - 第一层：强度规则（6-20 位，含字母 + 数字）
 const PWD_RE = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{6,20}$/
 
 function AuthForm({ mobile }: { mobile: boolean }) {
   const nav = useNavigate()
-  const login = useStore((s) => s.login)
   const register = useStore((s) => s.register)
   const loginPwd = useStore((s) => s.loginPwd)
 
@@ -47,18 +45,12 @@ function AuthForm({ mobile }: { mobile: boolean }) {
       } finally { setLoading(false) }
     } else {
       if (!pwd) { showToast('err', '请输入密码'); return }
-      // 管理员：硬编码密码分支（内部账号）
-      if (qq === ADMIN_ACCOUNT.qq) {
-        if (pwd !== ADMIN_ACCOUNT.password) { showToast('err', '管理员密码错误'); return }
-        await login(qq, 'admin')
-        nav('/admin')
-        return
-      }
       setLoading(true)
       try {
         await loginPwd(qq, pwd)
+        const me = useStore.getState().me
         showToast('ok', '登录成功')
-        setTimeout(() => nav('/'), 500)
+        setTimeout(() => nav(me?.role === 'admin' ? '/admin' : '/'), 500)
       } catch (e: any) {
         showToast('err', e?.message || '登录失败')
       } finally { setLoading(false) }
