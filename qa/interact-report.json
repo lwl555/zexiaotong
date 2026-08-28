@@ -1,22 +1,22 @@
 {
-  "qq": "2893561757",
+  "qq": "2898375746",
   "results": [
     {
       "name": "register",
       "ok": true,
-      "ms": 2959,
+      "ms": 6980,
       "note": ""
     },
     {
       "name": "wallet_recharge",
       "ok": false,
-      "ms": 30096,
+      "ms": 30535,
       "note": "page.waitForFunction: Timeout 30000ms exceeded."
     },
     {
       "name": "publish_task",
       "ok": false,
-      "ms": 30091,
+      "ms": 30687,
       "note": "page.waitForFunction: Timeout 30000ms exceeded."
     },
     {
@@ -28,28 +28,30 @@
     {
       "name": "publish_post",
       "ok": false,
-      "ms": 2396,
+      "ms": 2841,
       "note": "帖子未出现在社区"
     },
     {
       "name": "publish_goods",
       "ok": false,
-      "ms": 2384,
+      "ms": 2756,
       "note": "商品未出现在二手市场"
     },
     {
       "name": "ai_chat",
       "ok": false,
-      "ms": 30108,
+      "ms": 38275,
       "note": "page.waitForFunction: Timeout 30000ms exceeded."
     }
   ],
   "consoleErrors": [
-    "Failed to load resource: the server responded with a status of 401 ()",
-    "Failed to load resource: the server responded with a status of 401 ()"
+    "Failed to load resource: the server responded with a status of 500 ()",
+    "Failed to load resource: the server responded with a status of 400 ()",
+    "Failed to load resource: the server responded with a status of 400 ()"
   ],
   "pageErrors": [
-    "Object",
-    "Object"
+    "Edge Function returned a non-2xx status code",
+    "Edge Function returned a non-2xx status code",
+    "Edge Function returned a non-2xx status code"
   ]
 }

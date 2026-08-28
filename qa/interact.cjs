@@ -70,7 +70,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms))
     await page.goto(BASE + '#/wallet', { waitUntil: 'domcontentloaded', timeout: 60000 })
     await page.waitForFunction(() => document.body && document.body.innerText.includes('我的钱包'), { timeout: 20000 })
     await fillPh('充值金额', '100')
-    await clickBtn('充值')
+    // 注意：页面有两个"充值"按钮（模式切换 tab + 提交按钮），必须点 .btn-primary 那个提交按钮
+    await page.locator('button.btn-primary').first().click()
     await page.waitForFunction(() => document.body && document.body.innerText.includes('¥100.00'), { timeout: 15000 })
   })
 

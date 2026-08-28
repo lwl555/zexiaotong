@@ -148,6 +148,8 @@ export async function registerUser(qq: string, password: string): Promise<Profil
 
   // 走 db-write 的 register action（后端查重 + 插入，绕过 anon RLS 写限制）
   const d = await dbWrite('register', { qq, password_hash: hash, nickname })
+  // [DEBUG] 临时排查 uid 与 DB 不一致
+  try { console.log('[DEBUG registerUser] resp=', JSON.stringify(d), 'storedId=', d?.profile?.id) } catch {}
   const prof = rowToProfile(d.profile)
   try { localStorage.setItem(STORAGE_KEY, prof.id) } catch {}
   return prof
