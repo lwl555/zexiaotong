@@ -13,9 +13,9 @@
 
 | 维度 | 状态 |
 |---|---|
-| 数据通信链路（首页 406/409）） | ✅ **已修复** — home 失败请求 3→0，控制台错误 3→0 |
+| 数据通信链路（首页 406/409） | ✅ **已修复（live 实测验证）** — home 失败请求 3→0，控制台错误 3→0（见 §二、qa/full-live-after.json） |
 | 性能（主 JS 包体积） | ✅ **已优化** — 1.4 MB 单 bundle → 457 KB main（**-67%**），Dashboard/docx/AITangdou 等按需懒加载 |
-| 性能（首页 dom，live） | ✅ 8038ms → 6501ms（**-19%**），主因是解析主 JS 变小 + 少 3 个失败请求 |
+| 性能（首页 dom） | ⚠️ live 实测 **8038ms → 8032ms（基本持平）**——首页 dom 受 11 个并行 supabase 请求 RTT 主导，与包体无关；初稿的 6501ms(-19%) 是**本地预览**测得（无真实 RTT），非生产值。真实 live 收益见上两行（0 失败 + 0 报错） |
 | UI 渲染（全部 17 路由） | ✅ 全部正常 ready=ok，无控制台/页面报错 |
 | 业务写操作（注册/充值/发布） | ⚠️ **anon 鉴权 RLS 限制**，DB 写不进 — 预存在后端瓶颈，本轮未修复（见 §四） |
 | 首页视觉约束 | ✅ Home.tsx / WeChatHome.tsx / MobileLayout.tsx 已还原 HEAD，零改动 |
@@ -28,13 +28,13 @@
 
 ### 首页（核心）
 
-| 指标 | Before（旧码） | After（新码） | 变化 |
+| 指标 | Before（live 旧码 8bf2335） | After（live 新码 5da3cffc） | 变化 |
 |---|---|---|---|
 | supabase 失败请求数 | **3** | **0** | ✅ -3（100%） |
 | 控制台 + 页面错误 | **3** | **0** | ✅ -3 |
 | 非 API 失败请求 | 0 | 0 | — |
 | supabase 请求总数 | 14 | 11 | -3（移除失败 INSERT + 2 个 select 合并为成功 select） |
-| home dom 耗时（live） | 8038 ms | 6501 ms | ✅ -1.5s（-19%） |
+| home dom 耗时（live） | 8038 ms | 8032 ms | ➖ 基本持平（首页 dom 受 11 个并行 supabase 请求 RTT 主导；包体缩小对 live dom 影响有限，弱网/低端机更有感） |
 
 ### 失败请求根因（before → after 对照）
 
@@ -52,6 +52,8 @@
 | 非 API failed requests | 0 | 0 |
 | supabase 失败请求总数 | 3 | **0** |
 
+> ✅ **本表 After 现已用生产实测复核**：`qa/full-live-after.json`（commit `5da3cffc`，2026-08-28 重跑）显示全站 17 路由 `supabaseFailed=0`、`console+pageErr=0`、`nonApiFailedReq=0`，home `netFail=0(11)`。初稿 After 在本地预览测得，结论一致但非生产值；现以生产实测为准。
+
 ---
 
 ## 三、性能优化（已部署）
@@ -68,11 +70,11 @@
 | Home | 11 KB | 5 KB | 懒加载 |
 
 - **主 bundle：~1.4 MB → 457 KB（-67%）**
-- Live 实测：`assets/index-BgcFaSSn.js` = **461 371 bytes**（≈ 450 KiB）——但初稿撰写时该包**仍由旧码（b2f01c8）构建**，`grep maybeSingle` 实测 **0 次**，即修复**当时并未上线**（见顶部修正说明）。
-- 本续作已将修复提交推送，部署后对 live JS 重新 grep 验证（应出现 `maybeSingle` ≥ 1 次）。
+- Live 实测：`assets/index-BgcFaSSn.js`（461 371 bytes，≈ 450 KiB）。**部署后续作对 live JS 重新 grep 验证**：`maybeSingle` 出现 **2 次**（含 `getCurrentUser` 的 `.eq("id",t).maybeSingle()` + supabase 库方法）、`commission_rate` **1 次**、`select('*')` 形式的 profiles 请求 **0 次**——证明数据链路修复已真实上线（详见顶部修正说明与 §七）。
 
-### 首屏 dom 提升
-home（guest 视角 live）：**8038 ms → 6501 ms**（-19%）。剩余耗时主要是 11 个并行 supabase 请求的 RTT。
+### 首屏 dom 提升（修正）
+- **本地预览**测得 home dom 8038ms → 6501ms（-19%），因预览无真实网络 RTT。
+- **生产 live 实测**：home dom **8038ms → 8032ms（基本持平）**——首页渲染等待 11 个并行 supabase 请求返回，耗时由网络 RTT 主导，包体缩小对其影响有限。真正的 live 收益是「0 失败请求 + 0 控制台错误」与「主包 -67%（弱网/低端机解析更快）」。
 
 ---
 
@@ -130,7 +132,8 @@ home（guest 视角 live）：**8038 ms → 6501 ms**（-19%）。剩余耗时�
 | `qa/diag.cjs` | 聚焦诊断（设 localStorage 后访问 wallet/publish，捕获完整 pageerror） |
 | `qa/datalink.sh` | 旧版数据链路测量（已被 full.cjs 替代） |
 | `qa/full-before.json` | Before 报告（live 旧码） |
-| `qa/full-after.json` | After 报告（live 新码） |
+| `qa/full-after.json` | After 报告（**本地预览**测得，非生产；供对照） |
+| `qa/full-live-after.json` | **After 生产实测**（commit 5da3cffc 重跑，supabaseFailed=0，为权威 after 数据） |
 | `qa/interact-report.json` | 交互功能报告（含 console/pageErrors） |
 | `qa/testuser.json` | 测试账号（已清理） |
 | `qa/shots/*.png` | 17 路由截图 + 交互步骤截图 |
@@ -139,7 +142,12 @@ home（guest 视角 live）：**8038 ms → 6501 ms**（-19%）。剩余耗时�
 
 ## 七、Commit / Deploy
 
-- **Commit（初稿）**：`b2f01c8` (本地) → pushed as `8bf2335`（main via push_api.py）
-- **CI**：run 33137284702 `completed success`（自动部署 GitHub Pages）
+- **Commit（初稿）**：`b2f01c8` → `8bf2335`（main，初稿，未含 db.ts 修复）
+- **CI（初稿）**：run 33137284702 `completed success`
 - **Live（初稿）**：`https://lwl555.github.io/zexiaotong/` —— 初稿误判为「已含新代码」，实为旧码（见顶部修正）。
-- **续作部署（2026-08-28）**：将 `src/lib/db.ts` 数据链路修复提交并推送（force-push via push_api.py，action 触发 Pages 重建）。部署后已对 live JS 重新 grep 验证 `maybeSingle` 出现次数（应 ≥1）。新 commit SHA 见下方续作记录。
+- **续作部署（2026-08-28）**：将 `src/lib/db.ts` 数据链路修复提交并 **force-push via push_api.py**（action 触发 Pages 重建）。
+  - **新 commit**：`5da3cffcc65e45bde70046a3ac431eb88c7dc5fe` → main
+  - **CI**：run **33138166652** `completed success`
+  - **Live 验证（grep live JS）**：`maybeSingle`=2、`commission_rate`=1、`select('*')` profiles 请求=0 → **修复确已上线**
+  - **Live 重测（Playwright）**：`qa/full-live-after.json` → 17 路由 `supabaseFailed=0` / `console+pageErr=0` / `nonApiFailedReq=0`，home `netFail=0(11)`
+  - **数据链路结论（生产权威）**：首页 supabase 失败请求 **3→0**、控制台错误 **3→0**、首页请求总数 14→11
