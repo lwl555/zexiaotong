@@ -122,26 +122,10 @@ export async function loginUser(qq: string, roleOverride?: Role): Promise<Profil
   if (!supabase) return prof
 
   try {
-    const { data, error } = await withTimeout(
-      supabase.from('profiles').select('*').eq('id', id).single(),
-      6000, 'loginSelect'
-    )
-    if (!error && data) {
-      // 已有档案：补登 QQ 号 + 角色
-      const upd: Record<string, any> = { phone: qq }
-      if (roleOverride) upd.role = roleOverride
-      const { data: u } = await withTimeout(
-        supabase.from('profiles').update(upd).eq('id', id).select().single(),
-        6000, 'loginUpdate'
-      ).catch(() => ({ data: null as any }))
-      return u ? rowToProfile(u) : { ...rowToProfile(data), ...(roleOverride ? { role: roleOverride } : {}) }
-    }
-    // 没有档案：插入（带 QQ 号）
-    const ins = await withTimeout(
-      supabase.from('profiles').insert(profileToRow(prof)).select().single(),
-      6000, 'loginInsert'
-    ).catch(() => ({ data: null as any }))
-    return ins?.data ? rowToProfile(ins.data) : prof
+    // 走 db-write（service_role 绕过 RLS，后端按 uid 写入 phone/role）
+    const d = await dbWrite('login_set', { uid: id, qq, role: roleOverride })
+    if (d?.profile) return rowToProfile(d.profile)
+    return prof
   } catch {
     return prof
   }
@@ -149,7 +133,7 @@ export async function loginUser(qq: string, roleOverride?: Role): Promise<Profil
 
 // ─── 注册 / 密码登录 ─────────────────────────────────────────
 // 真正注册：写入 QQ + 密码哈希（前端 SHA-256(qq:password)）。
-// 走 insert（RLS 允许 anyone insert），完全避开 update 的 RLS 限制。
+// 走 db-write（service_role 绕过 RLS，后端做重复检查 + 插入）。
 export async function registerUser(qq: string, password: string): Promise<Profile> {
   const hash = await sha256Hex(`${qq}:${password}`)
   const nickname = qq.slice(0, 3) + '****' + qq.slice(-2)
@@ -162,42 +146,9 @@ export async function registerUser(qq: string, password: string): Promise<Profil
     return prof
   }
 
-  // 1) 是否已注册该 QQ
-  const { data: exist } = await withTimeout(
-    supabase.from('profiles').select('id, password_hash').eq('phone', qq).maybeSingle(),
-    6000, 'regCheck'
-  ).catch(() => ({ data: null as any }))
-
-  if (exist) {
-    if (exist.password_hash) throw new Error('该 QQ 已注册，请直接登录')
-    // 老游客账号（有 phone 无密码）：尝试补密码；若 RLS 拒绝则提示换 QQ
-    const upd = await withTimeout(
-      supabase.from('profiles').update({ password_hash: hash }).eq('id', exist.id),
-      6000, 'regBackfill'
-    ).catch(() => ({ error: { message: 'update denied' } as any }))
-    if (upd?.error) throw new Error('该 QQ 已存在但未设置密码，请使用其他 QQ 注册')
-    const { data } = await withTimeout(
-      supabase.from('profiles').select('*').eq('id', exist.id).single(),
-      6000, 'regBackfillGet'
-    ).catch(() => ({ data: null as any }))
-    if (data) {
-      const prof = rowToProfile(data)
-      try { localStorage.setItem(STORAGE_KEY, prof.id) } catch {}
-      return prof
-    }
-  }
-
-  // 2) 全新注册：用新 uuid 插入（不与游客 localStorage id 冲突）
-  const id = (crypto as any)?.randomUUID?.() || `u-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-  const payload: Record<string, any> = {
-    id, phone: qq, nickname, avatar: '', role: 'user', balance: 0, frozen: 0, status: 'active', password_hash: hash
-  }
-  const { data, error } = await withTimeout(
-    supabase.from('profiles').insert(profileToRow(payload)).select().single(),
-    6000, 'regInsert'
-  )
-  if (error) throw new Error('注册失败：' + (error.message || '未知错误'))
-  const prof = rowToProfile(data)
+  // 走 db-write 的 register action（后端查重 + 插入，绕过 anon RLS 写限制）
+  const d = await dbWrite('register', { qq, password_hash: hash, nickname })
+  const prof = rowToProfile(d.profile)
   try { localStorage.setItem(STORAGE_KEY, prof.id) } catch {}
   return prof
 }
@@ -255,24 +206,13 @@ export async function fetchMyTasks(userId: string): Promise<Task[]> {
 }
 
 export async function createTask(task: Partial<Task>): Promise<Task> {
-  const { data, error } = await supabase!
-    .from('tasks')
-    .insert(task)
-    .select()
-    .single()
-  if (error) throw error
-  return data as Task
+  const d = await dbWrite('insert', { table: 'tasks', row: task })
+  return d.row as Task
 }
 
 export async function updateTask(id: string, updates: Partial<Task>): Promise<Task> {
-  const { data, error } = await supabase!
-    .from('tasks')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single()
-  if (error) throw error
-  return data as Task
+  const d = await dbWrite('update', { table: 'tasks', id, updates, uid: currentUid() })
+  return (d.row || { id, ...updates }) as Task
 }
 
 // ─── 钱包 ───────────────────────────────────────────────────────
@@ -287,13 +227,8 @@ export async function fetchBalance(userId: string): Promise<{ balance: number; f
 }
 
 export async function addTxn(txn: Partial<WalletTxn>): Promise<WalletTxn> {
-  const { data, error } = await supabase!
-    .from('txns')
-    .insert(txn)
-    .select()
-    .single()
-  if (error) throw error
-  return data as WalletTxn
+  const d = await dbWrite('insert', { table: 'txns', row: txn })
+  return d.row as WalletTxn
 }
 
 export async function fetchTxns(userId: string): Promise<WalletTxn[]> {
@@ -319,13 +254,8 @@ export async function fetchGoods(status: GoodsStatus = 'on'): Promise<Goods[]> {
 }
 
 export async function createGoods(goods: Partial<Goods>): Promise<Goods> {
-  const { data, error } = await supabase!
-    .from('goods')
-    .insert(goods)
-    .select()
-    .single()
-  if (error) throw error
-  return data as Goods
+  const d = await dbWrite('insert', { table: 'goods', row: goods })
+  return d.row as Goods
 }
 
 // ─── 社区帖子 ───────────────────────────────────────────────────
@@ -341,24 +271,13 @@ export async function fetchPosts(status: PostStatus = 'on'): Promise<Post[]> {
 }
 
 export async function createPost(post: Partial<Post>): Promise<Post> {
-  const { data, error } = await supabase!
-    .from('posts')
-    .insert(post)
-    .select()
-    .single()
-  if (error) throw error
-  return data as Post
+  const d = await dbWrite('insert', { table: 'posts', row: post })
+  return d.row as Post
 }
 
 export async function updatePost(id: string, updates: Partial<Post>): Promise<Post> {
-  const { data, error } = await supabase!
-    .from('posts')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single()
-  if (error) throw error
-  return data as Post
+  const d = await dbWrite('update', { table: 'posts', id, updates, uid: currentUid() })
+  return (d.row || { id, ...updates }) as Post
 }
 
 // ─── 评论 ───────────────────────────────────────────────────────
@@ -375,13 +294,8 @@ export async function fetchComments(target_type: string, target_id: string): Pro
 }
 
 export async function createComment(comment: Partial<Comment>): Promise<Comment> {
-  const { data, error } = await supabase!
-    .from('comments')
-    .insert(comment)
-    .select()
-    .single()
-  if (error) throw error
-  return data as Comment
+  const d = await dbWrite('insert', { table: 'comments', row: comment })
+  return d.row as Comment
 }
 
 // ─── 私信 ───────────────────────────────────────────────────────
@@ -397,13 +311,8 @@ export async function fetchMessages(convId: string): Promise<Message[]> {
 }
 
 export async function sendMessage(msg: Partial<Message>): Promise<Message> {
-  const { data, error } = await supabase!
-    .from('messages')
-    .insert(msg)
-    .select()
-    .single()
-  if (error) throw error
-  return data as Message
+  const d = await dbWrite('insert', { table: 'messages', row: msg })
+  return d.row as Message
 }
 
 // ─── 通知 ───────────────────────────────────────────────────────
@@ -419,20 +328,12 @@ export async function fetchNotifications(userId: string): Promise<Notification[]
 }
 
 export async function markRead(notifId: string): Promise<void> {
-  await supabase!
-    .from('notifications')
-    .update({ read: true })
-    .eq('id', notifId)
+  await dbWrite('update', { table: 'notifications', id: notifId, updates: { read: true }, uid: currentUid() })
 }
 
 export async function createNotification(notif: Partial<Notification>): Promise<Notification> {
-  const { data, error } = await supabase!
-    .from('notifications')
-    .insert(notif)
-    .select()
-    .single()
-  if (error) throw error
-  return data as Notification
+  const d = await dbWrite('insert', { table: 'notifications', row: notif })
+  return d.row as Notification
 }
 
 // ─── 提现 ───────────────────────────────────────────────────────
@@ -448,13 +349,8 @@ export async function fetchWithdrawals(userId: string): Promise<Withdrawal[]> {
 }
 
 export async function createWithdrawal(wd: Partial<Withdrawal>): Promise<Withdrawal> {
-  const { data, error } = await supabase!
-    .from('withdrawals')
-    .insert(wd)
-    .select()
-    .single()
-  if (error) throw error
-  return data as Withdrawal
+  const d = await dbWrite('insert', { table: 'withdrawals', row: wd })
+  return d.row as Withdrawal
 }
 
 // ─── 仲裁 ───────────────────────────────────────────────────────
@@ -468,24 +364,13 @@ export async function fetchArbitrations(userId?: string): Promise<Arbitration[]>
 }
 
 export async function createArbitration(arb: Partial<Arbitration>): Promise<Arbitration> {
-  const { data, error } = await supabase!
-    .from('arbitrations')
-    .insert(arb)
-    .select()
-    .single()
-  if (error) throw error
-  return data as Arbitration
+  const d = await dbWrite('insert', { table: 'arbitrations', row: arb })
+  return d.row as Arbitration
 }
 
 export async function updateArbitration(id: string, updates: Partial<Arbitration>): Promise<Arbitration> {
-  const { data, error } = await supabase!
-    .from('arbitrations')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single()
-  if (error) throw error
-  return data as Arbitration
+  const d = await dbWrite('update', { table: 'arbitrations', id, updates, uid: currentUid() })
+  return (d.row || { id, ...updates }) as Arbitration
 }
 
 // ─── 平台配置 ───────────────────────────────────────────────────
@@ -530,26 +415,45 @@ export async function fetchBanners(): Promise<Banner[]> {
 
 // ─── 管理员操作 ─────────────────────────────────────────────────
 
-export async function adminApproveWithdrawal(wdId: string, userId: string, amount: number) {
-  // 1. 扣余额
-  await supabase!.rpc('decrement_balance', { user_id: userId, amount })
-  // 2. 更新提现状态
-  await supabase!
-    .from('withdrawals')
-    .update({ status: 'approved', handled_at: new Date().toISOString() })
-    .eq('id', wdId)
+export async function adminApproveWithdrawal(wdId: string, userId: string, amount: number, operatorId: string) {
+  await dbWrite('approve_wd', { wdId, userId, amount, uid: operatorId })
 }
 
-export async function adminRejectWithdrawal(wdId: string, reason: string) {
-  await supabase!
-    .from('withdrawals')
-    .update({ status: 'rejected', reason, handled_at: new Date().toISOString() })
-    .eq('id', wdId)
+export async function adminRejectWithdrawal(wdId: string, reason: string, operatorId: string) {
+  await dbWrite('reject_wd', { wdId, reason, uid: operatorId })
+}
+
+// ─── 供 store 直接调用（替代原本绕过 db 层的裸 supabase!.from 写操作）───
+
+// 充值：走 db-write 的 recharge action（绕过 RLS 写限制，后端改余额 + 记流水）
+export async function recharge(uid: string, amount: number): Promise<number> {
+  const d = await dbWrite('recharge', { uid, amount })
+  return d.balance as number
+}
+
+// 平台配置：仅管理员可改
+export async function setConfig(config: PlatformConfig, operatorId: string) {
+  await dbWrite('set_config', { config, uid: operatorId })
+}
+
+// 改 profiles 状态（封禁/解封），仅管理员
+export async function setProfileStatus(targetId: string, status: string, operatorId: string) {
+  await dbWrite('update', { table: 'profiles', id: targetId, updates: { status }, uid: operatorId })
+}
+
+// 改业务记录状态（任务/商品/帖子 下架/删除），owner 或管理员
+export async function setRecordStatus(
+  table: 'tasks' | 'goods' | 'posts',
+  id: string,
+  status: string,
+  operatorId: string
+) {
+  await dbWrite('update', { table, id, updates: { status }, uid: operatorId })
 }
 
 // ─── 业务闭环（带事务性保障） ───────────────────────────────────
 
-// 发布任务：冻结余额 + 创建任务 + 记流水
+// 发布任务：冻结余额 + 创建任务 + 记流水（整段走 db-write 的 publish_task action，原子执行）
 export async function publishTask(input: {
   title: string
   category: string
@@ -561,108 +465,25 @@ export async function publishTask(input: {
   poster_name: string
   poster_avatar: string
 }) {
-  const me = await getCurrentUser()
-  const available = me.balance - me.frozen
-  if (available < input.amount) {
-    throw new Error(`可用余额不足，无法冻结 ¥${input.amount}`)
-  }
-
-  // 原子操作：用 supabase RPC 或顺序调用（真实事务需要 DB 函数）
-  // 这里顺序调用，失败时抛出（简单版，真实事务用 Edge Function 更好）
-  const task = await createTask({
-    ...input,
-    status: 'open',
-    accepted_id: null,
-    accepted_name: null,
-    top_until: null
-  } as Partial<Task>)
-
-  await addTxn({
-    user_id: input.poster_id,
-    type: 'freeze',
-    amount: -input.amount,
-    balance_after: me.balance,  // 不变
-    remark: `发布任务冻结（${input.title}）`
+  const d = await dbWrite('publish_task', {
+    uid: input.poster_id,
+    task: { ...input, status: 'open', accepted_id: null, accepted_name: null, top_until: null }
   })
-
-  // 更新冻结金额
-  await supabase!
-    .from('profiles')
-    .update({ frozen: me.frozen + input.amount })
-    .eq('id', input.poster_id)
-
-  return task
+  return d.task as Task
 }
 
 // 接单
 export async function takeTask(taskId: string) {
   const me = await getCurrentUser()
-  const { data: task } = await supabase!
-    .from('tasks')
-    .select('*')
-    .eq('id', taskId)
-    .single()
-  if (!task || task.status !== 'open') throw new Error('任务不可接')
-
-  await updateTask(taskId, {
-    status: 'accepted',
-    accepted_id: me.id,
-    accepted_name: me.nickname
-  })
-
-  // 通知雇主
-  await createNotification({
-    user_id: task.poster_id,
-    type: 'task_taken',
-    title: '有人接单',
-    content: `${me.nickname} 已接下「${task.title}」`
-  })
+  if (!me) throw new Error('请先登录')
+  await dbWrite('take_task', { taskId, uid: me.id, nickname: me.nickname })
 }
 
-// 验收通过：结算
+// 验收通过：结算（整段走 db-write 的 review_pass action，原子执行）
 export async function reviewPass(taskId: string) {
-  const { data: task } = await supabase!
-    .from('tasks')
-    .select('*')
-    .eq('id', taskId)
-    .single()
-  if (!task) throw new Error('任务不存在')
-
-  const config = await fetchPlatformConfig()
-  const commission = task.amount * config.commission_rate
-  const net = task.amount - commission
-
-  // 解冻雇主余额
-  const { data: employer } = await supabase!
-    .from('profiles')
-    .select('*')
-    .eq('id', task.poster_id)
-    .single()
-  await supabase!
-    .from('profiles')
-    .update({ frozen: employer.frozen - task.amount })
-    .eq('id', task.poster_id)
-
-  // 给接单者加余额
-  await supabase!.rpc('increment_balance', { user_id: task.accepted_id, amount: net })
-  await addTxn({
-    user_id: task.accepted_id!,
-    type: 'income',
-    amount: net,
-    balance_after: 0, // 前端会重新拉取
-    remark: `任务完成收入（${task.title}，平台抽佣 ¥${commission}）`
-  })
-
-  // 更新任务状态
-  await updateTask(taskId, { status: 'done' })
-
-  // 通知双方
-  await createNotification({
-    user_id: task.accepted_id!,
-    type: 'task_status',
-    title: '任务已完成',
-    content: `「${task.title}」已结算，收入 ¥${net}`
-  })
+  const me = await getCurrentUser()
+  if (!me) throw new Error('请先登录')
+  await dbWrite('review_pass', { taskId, uid: me.id })
 }
 
 // ─── 管理员用户操作（真实删除 / 冻结 / 解冻 / 列出）────────────────────
@@ -681,6 +502,25 @@ async function adminInvoke(action: AdminAction, payload: Record<string, any> = {
   if (error) throw new Error(error.message || '管理员操作请求失败')
   if (data && (data as any).error) throw new Error((data as any).error)
   return data as any
+}
+
+// ─── 通用写操作：走 db-write Edge Function（service_role 绕过 RLS，后端复刻所有权校验）───
+// 任何失败都会抛出可读错误，由调用方（UI）捕获后 toast 提示。
+async function dbWrite(action: string, payload: Record<string, any> = {}): Promise<any> {
+  if (!supabase) throw new Error('未连接到数据库')
+  const { data, error } = await withTimeout(
+    supabase.functions.invoke('db-write', { body: { action, ...payload } }),
+    15000,
+    'dbWrite:' + action
+  )
+  if (error) throw new Error(error.message || '写操作请求失败')
+  if (data && (data as any).error) throw new Error((data as any).error)
+  return data as any
+}
+
+// 当前本地用户 id（localStorage 中保存的 profile id，登录/注册时已落库）
+function currentUid(): string {
+  return ensureUserId()
 }
 
 // 列出用户（分页，page 从 0 开始）

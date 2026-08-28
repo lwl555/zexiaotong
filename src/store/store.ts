@@ -280,20 +280,10 @@ export const useStore = create<State>((set, get) => ({
   // ─── 钱包 ───
   recharge: async (amount) => {
     const me = get().me!
-    await db.addTxn({
-      user_id: me.id,
-      type: 'recharge',
-      amount,
-      balance_after: me.balance + amount,
-      remark: '账户充值'
-    })
-    // 更新余额
-    const { data } = await db.supabase!
-      .from('profiles')
-      .update({ balance: me.balance + amount })
-      .eq('id', me.id)
+    // 走 db-write（service_role 绕过 RLS，后端改余额 + 记流水）
+    const balance = await db.recharge(me.id, amount)
     const txns = await db.fetchTxns(me.id)
-    set(s => ({ me: { ...me, balance: me.balance + amount }, txns }))
+    set(s => ({ me: { ...me, balance }, txns }))
   },
 
   withdraw: async (amount) => {
@@ -378,47 +368,55 @@ export const useStore = create<State>((set, get) => ({
 
   // ─── 后台 ───
   banUser: async (id) => {
-    await db.supabase!.from('profiles').update({ status: 'banned' }).eq('id', id)
+    const me = get().me!
+    await db.setProfileStatus(id, 'banned', me.id)
     set(s => ({ users: s.users.map(u => u.id === id ? { ...u, status: 'banned' as const } : u) }))
   },
 
   unbanUser: async (id) => {
-    await db.supabase!.from('profiles').update({ status: 'active' }).eq('id', id)
+    const me = get().me!
+    await db.setProfileStatus(id, 'active', me.id)
     set(s => ({ users: s.users.map(u => u.id === id ? { ...u, status: 'active' as const } : u) }))
   },
 
   removeTask: async (id) => {
-    await db.updateTask(id, { status: 'closed' })
+    const me = get().me!
+    await db.setRecordStatus('tasks', id, 'closed', me.id)
     const tasks = await db.fetchTasks()
     set({ tasks })
   },
 
   removeGoods: async (id) => {
-    await db.supabase!.from('goods').update({ status: 'removed' }).eq('id', id)
+    const me = get().me!
+    await db.setRecordStatus('goods', id, 'removed', me.id)
     const goods = await db.fetchGoods()
     set({ goods })
   },
 
   removePost: async (id) => {
-    await db.updatePost(id, { status: 'removed' })
+    const me = get().me!
+    await db.setRecordStatus('posts', id, 'removed', me.id)
     const posts = await db.fetchPosts()
     set({ posts })
   },
 
   setTaskStatus: async (id, status) => {
-    await db.updateTask(id, { status })
+    const me = get().me!
+    await db.setRecordStatus('tasks', id, status, me.id)
     const tasks = await db.fetchTasks()
     set({ tasks })
   },
 
   setGoodsStatus: async (id, status) => {
-    await db.supabase!.from('goods').update({ status }).eq('id', id)
+    const me = get().me!
+    await db.setRecordStatus('goods', id, status, me.id)
     const goods = await db.fetchGoods()
     set({ goods })
   },
 
   setPostStatus: async (id, status) => {
-    await db.updatePost(id, { status })
+    const me = get().me!
+    await db.setRecordStatus('posts', id, status, me.id)
     const posts = await db.fetchPosts()
     set({ posts })
   },
@@ -444,26 +442,23 @@ export const useStore = create<State>((set, get) => ({
   },
 
   approveWithdrawal: async (id) => {
+    const me = get().me!
     const wd = get().withdrawals.find(w => w.id === id)!
-    await db.adminApproveWithdrawal(id, wd.user_id, wd.amount)
+    await db.adminApproveWithdrawal(id, wd.user_id, wd.amount, me.id)
     const withdrawals = await db.fetchWithdrawals(get().me?.id || '')
     set({ withdrawals })
   },
 
   rejectWithdrawal: async (id, reason) => {
-    await db.adminRejectWithdrawal(id, reason)
+    const me = get().me!
+    await db.adminRejectWithdrawal(id, reason, me.id)
     const withdrawals = await db.fetchWithdrawals(get().me?.id || '')
     set({ withdrawals })
   },
 
   setConfig: async (c) => {
-    await db.supabase!.from('platform_config').update({
-      commission_rate: c.commission_rate,
-      top_price_d1: c.top_price.d1,
-      top_price_d3: c.top_price.d3,
-      top_price_d7: c.top_price.d7,
-      announce: c.announce
-    }).eq('id', 1)
+    const me = get().me!
+    await db.setConfig(c, me.id)
     set({ config: c })
   }
 }))
