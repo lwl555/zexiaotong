@@ -1,37 +1,52 @@
 import { useState } from 'react'
 
-// 三套反 AI-slop 手机版主题，全部用内联色板切换，无全局污染。
-// 中文标题统一系统中文栈（避开 iOS 微信衬线回退坑），编辑感靠字重+字号+等宽小标签。
-type ThemeKey = 'clay' | 'mono' | 'night'
+// 五套手机版主题，全部用内联色板切换，无全局污染。
+// 中文标题统一系统中文栈（避开 iOS 微信衬线回退坑）。
+type ThemeKey = 'white-hard' | 'white-min' | 'clay' | 'mono' | 'night'
 interface Palette {
   name: string
   bg: string; surface: string; fg: string; muted: string
   line: string; accent: string; accentSoft: string; accentFg: string
   hero: string; shell: string; tabOn: string
   eyebrow: string; ctaRadius: number
+  borderW: number; hard: boolean
 }
 
 const THEMES: Record<ThemeKey, Palette> = {
+  'white-hard': {
+    name: '白底硬边·砖红',
+    bg: '#ffffff', surface: '#ffffff', fg: '#111111', muted: '#6b6b6b',
+    line: '#111111', accent: '#D8451F', accentSoft: '#fbe9e3', accentFg: '#ffffff',
+    hero: '#f4f4f4', shell: '#111111', tabOn: '#111111',
+    eyebrow: 'ZEXIAO · 2026 择校季', ctaRadius: 2, borderW: 3, hard: true
+  },
+  'white-min': {
+    name: '白底极简·墨黑',
+    bg: '#ffffff', surface: '#ffffff', fg: '#111111', muted: '#8a8a8a',
+    line: '#e6e6e6', accent: '#111111', accentSoft: '#f2f2f2', accentFg: '#ffffff',
+    hero: '#f4f4f4', shell: '#e6e6e6', tabOn: '#111111',
+    eyebrow: 'ZEXIAO · 2026 择校季', ctaRadius: 8, borderW: 2, hard: false
+  },
   clay: {
     name: '暖陶土编辑风',
     bg: '#f7f5f0', surface: '#fffdf8', fg: '#1c1814', muted: '#6b6258',
     line: '#e3d9c6', accent: '#c2410c', accentSoft: '#fbeede', accentFg: '#ffffff',
     hero: '#e7e0d2', shell: '#ddd6c6', tabOn: '#c2410c',
-    eyebrow: 'ZEXIAO · 2026 择校季', ctaRadius: 2
+    eyebrow: 'ZEXIAO · 2026 择校季', ctaRadius: 2, borderW: 1, hard: false
   },
   mono: {
     name: '墨黑极简风',
     bg: '#fafafa', surface: '#ffffff', fg: '#16181d', muted: '#9a9a9a',
     line: '#e2e2e2', accent: '#16181d', accentSoft: '#f0f0f0', accentFg: '#ffffff',
     hero: '#ececec', shell: '#e2e2e2', tabOn: '#16181d',
-    eyebrow: 'ZEXIAO · 2026 择校季', ctaRadius: 2
+    eyebrow: 'ZEXIAO · 2026 择校季', ctaRadius: 2, borderW: 1, hard: false
   },
   night: {
     name: '暖炭暗调风',
     bg: '#1a1714', surface: '#221e19', fg: '#efe9dd', muted: '#8c8378',
     line: '#3a342c', accent: '#c2410c', accentSoft: '#2a251f', accentFg: '#efe9dd',
     hero: '#2a251f', shell: '#3a342c', tabOn: '#c2410c',
-    eyebrow: 'NIGHT EDITION · 2026', ctaRadius: 2
+    eyebrow: 'NIGHT EDITION · 2026', ctaRadius: 2, borderW: 1, hard: false
   }
 }
 
@@ -43,18 +58,28 @@ const IDX: [string, string, string][] = [
 ]
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", sans-serif'
 
+// 硬边卡片样式：粗黑边 + 无模糊实色硬阴影（neo-brutalism）
+function card(t: Palette, radius = t.ctaRadius) {
+  return {
+    border: `${t.borderW}px solid ${t.fg}`,
+    borderRadius: radius,
+    boxShadow: t.hard ? '5px 5px 0 #111111' : 'none'
+  }
+}
+
 export default function ThemePreview() {
-  const [theme, setTheme] = useState<ThemeKey>('clay')
+  const [theme, setTheme] = useState<ThemeKey>('white-hard')
   const [tab, setTab] = useState(0)
   const t = THEMES[theme]
   const tabs = ['首页', '发现', '任务', '消息', '我的']
-  const isMono = theme === 'mono'
+  const isNight = theme === 'night'
+  const outerBg = isNight ? '#0f0d0b' : '#f0efec'
 
   return (
-    <div style={{ minHeight: '100vh', background: theme === 'night' ? '#0f0d0b' : '#f0efec', fontFamily: FONT, padding: '22px 12px 40px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+    <div style={{ minHeight: '100vh', background: outerBg, fontFamily: FONT, padding: '22px 12px 40px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
       {/* 主题切换器 */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-        {(['clay', 'mono', 'night'] as ThemeKey[]).map(k => {
+        {(['white-hard', 'white-min', 'clay', 'mono', 'night'] as ThemeKey[]).map(k => {
           const on = theme === k
           return (
             <button key={k} onClick={() => setTheme(k)}
@@ -75,27 +100,27 @@ export default function ThemePreview() {
           {/* 顶栏 */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '6px 18px 8px' }}>
             <span style={{ fontSize: 21, fontWeight: 500, color: t.fg, letterSpacing: 2 }}>择校通</span>
-            {isMono
-              ? <span style={{ fontSize: 11, color: t.muted, border: `1px solid ${t.fg}`, padding: '3px 10px', borderRadius: 4 }}>登录</span>
-              : <span style={{ width: 28, height: 28, borderRadius: '50%', background: t.accent, color: t.accentFg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>学</span>}
+            {isNight
+              ? <span style={{ width: 28, height: 28, borderRadius: '50%', background: t.accent, color: t.accentFg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>学</span>
+              : <span style={{ fontSize: 11, color: t.fg, border: `${t.borderW}px solid ${t.fg}`, padding: '3px 10px', borderRadius: t.ctaRadius }}>登录</span>}
           </div>
           {/* eyebrow */}
           <div style={{ padding: '0 18px', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 10, letterSpacing: 3, color: t.accent }}>{t.eyebrow}</div>
           {/* 搜索 */}
-          <div style={{ margin: '8px 18px', padding: '9px 12px', border: `1px solid ${t.fg}`, borderRadius: t.ctaRadius, color: t.muted, fontSize: 12 }}>搜学校 / 专业 / 分数线</div>
+          <div style={{ margin: '8px 18px', padding: '9px 12px', ...card(t), color: t.muted, fontSize: 12 }}>搜学校 / 专业 / 分数线</div>
           {/* Hero */}
           <div style={{ margin: '10px 18px', display: 'flex', gap: 12, alignItems: 'center' }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 19, fontWeight: 500, color: t.fg, lineHeight: 1.35 }}>选对学校<br />比努力<br />更关键</div>
-              <div style={{ marginTop: 8, fontSize: 10, color: t.muted, lineHeight: 1.5 }}>{theme === 'night' ? '深夜也陪你择校。' : '用数据，不熬鸡汤。'}</div>
+              <div style={{ marginTop: 8, fontSize: 10, color: t.muted, lineHeight: 1.5 }}>{isNight ? '深夜也陪你择校。' : '用数据，不熬鸡汤。'}</div>
               <div style={{ marginTop: 10, display: 'inline-block', background: t.accent, color: t.accentFg, fontSize: 11, padding: '6px 14px', borderRadius: t.ctaRadius }}>开始测评 →</div>
             </div>
-            <div style={{ width: 96, height: 120, background: t.hero, border: `1px solid ${t.line}`, display: 'flex', alignItems: 'flex-end', padding: 7, fontSize: 9, color: t.muted }}>校园实景照片</div>
+            <div style={{ width: 96, height: 120, background: t.hero, ...card(t), display: 'flex', alignItems: 'flex-end', padding: 7, fontSize: 9, color: t.muted }}>校园实景照片</div>
           </div>
           {/* 编号索引 */}
-          <div style={{ margin: '4px 18px', borderTop: `1px solid ${t.fg}` }}>
+          <div style={{ margin: '4px 18px', ...(t.hard ? card(t) : {}), borderTop: t.hard ? 'none' : `1px solid ${t.fg}`, padding: t.hard ? 6 : 0 }}>
             {IDX.map(([n, title, sub]) => (
-              <div key={n} style={{ display: 'flex', gap: 10, padding: '8px 0', borderBottom: `1px solid ${t.line}`, alignItems: 'baseline' }}>
+              <div key={n} style={{ display: 'flex', gap: 10, padding: '8px 4px', borderBottom: `1px solid ${t.line}`, alignItems: 'baseline' }}>
                 <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 11, color: t.accent }}>{n}</span>
                 <div><div style={{ fontSize: 12, color: t.fg }}>{title}</div><div style={{ fontSize: 9, color: t.muted, marginTop: 2 }}>{sub}</div></div>
               </div>
@@ -110,8 +135,8 @@ export default function ThemePreview() {
         </div>
       </div>
 
-      <p style={{ fontSize: 12, color: theme === 'night' ? '#8c8378' : '#888', maxWidth: 340, textAlign: 'center', lineHeight: 1.6 }}>
-        真实可切换预览 · 三套均避开 AI 模板风（无紫蓝渐变 / 圆角卡片网格 / 柔和投影）<br />
+      <p style={{ fontSize: 12, color: isNight ? '#8c8378' : '#888', maxWidth: 340, textAlign: 'center', lineHeight: 1.6 }}>
+        手机真实可切换预览 · 白底两版基于你认可的硬边版式，仅改配色为白色简约<br />
         选定方向后我回写到全站手机版（MobileLayout / WeChatHome 等）
       </p>
     </div>
