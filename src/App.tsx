@@ -44,6 +44,7 @@ const Mine          = lazy(() => import('./pages/mobile/Mine').then(m => ({ defa
 const FeatureNotify = lazy(() => import('./pages/mobile/FeatureNotify').then(m => ({ default: m.default })))
 const News          = lazy(() => import('./pages/mobile/News').then(m => ({ default: m.default })))
 const MobileMoney   = lazy(() => import('./pages/mobile/Money').then(m => ({ default: m.default })))
+const ThemePreview  = lazy(() => import('./pages/mobile/ThemePreview').then(m => ({ default: m.default })))
 
 // PC 管理后台（同一平台内的模块，自身响应式）
 const Dashboard     = lazy(() => import('./pages/admin/Dashboard').then(m => ({ default: m.default })))
@@ -129,7 +130,7 @@ export default function App() {
   // 不停留在某个聊天（糖豆 / 百事通等）。仅在首次加载执行一次，不影响站内导航。
   useEffect(() => {
     const p = loc.pathname
-    const keep = p === '/' || p === '/splash' || p === '/login' || p.startsWith('/admin')
+    const keep = p === '/' || p === '/splash' || p === '/login' || p === '/theme-preview' || p.startsWith('/admin')
     if (!keep) nav('/', { replace: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -143,6 +144,8 @@ export default function App() {
     <ErrorBoundary>
       <Suspense fallback={<RouteFallback />}>
         <Routes>
+          {/* 手机版 UI 主题预览页（独立页，自带手机壳，不在 ResponsiveShell 内叠加） */}
+          <Route path="/theme-preview" element={<ThemePreview />} />
           {/* 管理后台：同一个平台内的独立模块，自身响应式（手机上侧栏变顶部条） */}
           <Route path="/admin/*" element={<AdminLayout />}>
             <Route index element={<Dashboard />} />
