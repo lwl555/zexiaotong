@@ -1,0 +1,55 @@
+{
+  "qq": "2893561757",
+  "results": [
+    {
+      "name": "register",
+      "ok": true,
+      "ms": 2959,
+      "note": ""
+    },
+    {
+      "name": "wallet_recharge",
+      "ok": false,
+      "ms": 30096,
+      "note": "page.waitForFunction: Timeout 30000ms exceeded."
+    },
+    {
+      "name": "publish_task",
+      "ok": false,
+      "ms": 30091,
+      "note": "page.waitForFunction: Timeout 30000ms exceeded."
+    },
+    {
+      "name": "my_tasks_visible",
+      "ok": false,
+      "ms": 1508,
+      "note": "任务未出现在我发布的列表"
+    },
+    {
+      "name": "publish_post",
+      "ok": false,
+      "ms": 2396,
+      "note": "帖子未出现在社区"
+    },
+    {
+      "name": "publish_goods",
+      "ok": false,
+      "ms": 2384,
+      "note": "商品未出现在二手市场"
+    },
+    {
+      "name": "ai_chat",
+      "ok": false,
+      "ms": 30108,
+      "note": "page.waitForFunction: Timeout 30000ms exceeded."
+    }
+  ],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 401 ()",
+    "Failed to load resource: the server responded with a status of 401 ()"
+  ],
+  "pageErrors": [
+    "Object",
+    "Object"
+  ]
+}

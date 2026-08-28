@@ -1,0 +1,23 @@
+=== 数据链路测量 @ before ===
+时间: Thu Aug 27 17:40:20     2026
+
+[1] REST /profiles (anon select) x5
+  try1: http=400 time=1.201914s
+  try2: http=400 time=1.000573s
+  try3: http=400 time=1.468364s
+  try4: http=400 time=0.866768s
+  try5: http=400 time=1.087757s
+
+[2] Edge agnes-search /v1/chat/completions (non-stream) x5
+  try1: time=7.624810s hasChoices=0
+  try2: time=7.799399s hasChoices=0
+  try3: time=11.572106s hasChoices=0
+  try4: time=8.453814s hasChoices=0
+  try5: time=9.434444s hasChoices=0
+
+[3] Edge agnes-search OPTIONS/轻探 x3
+  try1: time=1.946125s
+  try2: time=2.637996s
+  try3: time=1.508580s
+
+done -> qa/datalink-before.txt
