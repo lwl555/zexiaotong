@@ -130,7 +130,7 @@ export default function MobileLayout() {
   const notifyMeta = notifyMatch ? FEATURES[notifyMatch[1]] : undefined
 
   return (
-    <div className="app-shell flex flex-col mx-auto" style={{ minHeight: '100vh', maxWidth: 480, background: '#ededed' }}>
+    <div className="app-shell flex flex-col" style={{ minHeight: '100vh', background: '#ededed' }}>
       <div className="flex-1 overflow-y-auto no-scrollbar" style={{ paddingBottom: 48 }}>
         {showTopBar && (
           <div

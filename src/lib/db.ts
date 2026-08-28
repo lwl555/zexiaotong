@@ -85,8 +85,10 @@ export async function getCurrentUser(roleOverride?: Role): Promise<Profile> {
 
   // 拉 profile（最多等 6 秒；微信内置浏览器慢/连接被掐时不能干等）
   try {
+    // 优化：maybeSingle() 替代 single()——无行时返回 data=null 而非 406，避免控制台刷"Failed to load resource 406"。
+    // 注意：profiles 表里的列名是 phone，不是 qq（qq 是应用层 rowToProfile 的别名），这里必须用 phone。
     const { data, error } = await withTimeout(
-      supabase.from('profiles').select('*').eq('id', id).single(),
+      supabase.from('profiles').select('id, phone, nickname, avatar, role, balance, frozen, status, created_at').eq('id', id).maybeSingle(),
       6000,
       'selectProfile'
     )
@@ -94,15 +96,11 @@ export async function getCurrentUser(roleOverride?: Role): Promise<Profile> {
       // roleOverride 仅用于登录时首次写入（演示用：新建账号时赋予角色）
       return rowToProfile(data)
     }
-
-    // 拉不到 → 试着 insert 一个（匿名游客注册）；insert 也限时，失败直接返回本地兜底
-    const insertPayload = roleOverride ? { ...fallback, role: roleOverride } : fallback
-    const ins = await withTimeout(
-      supabase.from('profiles').insert(profileToRow(insertPayload)).select().single(),
-      6000,
-      'insertProfile'
-    ).catch(() => ({ data: null as any, error: { message: 'insert timeout' } }))
-    return (ins?.data as Profile) || fallback
+    // 没拉到记录：直接返回本地兜底。
+    // 原逻辑还会试着 INSERT 一个匿名游客档案，但 RLS 对 anon 的 INSERT 一律拒（返回 409），
+    // 既浪费时间又污染控制台。这里彻底跳过：访客的"档案"只在登录/注册时才真正落库。
+    if (roleOverride) return { ...fallback, role: roleOverride }
+    return fallback
   } catch {
     // 任何超时 / 异常 → 直接返回本地兜底，保证 init() 不卡死
     if (roleOverride) return { ...fallback, role: roleOverride }
@@ -493,16 +491,25 @@ export async function updateArbitration(id: string, updates: Partial<Arbitration
 // ─── 平台配置 ───────────────────────────────────────────────────
 
 export async function fetchPlatformConfig(): Promise<PlatformConfig> {
-  const { data } = await supabase!
-    .from('platform_config')
-    .select('*')
-    .single()
-  if (!data) return { commission_rate: 0.10, top_price: { d1: 2, d3: 5, d7: 10 }, announce: '' }
-  return {
-    commission_rate: data.commission_rate,
-    top_price: { d1: data.top_price_d1, d3: data.top_price_d3, d7: data.top_price_d7 },
-    announce: data.announce
-  } as PlatformConfig
+  const DEFAULT_CFG: PlatformConfig = { commission_rate: 0.10, top_price: { d1: 2, d3: 5, d7: 10 }, announce: '' }
+  if (!supabase) return DEFAULT_CFG
+  try {
+    // 优化：显式列 + maybeSingle()。原 select('*') 在 RLS 列级限制下返回 406（控制台报错且取不到配置）。
+    const { data, error } = await withTimeout(
+      supabase!.from('platform_config')
+        .select('commission_rate, top_price_d1, top_price_d3, top_price_d7, announce')
+        .maybeSingle(),
+      6000, 'fetchConfig'
+    )
+    if (error || !data) return DEFAULT_CFG
+    return {
+      commission_rate: (data as any).commission_rate,
+      top_price: { d1: (data as any).top_price_d1, d3: (data as any).top_price_d3, d7: (data as any).top_price_d7 },
+      announce: (data as any).announce
+    } as PlatformConfig
+  } catch {
+    return DEFAULT_CFG
+  }
 }
 
 // ─── 分类 / 轮播 ───────────────────────────────────────────────
