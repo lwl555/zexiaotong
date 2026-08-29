@@ -58,11 +58,11 @@ const Config        = lazy(() => import('./pages/admin/Config').then(m => ({ def
 const System        = lazy(() => import('./pages/admin/System').then(m => ({ default: m.default })))
 const FeatureChats  = lazy(() => import('./pages/admin/FeatureChats').then(m => ({ default: m.default })))
 
-// 路由切换时的加载占位（与微信绿品牌一致；只在 chunk 下载期间出现一帧）
+// 路由切换时的加载占位（陶土红品牌色；只在 chunk 下载期间出现一帧）
 function RouteFallback() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#ededed]">
-      <div className="w-7 h-7 border-[3px] border-[#07c160]/30 border-t-[#07c160] rounded-full animate-spin" />
+      <div className="w-7 h-7 border-[3px] border-[#D8451F]/30 border-t-[#D8451F] rounded-full animate-spin" />
     </div>
   )
 }
