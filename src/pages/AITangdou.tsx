@@ -1050,7 +1050,7 @@ export default function AITangdou() {
             maxWidth: isMobile ? '82%' : '70%',
             padding: m.image ? 0 : (isMobile ? '8px 11px' : '10px 14px'),
             borderRadius: 14,
-            background: m.role === 'user' ? '#07c160' : (m.error ? '#fef2f2' : '#ffffff'),
+            background: m.role === 'user' ? '#D8451F' : (m.error ? '#fef2f2' : '#ffffff'),
             border: m.error ? '1px solid #fecaca' : '1px solid rgba(0,0,0,0.06)',
             color: m.role === 'user' ? '#fff' : (m.error ? '#b42318' : '#1c1814'),
             fontSize: isMobile ? 13.5 : 14,
