@@ -34,7 +34,7 @@ function Bubble({ m, meId, meta }: { m: FeatureChatMsg; meId: string; meta: Feat
     return (
       <div className="flex justify-end">
         <div className="max-w-[72%] px-3.5 py-2.5 rounded-2xl rounded-br-sm text-[15px] leading-relaxed text-white"
-          style={{ background: '#07c160' }}>
+          style={{ background: '#D8451F' }}>
           {m.content}
           {time && <div className="text-[10px] text-white/70 text-right mt-0.5">{time}</div>}
         </div>
