@@ -37,8 +37,7 @@ function titleOf(path: string): string {
   return '择校通'
 }
 
-// 微信风格底部 4 Tab（微信绿 #07c160）
-const WECHAT_GREEN = '#07c160'
+// 底部 Tab 配色由白底结合版（墨黑选中态 + 粗黑边）控制
 const tabs = [
   { to: '/', label: '首页', icon: MessageSquare, end: true },
   { to: '/community', label: '通讯录', icon: Users, end: false },
