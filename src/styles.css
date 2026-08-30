@@ -7,19 +7,23 @@
   --faint: #999999;
   --border: #e0e0e0;
   --border-strong: #d0d0d0;
-  --accent: #D8451F;           /* 陶土红作为全站主强调（与手机版白底结合版统一） */
-  --accent-2: #b5370f;         /* 陶土深 */
-  --accent-3: #8a3410;         /* 更深陶土 */
+  --accent: #1a1a1a;           /* 中性墨黑：内侧密集页用黑/深灰做强调，避免陶土红泛滥 */
+  --accent-2: #333333;         /* 深灰 */
+  --accent-3: #0a0a0a;         /* 更深黑 */
+  --brand: #D8451F;            /* 稳定品牌色：始终陶土红（首页/主按钮/用户气泡） */
+  --brand-2: #b5370f;          /* 陶土深 */
+  --brand-3: #8a3410;          /* 更深陶土 */
+  --brand-soft: #fbeede;       /* 陶土浅 */
   --accent-soft: #f0f0f0;      /* 极浅灰 */
   --accent-fg: #ffffff;
   --danger: #dc2626;
   --ok: #16a34a;
   --warn: #ca8a04;
-  --radius: 10px;
-  --radius-sm: 8px;
-  /* 硬边无模糊阴影：呼应手机版新粗野版式，替代柔和投影 */
-  --shadow: 4px 4px 0 rgba(20, 16, 12, 0.92);
-  --shadow-sm: 2px 2px 0 rgba(20, 16, 12, 0.55);
+  --radius: 13px;
+  --radius-sm: 9px;
+  /* 内侧页默认柔和投影（干净）；硬边阴影仅首页 .theme-home 启用 */
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 16px 34px rgba(0, 0, 0, 0.08);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
   --maxw: 1200px;
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
     "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
@@ -50,10 +54,19 @@
   --faint: #9a9085;
   --border: #e7ddcb;
   --border-strong: #d8cbb2;
-  --accent: #D8451F;
-  --accent-2: var(--accent-2);
+  --accent: #D8451F;          /* 首页：陶土红强调（与手机版白底结合版统一） */
+  --accent-2: #b5370f;
   --accent-3: #8a3410;
   --accent-soft: #fbeede;
+  --brand: #D8451F;
+  --brand-2: #b5370f;
+  --brand-3: #8a3410;
+  --brand-soft: #fbeede;
+  --radius: 10px;
+  --radius-sm: 8px;
+  /* 首页硬边无模糊阴影：白底结合版签名版式（仅首页启用） */
+  --shadow: 5px 5px 0 rgba(17, 17, 17, 0.92);
+  --shadow-sm: 3px 3px 0 rgba(17, 17, 17, 0.5);
   --c-adv: #15803d; --c-adv-bg: #ecfdf3; --c-adv-bar: #34d399;
   --c-dis: #b42318; --c-dis-bg: #fef2f2; --c-dis-bar: #f87171;
   --c-hl:  #b45309; --c-hl-bg:  #fffbeb; --c-hl-bar:  #fbbf24;
@@ -249,10 +262,10 @@ a { color: inherit; text-decoration: none; }
   transition: all 0.15s ease; cursor: pointer;
 }
 .cta.primary {
-  background: var(--accent); color: #fff;
+  background: var(--brand); color: #fff;
   box-shadow: 4px 4px 0 rgba(20, 16, 12, 0.92);
 }
-.cta.primary:hover { background: var(--accent-3); transform: translateY(-1px); }
+.cta.primary:hover { background: var(--brand-3); transform: translateY(-1px); }
 .cta.ghost {
   background: transparent; color: var(--fg);
   border: 1px solid var(--border-strong);
@@ -493,8 +506,8 @@ textarea { resize: vertical; min-height: 88px; }
   border: 1px solid transparent; border-radius: var(--radius-sm); padding: 10px 18px;
   transition: all 0.15s ease; white-space: nowrap;
 }
-.btn-primary { background: var(--accent); color: var(--accent-fg); box-shadow: 3px 3px 0 rgba(20, 16, 12, 0.9); }
-.btn-primary:hover { background: var(--accent-3); }
+.btn-primary { background: var(--brand); color: var(--accent-fg); box-shadow: 3px 3px 0 rgba(20, 16, 12, 0.9); }
+.btn-primary:hover { background: var(--brand-3); }
 .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
 .btn-ghost { background: var(--surface); color: var(--fg); border-color: var(--border-strong); }
 .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
@@ -1075,7 +1088,7 @@ textarea { resize: vertical; min-height: 88px; }
 .wx .msg { margin-bottom: 14px; }
 .wx .msg.user { justify-content: flex-end; }
 .wx .msg.user .bubble {
-  background: var(--accent); color: #fff; border: 0; border-radius: 14px 14px 4px 14px;
+  background: var(--brand); color: #fff; border: 0; border-radius: 14px 14px 4px 14px;
   padding: 10px 13px; max-width: 80%;
 }
 .wx .msg.ai .bubble {
