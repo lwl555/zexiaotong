@@ -5,6 +5,20 @@ import { useStore } from '../../store/store'
 import { useMe } from '../../store/useMe'
 import { fetchComments, createComment } from '../../lib/db'
 import type { Comment } from '../../lib/types'
+import {
+  PageHeader,
+  SectionLabel,
+  HardCard,
+  ListRow,
+  BtnPrimary,
+  Tag,
+  INK,
+  MUTED,
+  ACCENT,
+  HAIR,
+  FONT,
+  MONO,
+} from '../../components/Editorial'
 
 export default function PostDetail() {
   const { id } = useParams()
@@ -27,7 +41,15 @@ export default function PostDetail() {
       .finally(() => setLoading(false))
   }, [id])
 
-  if (!post) return <div className="p-10 text-center text-gray-400">帖子不存在或已删除</div>
+  if (!post) {
+    return (
+      <div style={{ padding: '8px 2px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
+        <HardCard>
+          <div style={{ textAlign: 'center', color: MUTED, fontSize: 14 }}>帖子不存在或已删除</div>
+        </HardCard>
+      </div>
+    )
+  }
 
   const send = async () => {
     if (!comment.trim()) return
@@ -59,44 +81,85 @@ export default function PostDetail() {
   }
 
   return (
-    <div className="px-4 pt-3 pb-10">
-      <button onClick={() => nav(-1)} className="text-gray-400 mb-2 flex items-center"><ChevronLeft size={16} /> 返回</button>
+    <div style={{ padding: '8px 2px 96px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
+      <button onClick={() => nav(-1)} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT, fontSize: 13, color: MUTED, marginBottom: 12, padding: 0 }}>
+        <ChevronLeft size={16} /> 返回
+      </button>
 
-      {post.images[0] && <img src={post.images[0]} className="w-full h-36 object-cover rounded-2xl mb-3 bg-gray-100" alt="" />}
-      <h1 className="text-[18px] font-bold text-ink leading-snug">{post.title}</h1>
-      <div className="flex items-center gap-2 mt-2 text-xs text-gray-400">
-        <img src={post.author_avatar} className="w-6 h-6 rounded-full" alt="" />{post.author_name}
-      </div>
-      <p className="text-sm text-gray-700 mt-3 leading-relaxed whitespace-pre-wrap">{post.content}</p>
+      {post.images[0] && (
+        <img src={post.images[0]} alt="" style={{ width: '100%', height: 220, objectFit: 'cover', border: `3px solid ${INK}`, borderRadius: 2, marginBottom: 16, background: '#efefef' }} />
+      )}
 
-      <div className="flex items-center gap-6 mt-5 py-3 border-y border-gray-100">
-        <button onClick={() => likePost(post.id)} className={'flex items-center gap-1.5 ' + (post.liked ? 'text-red-500' : 'text-gray-500')}>
+      <PageHeader
+        eyebrow="Post"
+        title={post.title}
+        right={<Tag tone="line">帖子</Tag>}
+      />
+
+      {/* 作者 + 正文：硬边主卡 */}
+      <HardCard style={{ marginBottom: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, paddingBottom: 12, borderBottom: `1px solid ${HAIR}` }}>
+          <img src={post.author_avatar} alt="" style={{ width: 30, height: 30, borderRadius: '50%', border: `1.5px solid ${INK}` }} />
+          <span style={{ fontFamily: FONT, fontSize: 14, fontWeight: 700, color: INK }}>{post.author_name}</span>
+          <span style={{ fontFamily: MONO, fontSize: 11, color: MUTED, letterSpacing: 1, marginLeft: 'auto' }}>
+            {String(post.likes + post.collects).padStart(3, '0')} 互动
+          </span>
+        </div>
+        <p style={{ fontFamily: FONT, fontSize: 15, color: INK, lineHeight: 1.75, margin: 0, whiteSpace: 'pre-wrap' }}>{post.content}</p>
+      </HardCard>
+
+      {/* 互动条：点赞 / 收藏 / 举报 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 18, padding: '12px 2px', borderTop: `1px solid ${HAIR}`, borderBottom: `1px solid ${HAIR}`, marginBottom: 20 }}>
+        <button onClick={() => likePost(post.id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT, fontSize: 14, fontWeight: 600, color: post.liked ? ACCENT : MUTED, padding: 0 }}>
           <Heart size={18} /> {post.likes}
         </button>
-        <button onClick={() => collectPost(post.id)} className={'flex items-center gap-1.5 ' + (post.collected ? 'text-amber-500' : 'text-gray-500')}>
+        <button onClick={() => collectPost(post.id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT, fontSize: 14, fontWeight: 600, color: post.collected ? ACCENT : MUTED, padding: 0 }}>
           <Star size={18} /> {post.collects}
         </button>
-        <button onClick={() => nav('/')} className="flex items-center gap-1.5 text-gray-500 ml-auto"><Flag size={16} /> 举报</button>
+        <button onClick={() => nav('/')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT, fontSize: 14, fontWeight: 600, color: MUTED, marginLeft: 'auto', padding: 0 }}>
+          <Flag size={16} /> 举报
+        </button>
       </div>
 
-      <h2 className="font-bold text-ink mt-5 mb-2">评论 {comments.length}</h2>
-      <div className="space-y-3">
-        {loading && <div className="text-sm text-gray-400">加载评论中…</div>}
-        {!loading && comments.length === 0 && <div className="text-sm text-gray-400">暂无评论，来抢沙发</div>}
+      <SectionLabel index="02" label="评论" />
+
+      <div>
+        {loading && <div style={{ textAlign: 'center', color: MUTED, fontSize: 14, padding: '32px 0' }}>加载评论中…</div>}
+        {!loading && comments.length === 0 && <div style={{ textAlign: 'center', color: MUTED, fontSize: 14, padding: '32px 0' }}>暂无评论，来抢沙发</div>}
         {comments.map(c => (
-          <div key={c.id} className="flex gap-2">
-            <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-brand-600 text-sm shrink-0">{c.author_name.slice(-1)}</div>
-            <div className="flex-1">
-              <div className="text-sm font-medium">{c.author_name} <span className="text-xs text-gray-400 font-normal ml-2">{new Date(c.created_at).toLocaleString('zh-CN')}</span></div>
-              <div className="text-sm text-gray-600 mt-0.5">{c.content}</div>
+          <ListRow key={c.id} style={{ alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', gap: 10, width: '100%' }}>
+              <div style={{ width: 32, height: 32, borderRadius: '50%', border: `2px solid ${INK}`, background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, fontSize: 14, fontWeight: 700, color: INK, flexShrink: 0 }}>
+                {c.author_name.slice(-1)}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: FONT, fontSize: 14, fontWeight: 600, color: INK }}>
+                  {c.author_name}
+                  <span style={{ fontFamily: FONT, fontSize: 12, color: MUTED, fontWeight: 400, marginLeft: 8 }}>
+                    {new Date(c.created_at).toLocaleString('zh-CN')}
+                  </span>
+                </div>
+                <div style={{ fontFamily: FONT, fontSize: 14, color: MUTED, marginTop: 4, lineHeight: 1.6 }}>{c.content}</div>
+              </div>
             </div>
-          </div>
+          </ListRow>
         ))}
       </div>
 
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] h-16 bg-white border-t border-gray-100 flex items-center gap-2 px-4 z-30">
-        <input className="input flex-1" value={comment} onChange={e => setComment(e.target.value)} placeholder="友善评论…" onKeyDown={e => e.key === 'Enter' && send()} />
-        <button className="btn-primary px-5" onClick={send}><MessageCircle size={16} /></button>
+      {/* 固定评论输入栏：白底 + 粗黑边 */}
+      <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 1200, height: 64, background: '#ffffff', borderTop: `2px solid ${INK}`, display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', zIndex: 30 }}>
+        <input
+          value={comment}
+          onChange={e => setComment(e.target.value)}
+          placeholder="友善评论…"
+          onKeyDown={e => e.key === 'Enter' && send()}
+          style={{ flex: 1, border: `2px solid ${INK}`, borderRadius: 2, padding: '10px 12px', fontFamily: FONT, fontSize: 15, outline: 'none', background: '#ffffff', color: INK }}
+        />
+        <BtnPrimary onClick={send}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <MessageCircle size={16} /> 发送
+          </span>
+        </BtnPrimary>
       </div>
     </div>
   )

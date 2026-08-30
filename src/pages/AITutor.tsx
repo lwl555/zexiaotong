@@ -1,15 +1,17 @@
 import AIChat from '../components/AIChat'
 import { PROMPT_AI_TUTOR, PROMPT_EMPHASIS } from '../lib/prompts'
+import { PageHeader, FONT } from '../components/Editorial'
 
 // 学习导师：从「表单提交」改为微信聊天气泡（复用 AIChat，移动端 .wx 绿白气泡）。
 // 把分数 / 位次 / 意向交给 AI 在对话里逐步澄清，保持与百事通一致的聊天体验。
 export default function AITutor() {
   return (
-    <>
-      <div className="page-head">
-        <h2>学习导师</h2>
-        <p>把你的分数、位次、意向城市和 / 或专业告诉 AI，它按冲 / 稳 / 保三档帮你规划院校与专业——只给建议，决定权在你。对话自动保存，可随时接着聊。</p>
-      </div>
+    <div style={{ padding: '8px 2px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
+      <PageHeader
+        eyebrow="AI Tutor"
+        title="学习导师"
+        desc="把你的分数、位次、意向城市和 / 或专业告诉 AI，它按冲 / 稳 / 保三档帮你规划院校与专业——只给建议，决定权在你。对话自动保存，可随时接着聊。"
+      />
 
       <AIChat
         title="学习导师"
@@ -36,6 +38,6 @@ export default function AITutor() {
           '换成同档次但性价比更高的学校有推荐吗？'
         ]}
       />
-    </>
+    </div>
   )
 }

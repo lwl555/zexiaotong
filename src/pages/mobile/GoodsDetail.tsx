@@ -3,6 +3,16 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { MessageSquare, ChevronLeft, Share2 } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { useMe } from '../../store/useMe'
+import {
+  SectionLabel,
+  Tag,
+  BtnPrimary,
+  INK,
+  MUTED,
+  ACCENT,
+  HAIR,
+  FONT,
+} from '../../components/Editorial'
 
 export default function GoodsDetail() {
   const { id } = useParams()
@@ -12,7 +22,7 @@ export default function GoodsDetail() {
   const sendMessage = useStore(s => s.sendMessage)
   const [imgIdx, setImgIdx] = useState(0)
 
-  if (!good) return <div className="p-10 text-center text-gray-400">商品不存在或已下架</div>
+  if (!good) return <div style={{ padding: '64px 16px', textAlign: 'center', color: MUTED, fontSize: 14, fontFamily: FONT }}>商品不存在或已下架</div>
   const isMine = good.seller_id === me.id
 
   const chat = () => {
@@ -22,45 +32,108 @@ export default function GoodsDetail() {
   }
 
   return (
-    <div className="pb-24">
-      <div className="relative">
-        <img src={good.images[imgIdx] || ''} className="w-full h-64 object-cover bg-gray-100" alt="" />
-        <button onClick={() => nav(-1)} className="absolute top-3 left-3 w-9 h-9 rounded-full bg-black/40 text-white flex items-center justify-center"><ChevronLeft size={20} /></button>
-        <button onClick={() => nav('/')} className="absolute top-3 right-3 w-9 h-9 rounded-full bg-black/40 text-white flex items-center justify-center"><Share2 size={16} /></button>
+    <div style={{ padding: '0 2px 88px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
+      {/* 顶部返回 / 分享 */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 8px', marginBottom: 4 }}>
+        <button onClick={() => nav(-1)} style={btnGhostMinimal()} aria-label="返回">
+          <ChevronLeft size={20} color={INK} />
+        </button>
+        <button onClick={() => nav('/')} style={btnGhostMinimal()} aria-label="分享">
+          <Share2 size={16} color={INK} />
+        </button>
+      </div>
+
+      {/* 主图 + 缩略点 */}
+      <div style={{ position: 'relative' }}>
+        <img
+          src={good.images[imgIdx] || ''}
+          alt=""
+          style={{ width: '100%', height: 260, objectFit: 'cover', border: `2px solid ${INK}`, borderRadius: 2, background: '#efefef', display: 'block' }}
+        />
         {good.images.length > 1 && (
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
-            {good.images.map((_, i) => <span key={i} className={'w-1.5 h-1.5 rounded-full ' + (i === imgIdx ? 'bg-white' : 'bg-white/50')} />)}
+          <div style={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 6 }}>
+            {good.images.map((_, i) => (
+              <span
+                key={i}
+                onClick={() => setImgIdx(i)}
+                style={{ width: 8, height: 8, borderRadius: '50%', cursor: 'pointer', background: i === imgIdx ? ACCENT : '#ffffff', border: `1.5px solid ${INK}` }}
+              />
+            ))}
           </div>
         )}
       </div>
 
-      <div className="px-4 pt-4">
-        <div className="text-2xl font-black text-brand-600">¥{good.price}</div>
-        <h1 className="text-lg font-black text-ink mt-2">{good.title}</h1>
-        <div className="flex items-center gap-2 mt-2">
-          <span className="tag bg-gray-100 text-gray-500">{good.category}</span>
+      <div style={{ padding: '18px 6px 0' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
+          <div style={{ fontFamily: FONT, fontSize: 30, fontWeight: 800, color: ACCENT, letterSpacing: '-0.02em' }}>¥{good.price}</div>
+          {good.status === 'off' ? (
+            <Tag tone="ink">已下架</Tag>
+          ) : (
+            <Tag tone="line">{good.category}</Tag>
+          )}
         </div>
-        <p className="text-sm text-gray-600 mt-4 leading-relaxed whitespace-pre-wrap">{good.description}</p>
+        <h1 style={{ fontFamily: FONT, fontSize: 22, fontWeight: 800, color: INK, marginTop: 10, lineHeight: 1.2, margin: 0 }}>{good.title}</h1>
+        <p style={{ fontFamily: FONT, fontSize: 14, color: MUTED, marginTop: 14, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{good.description}</p>
 
-        <div className="flex items-center gap-3 mt-5 p-3 rounded-2xl bg-gray-50">
-          <img src={good.seller_id ? '' : ''} className="w-10 h-10 rounded-full bg-brand-100" alt="" />
-          <div className="flex-1">
-            <div className="font-medium text-sm">{good.seller_name}</div>
-            <div className="text-xs text-gray-400">卖家</div>
+        {/* 卖家 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 18, padding: 14, border: `1px solid ${HAIR}`, borderRadius: 3 }}>
+          <img src={good.seller_id ? '' : ''} alt="" style={{ width: 40, height: 40, borderRadius: '50%', border: `1.5px solid ${INK}`, background: '#f4f2f2' }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontFamily: FONT, fontSize: 14, fontWeight: 600, color: INK }}>{good.seller_name}</div>
+            <div style={{ fontFamily: FONT, fontSize: 12, color: MUTED, marginTop: 2 }}>卖家</div>
           </div>
+        </div>
+
+        <div style={{ marginTop: 22 }}>
+          <SectionLabel label="交易须知" />
+          <p style={{ fontFamily: FONT, fontSize: 13, color: MUTED, lineHeight: 1.7, margin: 0 }}>
+            本平台仅提供信息撮合，请线下当面交易、自行确认成色与真伪，谨防诈骗。
+          </p>
         </div>
       </div>
 
-      {/* 底部操作栏 */}
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] h-16 bg-white border-t border-gray-100 flex items-center gap-3 px-4 z-30">
-        <button onClick={chat} disabled={isMine} className="flex flex-col items-center text-gray-500 disabled:opacity-40">
-          <MessageSquare size={20} /><span className="text-[11px] mt-0.5">私聊</span>
+      {/* 底部操作栏：白底 + 粗黑上边线 */}
+      <div
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: '100%',
+          maxWidth: 1200,
+          background: '#ffffff',
+          borderTop: `2px solid ${INK}`,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          padding: '12px 16px',
+          zIndex: 30,
+        }}
+      >
+        <button onClick={chat} disabled={isMine} style={{ ...btnGhostMinimal(), flexDirection: 'column', gap: 2, opacity: isMine ? 0.4 : 1, cursor: isMine ? 'not-allowed' : 'pointer' }}>
+          <MessageSquare size={20} color={INK} />
+          <span style={{ fontFamily: FONT, fontSize: 11, color: MUTED }}>私聊</span>
         </button>
-        <button onClick={chat} disabled={isMine}
-          className="btn-primary flex-1 disabled:opacity-40">
+        <BtnPrimary onClick={chat} disabled={isMine} style={{ flex: 1, opacity: isMine ? 0.4 : 1, cursor: isMine ? 'not-allowed' : 'pointer' }}>
           {isMine ? '这是你自己发布的' : '我想要（私聊卖家）'}
-        </button>
+        </BtnPrimary>
       </div>
     </div>
   )
+}
+
+function btnGhostMinimal(): any {
+  return {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    border: `2px solid ${INK}`,
+    borderRadius: 2,
+    background: '#ffffff',
+    color: INK,
+    fontFamily: FONT,
+    fontWeight: 600,
+    cursor: 'pointer',
+    padding: '8px 12px',
+  }
 }

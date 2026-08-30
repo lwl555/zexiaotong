@@ -2,6 +2,21 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { useMe } from '../../store/useMe'
+import {
+  PageHeader,
+  SectionLabel,
+  HardCard,
+  SoftCard,
+  ListRow,
+  BtnPrimary,
+  BtnGhost,
+  INK,
+  MUTED,
+  FAINT,
+  ACCENT,
+  FONT,
+  MONO,
+} from '../../components/Editorial'
 
 const aiTools = [
   { to: '/ai-search', label: 'AI 百事通' },
@@ -32,66 +47,111 @@ export default function Mine() {
   ]
 
   return (
-    <div className="px-3.5 pt-3 pb-10">
-      {/* 头部 */}
+    <div style={{ padding: '8px 2px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
+      <PageHeader eyebrow="Mine" title="我的" desc="账号、任务与择校通 AI 工具，一站式入口。" />
+
+      {/* 头部：用户卡片 */}
       {isGuest ? (
-        <button onClick={() => nav('/login')} className="w-full flex items-center gap-3.5 py-3.5 text-left active:bg-gray-50 rounded-xl">
-          <div className="w-14 h-14 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-base font-medium">登录</div>
-          <div className="flex-1">
-            <div className="font-bold text-[17px]">未登录</div>
-            <div className="text-[11px] text-brand-600 mt-0.5">点击登录 / 注册，解锁发任务、接单、钱包</div>
+        <HardCard
+          onClick={() => nav('/login')}
+          style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', marginBottom: 24 }}
+        >
+          <div
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: '50%',
+              border: `2px solid ${INK}`,
+              background: '#f4f2ee',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontFamily: FONT,
+              fontWeight: 700,
+              color: MUTED,
+              fontSize: 15,
+              flexShrink: 0,
+            }}
+          >
+            登录
           </div>
-          <ChevronRight size={18} className="text-gray-300" />
-        </button>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontFamily: FONT, fontSize: 18, fontWeight: 800, color: INK }}>未登录</div>
+            <div style={{ fontFamily: FONT, fontSize: 12, color: ACCENT, marginTop: 4 }}>
+              点击登录 / 注册，解锁发任务、接单、钱包
+            </div>
+          </div>
+          <ChevronRight size={18} color={FAINT} />
+        </HardCard>
       ) : (
-        <div className="flex items-center gap-3.5 py-3.5">
-          <img src={me.avatar} className="w-14 h-14 rounded-full bg-gray-200" alt="" />
-          <div className="flex-1">
-            <div className="font-bold text-[17px]">{me.nickname}</div>
-            <div className="text-[11px] text-gray-400">{me.qq} · {me.status === 'banned' ? '已封禁' : '正常'}</div>
+        <HardCard style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 24 }}>
+          <img
+            src={me.avatar}
+            alt=""
+            style={{ width: 56, height: 56, borderRadius: '50%', border: `2px solid ${INK}`, background: '#f4f2ee', flexShrink: 0 }}
+          />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: FONT, fontSize: 18, fontWeight: 800, color: INK }}>{me.nickname}</div>
+            <div style={{ fontFamily: FONT, fontSize: 12, color: MUTED, marginTop: 4 }}>
+              {me.qq} · {me.status === 'banned' ? '已封禁' : '正常'}
+            </div>
           </div>
-          <button onClick={() => nav('/wallet')} className="flex items-center gap-1 text-brand-600 text-[13px]">钱包</button>
-        </div>
+          <BtnGhost onClick={() => nav('/wallet')} style={{ padding: '7px 12px', color: ACCENT, borderColor: ACCENT }}>
+            钱包
+          </BtnGhost>
+        </HardCard>
       )}
 
-      {/* 我的模块（纯文字列表） */}
-      <div className="card divide-y divide-gray-50">
+      {/* 我的模块 */}
+      <SectionLabel label="我的模块" />
+      <SoftCard style={{ padding: 0, marginBottom: 24 }}>
         {myRows.map(r => (
-          <button key={r.label} onClick={r.onClick} className="w-full flex items-center gap-3 px-4 py-3 text-left">
-            <span className="flex-1 text-[14px] text-gray-800">{r.label}</span>
-            {r.val > 0 && <span className="text-[11px] text-red-500">{r.val} 条</span>}
-            <ChevronRight size={16} className="text-gray-300" />
-          </button>
+          <ListRow key={r.label} style={{ cursor: 'pointer', padding: '14px 16px' }} onClick={r.onClick}>
+            <span style={{ flex: 1, fontFamily: FONT, fontSize: 14, color: INK }}>{r.label}</span>
+            {r.val > 0 && <span style={{ fontFamily: MONO, fontSize: 11, color: ACCENT, letterSpacing: 1, marginRight: 8 }}>{r.val} 条</span>}
+            <ChevronRight size={16} color={FAINT} />
+          </ListRow>
         ))}
-      </div>
+      </SoftCard>
 
-      <button onClick={() => nav('/wallet')} className="btn-primary w-full mt-4">进入钱包中心</button>
+      <BtnPrimary onClick={() => nav('/wallet')} style={{ width: '100%', marginBottom: 24 }}>
+        进入钱包中心
+      </BtnPrimary>
 
-      {/* 择校通 AI 工具（纯文字直达，与首页一致） */}
-      <div className="mt-4">
-        <div className="text-[11px] text-gray-400 px-1 mb-2">择校通 · AI 工具</div>
-        <div className="card divide-y divide-gray-50">
-          {aiTools.map(t => (
-            <button key={t.to} onClick={() => nav(t.to)} className="w-full flex items-center px-4 py-3 text-left">
-              <span className="flex-1 text-[14px] text-gray-800">{t.label}</span>
-              <ChevronRight size={16} className="text-gray-300" />
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* 择校通 AI 工具 */}
+      <SectionLabel label="择校通 · AI 工具" />
+      <SoftCard style={{ padding: 0, marginBottom: 24 }}>
+        {aiTools.map(t => (
+          <ListRow key={t.to} style={{ cursor: 'pointer', padding: '14px 16px' }} onClick={() => nav(t.to)}>
+            <span style={{ flex: 1, fontFamily: FONT, fontSize: 14, color: INK }}>{t.label}</span>
+            <ChevronRight size={16} color={FAINT} />
+          </ListRow>
+        ))}
+      </SoftCard>
 
       {/* 设置 */}
-      <div className="card mt-4 divide-y divide-gray-50">
-        <button className="w-full flex items-center px-4 py-3 text-left"><span className="flex-1 text-[14px] text-gray-800">设置中心</span><ChevronRight size={16} className="text-gray-300" /></button>
+      <SectionLabel label="设置" />
+      <SoftCard style={{ padding: 0, marginBottom: 24 }}>
+        <ListRow style={{ cursor: 'pointer', padding: '14px 16px' }}>
+          <span style={{ flex: 1, fontFamily: FONT, fontSize: 14, color: INK }}>设置中心</span>
+          <ChevronRight size={16} color={FAINT} />
+        </ListRow>
         {me.role === 'admin' && (
-          <button onClick={() => nav('/admin')} className="w-full flex items-center px-4 py-3 text-left"><span className="flex-1 text-[14px] text-gray-800">进入管理后台</span><ChevronRight size={16} className="text-gray-300" /></button>
+          <ListRow style={{ cursor: 'pointer', padding: '14px 16px' }} onClick={() => nav('/admin')}>
+            <span style={{ flex: 1, fontFamily: FONT, fontSize: 14, color: ACCENT }}>进入管理后台</span>
+            <ChevronRight size={16} color={FAINT} />
+          </ListRow>
         )}
-      </div>
+      </SoftCard>
 
       {!isGuest && (
-        <button onClick={() => { logout(); nav('/splash') }} className="w-full mt-4 py-2.5 text-gray-400 text-[13px]">退出登录</button>
+        <BtnGhost onClick={() => { logout(); nav('/splash') }} style={{ width: '100%', color: MUTED }}>
+          退出登录
+        </BtnGhost>
       )}
-      <p className="text-center text-[11px] text-gray-300 mt-6">择校通 · 校园综合服务</p>
+      <p style={{ textAlign: 'center', fontFamily: MONO, fontSize: 11, color: FAINT, marginTop: 24, letterSpacing: 1 }}>
+        择校通 · 校园综合服务
+      </p>
     </div>
   )
 }

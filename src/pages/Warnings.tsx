@@ -1,6 +1,23 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { exportDocx } from '../lib/docx'
+import {
+  PageHeader,
+  SectionLabel,
+  HardCard,
+  SoftCard,
+  ListRow,
+  Tag,
+  BtnPrimary,
+  BtnGhost,
+  INK,
+  MUTED,
+  FAINT,
+  ACCENT,
+  HAIR,
+  FONT,
+  MONO,
+} from '../components/Editorial'
 
 interface Warning {
   id: string
@@ -53,108 +70,111 @@ export default function Warnings() {
   }
 
   return (
-    <>
-      <div className="page-head">
-        <h2>避雷清单</h2>
-        <p>标记学校 / 公司的真实缺点，记录自己遇到的坑，随时导出 Word 备份。数据存于公共看板，人人可看可加。</p>
-      </div>
+    <div style={{ padding: '8px 2px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
+      <PageHeader
+        eyebrow="Warnings"
+        title="避雷清单"
+        desc="标记学校 / 公司的真实缺点，记录自己遇到的坑，随时导出 Word 备份。数据存于公共看板，人人可看可加。"
+        right={
+          <BtnGhost onClick={exportAll} style={!items.length ? { opacity: 0.5, pointerEvents: 'none' } : {}}>
+            导出全部 Word
+          </BtnGhost>
+        }
+      />
 
-      <div className="split">
-        <div className="panel" style={{ padding: 18 }}>
-          <div className="field">
-            <label>类型</label>
-            <select value={form.target_type} onChange={(e) => setForm({ ...form, target_type: e.target.value as any })}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 320px) minmax(0, 1fr)', gap: 22, alignItems: 'start' }}>
+        {/* 发布面板：粗黑边硬卡 */}
+        <HardCard style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <SectionLabel label="添加避雷" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: 1.5, color: MUTED, textTransform: 'uppercase' }}>类型</label>
+            <select
+              value={form.target_type}
+              onChange={(e) => setForm({ ...form, target_type: e.target.value as any })}
+              style={{ border: `2px solid ${INK}`, borderRadius: 2, padding: '9px 10px', fontFamily: FONT, fontSize: 14, background: '#fff', color: INK, outline: 'none' }}
+            >
               <option value="school">院校</option>
               <option value="company">公司</option>
             </select>
           </div>
-          <div className="field">
-            <label>标题 *</label>
-            <input value={form.title} placeholder="如：某某大学 转专业极难" onChange={(e) => setForm({ ...form, title: e.target.value })} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: 1.5, color: MUTED, textTransform: 'uppercase' }}>标题 *</label>
+            <input
+              value={form.title}
+              placeholder="如：某某大学 转专业极难"
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              style={{ border: `2px solid ${INK}`, borderRadius: 2, padding: '9px 10px', fontFamily: FONT, fontSize: 14, outline: 'none' }}
+            />
           </div>
-          <div className="field">
-            <label>真实缺点 / 坑 *</label>
-            <textarea value={form.content} placeholder="直说，别客气" onChange={(e) => setForm({ ...form, content: e.target.value })} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: 1.5, color: MUTED, textTransform: 'uppercase' }}>真实缺点 / 坑 *</label>
+            <textarea
+              value={form.content}
+              placeholder="直说，别客气"
+              onChange={(e) => setForm({ ...form, content: e.target.value })}
+              rows={4}
+              style={{ border: `2px solid ${INK}`, borderRadius: 2, padding: '9px 10px', fontFamily: FONT, fontSize: 14, outline: 'none', resize: 'vertical' }}
+            />
           </div>
-          <div className="field">
-            <label>标签（逗号分隔）</label>
-            <input value={form.tags} placeholder="如：宿舍,就业,管理" onChange={(e) => setForm({ ...form, tags: e.target.value })} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: 1.5, color: MUTED, textTransform: 'uppercase' }}>标签（逗号分隔）</label>
+            <input
+              value={form.tags}
+              placeholder="如：宿舍,就业,管理"
+              onChange={(e) => setForm({ ...form, tags: e.target.value })}
+              style={{ border: `2px solid ${INK}`, borderRadius: 2, padding: '9px 10px', fontFamily: FONT, fontSize: 14, outline: 'none' }}
+            />
           </div>
-          <button className="btn btn-primary" style={{ width: '100%' }} onClick={add} disabled={saving || !form.title.trim() || !form.content.trim()}>
+          <BtnPrimary onClick={add} disabled={saving || !form.title.trim() || !form.content.trim()} style={saving || !form.title.trim() || !form.content.trim() ? { opacity: 0.5, cursor: 'not-allowed' } : {}}>
             {saving ? '保存中…' : '添加避雷'}
-          </button>
-        </div>
+          </BtnPrimary>
+        </HardCard>
 
+        {/* 列表区 */}
         <div>
-          <div className="toolbar" style={{ marginBottom: 14 }}>
-            <button className="btn btn-ghost btn-sm" onClick={exportAll} disabled={!items.length}>
-              导出全部 Word
-            </button>
-          </div>
           {loading ? (
-            <div className="loading"><span className="spinner" /> 加载中…</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: MUTED, fontSize: 14, padding: '40px 0' }}>
+              <span className="animate-spin" style={{ width: 16, height: 16, border: `3px solid ${HAIR}`, borderTopColor: ACCENT, borderRadius: '50%', display: 'inline-block' }} />
+              加载中…
+            </div>
           ) : items.length === 0 ? (
-            <div className="empty">还没有避雷记录，左边加第一条。</div>
+            <SoftCard style={{ textAlign: 'center', color: MUTED, fontSize: 14, padding: '48px 0' }}>
+              还没有避雷记录，左边加第一条。
+            </SoftCard>
           ) : (
-            <div className="list" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {items.map((i) => (
-                <div key={i.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                  <div
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 10,
-                      background: '#9a7b5b',
-                      color: '#fff',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: 700,
-                      flexShrink: 0,
-                      fontSize: 16
-                    }}
-                  >
-                    ⚠
-                  </div>
-                  <div
-                    style={{
-                      flex: 1,
-                      background: '#fff',
-                      border: '1px solid rgba(0,0,0,.06)',
-                      borderRadius: 12,
-                      padding: '10px 12px'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <span style={{ fontWeight: 600, color: '#1a1a1a' }}>{i.title}</span>
-                      <span
-                        style={{
-                          fontSize: 11,
-                          color: '#9a7b5b',
-                          border: '1px solid rgba(154,123,91,.4)',
-                          borderRadius: 6,
-                          padding: '1px 6px'
-                        }}
-                      >
-                        {i.target_type === 'school' ? '院校' : '公司'}
-                      </span>
+            <div>
+              <SectionLabel label={`避雷记录 · ${items.length}`} />
+              <div style={{ borderTop: `1px solid ${HAIR}` }}>
+                {items.map((i, idx) => (
+                  <ListRow key={i.id} style={{ alignItems: 'flex-start', gap: 14 }}>
+                    <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', flex: 1 }}>
+                      <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: ACCENT, paddingTop: 2 }}>{String(idx + 1).padStart(2, '0')}</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <span style={{ fontFamily: FONT, fontSize: 15, fontWeight: 700, color: INK }}>{i.title}</span>
+                          <Tag tone="accent">{i.target_type === 'school' ? '院校' : '公司'}</Tag>
+                        </div>
+                        <div style={{ fontFamily: FONT, fontSize: 13, color: MUTED, marginTop: 6, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{i.content}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontFamily: FONT, fontSize: 12, color: FAINT }}>
+                          <span>{i.tags || '无标签'}</span>
+                          <span>·</span>
+                          <span>{new Date(i.created_at).toLocaleDateString()}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div style={{ fontSize: 14, color: '#444', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{i.content}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 12, color: '#9ca3af' }}>
-                      <span>{i.tags || '无标签'}</span>
-                      <span>·</span>
-                      <span>{new Date(i.created_at).toLocaleDateString()}</span>
-                      <span style={{ marginLeft: 'auto', color: '#ef4444', cursor: 'pointer' }} onClick={() => del(i.id)}>
-                        删除
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                    <span
+                      onClick={() => del(i.id)}
+                      style={{ fontFamily: FONT, fontSize: 12, color: ACCENT, cursor: 'pointer', whiteSpace: 'nowrap', paddingTop: 2 }}
+                    >
+                      删除
+                    </span>
+                  </ListRow>
+                ))}
+              </div>
             </div>
           )}
         </div>
       </div>
-    </>
+    </div>
   )
 }

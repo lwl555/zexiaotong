@@ -108,18 +108,37 @@ Deno.serve(async (req) => {
     if (!action) return json({ error: '缺少 action' }, 400)
 
     // ── 注册 ──
+    // 关键约定：前端把游客 uid 一并传过来，后端用该 uid 作为 profile id，
+    // 与 login_set（QQ 登录）统一，避免「游客 id 落库 vs 注册新 id」前后端分裂。
     if (action === 'register') {
-      const { qq, password_hash, nickname, avatar } = body
+      const { qq, password_hash, nickname, avatar, uid } = body
       if (!qq || !password_hash) return json({ error: '缺少 qq 或密码哈希' }, 400)
+      const id = uid || crypto.randomUUID()
+
+      // 1) 该 QQ 是否已被别的账号注册
       const dup = await pg('GET', `profiles?select=id,password_hash&phone=eq.${enc(qq)}`)
       if (dup.ok && Array.isArray(dup.data) && dup.data.length) {
-        if (dup.data[0].password_hash) return json({ error: '该 QQ 已注册，请直接登录' }, 409)
-        // 老游客账号补密码
-        const u = await pg('PATCH', `profiles?id=eq.${enc(dup.data[0].id)}`, { password_hash })
+        const existing = dup.data[0]
+        if (existing.password_hash) return json({ error: '该 QQ 已注册，请直接登录' }, 409)
+        // 无密码（老游客）：与当前 uid 一致才补密码，否则撞号
+        if (existing.id !== id) return json({ error: '该 QQ 已被占用' }, 409)
+        const u = await pg('PATCH', `profiles?id=eq.${enc(id)}`, { password_hash })
         if (!u.ok) return json({ error: '注册失败：补密码时出错' }, 500)
         return json({ profile: strip(u.data?.[0]) })
       }
-      const id = crypto.randomUUID()
+
+      // 2) 游客 profile 是否已存在（phone 为空），则补 qq + 密码
+      const self = await getProfile(id)
+      if (self) {
+        if (self.phone && self.phone !== qq) {
+          return json({ error: '该账号已绑定其他 QQ，请先退出或用原 QQ 登录' }, 409)
+        }
+        const u = await pg('PATCH', `profiles?id=eq.${enc(id)}`, { phone: qq, password_hash })
+        if (!u.ok) return json({ error: '注册失败：更新账号时出错' }, 500)
+        return json({ profile: strip(u.data?.[0]) })
+      }
+
+      // 3) 全新注册：用 uid 作为 id 插入（与游客 id 统一）
       const ins = await pg('POST', 'profiles', {
         id,
         phone: qq,

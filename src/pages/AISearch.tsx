@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import AIChat from '../components/AIChat'
 import { PROMPT_AI_SEARCH_SCHOOL, PROMPT_AI_SEARCH_BY_CITY, PROMPT_AI_SEARCH_BY_COMPANY } from '../lib/prompts'
 import { consumePendingChannel } from '../lib/history'
+import { PageHeader, INK, ACCENT, PAPER, FONT } from '../components/Editorial'
 
 const MODES = [
   {
@@ -71,18 +72,38 @@ export default function AISearch() {
   }, [])
 
   return (
-    <>
-      <div className="page-head">
-        <h2>百事通</h2>
-        <p>指定院校、城市或公司，AI 多维度拆解真实信息，优点 / 缺点 / 亮点 / 重点 用不同颜色标记，辅助你理性决策。对话会自动保存，可随时接着聊。</p>
-      </div>
+    <div style={{ padding: '8px 2px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
+      <PageHeader
+        eyebrow="AI Search"
+        title="百事通"
+        desc="指定院校、城市或公司，AI 多维度拆解真实信息，优点 / 缺点 / 亮点 / 重点 用不同颜色标记，辅助你理性决策。对话会自动保存，可随时接着聊。"
+      />
 
-      <div className="tabs">
-        {MODES.map((m) => (
-          <button key={m.key} className={m.key === mode ? 'active' : ''} onClick={() => setMode(m.key)}>
-            {m.label}
-          </button>
-        ))}
+      {/* 子频道切换：粗黑边硬卡风按钮，激活态 ACCENT 填充 + 硬阴影 */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
+        {MODES.map((m) => {
+          const active = m.key === mode
+          return (
+            <button
+              key={m.key}
+              onClick={() => setMode(m.key)}
+              style={{
+                fontFamily: FONT,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: 'pointer',
+                padding: '9px 16px',
+                borderRadius: 2,
+                border: `2px solid ${INK}`,
+                background: active ? ACCENT : PAPER,
+                color: active ? '#fff' : INK,
+                boxShadow: active ? `4px 4px 0 ${INK}` : 'none',
+              }}
+            >
+              {m.label}
+            </button>
+          )
+        })}
       </div>
 
       <AIChat
@@ -100,6 +121,6 @@ export default function AISearch() {
         examples={cur.examples}
         followups={cur.followups}
       />
-    </>
+    </div>
   )
 }

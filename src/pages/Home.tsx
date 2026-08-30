@@ -1,5 +1,23 @@
 import { Link } from 'react-router-dom'
 import { Search, Building2, MapPin, Radio, FileText, AlertTriangle, Coins, Info, BookOpen, Compass } from 'lucide-react'
+import {
+  PageHeader,
+  SectionLabel,
+  IndexGrid,
+  HardCard,
+  SoftCard,
+  Stat,
+  Tag,
+  INK,
+  PAPER,
+  MUTED,
+  ACCENT,
+  ACCENT_SOFT,
+  HAIR,
+  FONT,
+  MONO,
+  hard,
+} from '../components/Editorial'
 
 const toolCards = [
   { to: '/ai-search?tab=school', ic: Search, title: '查院校', desc: '多维度拆解：数据、食堂、住宿、就业、优缺点 全摊开。' },
@@ -39,189 +57,280 @@ const scenes = [
 
 export default function Home() {
   return (
-    <>
+    <div style={{ padding: '8px 2px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
+      <PageHeader
+        eyebrow="ZEXIAOTONG · 高校与职业决策工具"
+        title="选学校、挑公司，我们把实话摊在桌面上。"
+        desc="不粉饰、不绕弯、不回避。关于分数、食堂、薪资、加班这些硬事实，一半来自联网检索的真实资料，一半来自 AI 的整理与对比——每条都标明白，哪句是事实、哪句是判断。"
+        right={
+          <Link
+            to="/ai-search?tab=school"
+            style={{ ...hard({ padding: '9px 16px', fontSize: 14, fontWeight: 700, color: PAPER, background: ACCENT, display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }) }}
+          >
+            <Compass size={15} strokeWidth={2} /> 开始一次查询
+          </Link>
+        }
+      />
+
       {/* 编辑式 Hero：左文右图，非对称 */}
-      <section className="hero">
-        <div className="hero-text">
-          <div className="hero-eyebrow">择校通 · 高校与职业决策工具</div>
-          <h1>选学校、挑公司，<br />我们把<span className="em">实话</span>摊在桌面上。</h1>
-          <p className="hero-lead">
-            不粉饰、不绕弯、不回避。关于分数、食堂、薪资、加班这些硬事实，
-            一半来自联网检索的真实资料，一半来自 AI 的整理与对比——每条都标明白，哪句是事实、哪句是判断。
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1.05fr) minmax(0, 0.95fr)',
+          gap: 22,
+          alignItems: 'stretch',
+          marginBottom: 18,
+        }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <div style={{ fontFamily: MONO, fontSize: 11, letterSpacing: 3, color: ACCENT, marginBottom: 10 }}>
+            REAL TALK, ON THE TABLE
+          </div>
+          <h1 style={{ fontFamily: FONT, fontSize: 34, fontWeight: 800, color: INK, letterSpacing: '-0.02em', lineHeight: 1.12, margin: 0 }}>
+            选学校、挑公司，<br />
+            我们把<span style={{ color: ACCENT }}>实话</span>摊在桌面上。
+          </h1>
+          <p style={{ fontFamily: FONT, fontSize: 14, color: MUTED, marginTop: 14, marginBottom: 0, lineHeight: 1.65, maxWidth: 520 }}>
+            不粉饰、不绕弯、不回避。关于分数、食堂、薪资、加班这些硬事实，一半来自联网检索的真实资料，一半来自 AI 的整理与对比——每条都标明白，哪句是事实、哪句是判断。
           </p>
-          <div className="hero-cta">
-            <Link to="/ai-search?tab=school" className="cta primary"><Compass size={16} strokeWidth={2} /> 开始一次查询</Link>
-            <Link to="/ai-tutor" className="cta ghost">试试实时资讯台</Link>
+          <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
+            <Link
+              to="/ai-search?tab=school"
+              style={{ ...hard({ padding: '9px 16px', fontSize: 14, fontWeight: 700, color: PAPER, background: ACCENT, display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }) }}
+            >
+              <Compass size={15} strokeWidth={2} /> 开始一次查询
+            </Link>
+            <Link
+              to="/ai-tutor"
+              style={{ ...hard({ padding: '8px 15px', fontSize: 14, fontWeight: 600, color: INK, background: PAPER, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' })}}
+            >
+              试试实时资讯台
+            </Link>
           </div>
         </div>
-        <figure className="hero-figure">
-          <img
-            src="https://images.pexels.com/photos/267885/pexels-photo-267885.jpeg?auto=compress&cs=tinysrgb&w=1200"
-            alt="毕业生抛起学士帽"
-            loading="lazy"
-            decoding="async"
-            onError={(e) => {
-              // Pexels 万一被 hotlink 限流，自动切到内联 SVG 占位（绝对不破图）
-              const img = e.currentTarget as HTMLImageElement
-              const fig = img.parentElement
-              if (!fig || fig.dataset.fallback === '1') return
-              fig.dataset.fallback = '1'
-              img.style.display = 'none'
-              fig.insertAdjacentHTML(
-                'afterbegin',
-                '<svg class="hero-fallback" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">' +
-                  '<defs>' +
-                    '<linearGradient id="g" x1="0" y1="0" x2="0" y2="1">' +
-                      '<stop offset="0" stop-color="#7a2e0a"/>' +
-                      '<stop offset="1" stop-color="#3a1606"/>' +
-                    '</linearGradient>' +
-                  '</defs>' +
-                  '<rect width="800" height="600" fill="url(#g)"/>' +
-                  // 远景楼群
-                  '<g fill="#1a0a04" opacity="0.55">' +
-                    '<rect x="40" y="280" width="120" height="220"/>' +
-                    '<rect x="170" y="240" width="90" height="260"/>' +
-                    '<rect x="270" y="260" width="100" height="240"/>' +
-                    '<rect x="380" y="220" width="110" height="280"/>' +
-                    '<rect x="500" y="250" width="90" height="250"/>' +
-                    '<rect x="600" y="270" width="120" height="230"/>' +
-                    '<rect x="730" y="240" width="70" height="260"/>' +
-                  '</g>' +
-                  // 楼群窗户（暖黄点光）
-                  '<g fill="#f5c481" opacity="0.6">' +
-                    '<rect x="55" y="310" width="6" height="6"/><rect x="70" y="310" width="6" height="6"/><rect x="85" y="310" width="6" height="6"/><rect x="100" y="310" width="6" height="6"/><rect x="115" y="310" width="6" height="6"/><rect x="130" y="310" width="6" height="6"/>' +
-                    '<rect x="55" y="340" width="6" height="6"/><rect x="70" y="340" width="6" height="6"/><rect x="85" y="340" width="6" height="6"/><rect x="115" y="340" width="6" height="6"/><rect x="130" y="340" width="6" height="6"/>' +
-                    '<rect x="190" y="280" width="6" height="6"/><rect x="205" y="280" width="6" height="6"/><rect x="220" y="280" width="6" height="6"/><rect x="235" y="280" width="6" height="6"/>' +
-                    '<rect x="190" y="320" width="6" height="6"/><rect x="220" y="320" width="6" height="6"/><rect x="235" y="320" width="6" height="6"/>' +
-                    '<rect x="395" y="260" width="6" height="6"/><rect x="410" y="260" width="6" height="6"/><rect x="440" y="260" width="6" height="6"/><rect x="455" y="260" width="6" height="6"/>' +
-                    '<rect x="410" y="300" width="6" height="6"/><rect x="440" y="300" width="6" height="6"/><rect x="470" y="300" width="6" height="6"/>' +
-                    '<rect x="410" y="340" width="6" height="6"/><rect x="440" y="340" width="6" height="6"/>' +
-                    '<rect x="525" y="290" width="6" height="6"/><rect x="540" y="290" width="6" height="6"/><rect x="570" y="290" width="6" height="6"/>' +
-                    '<rect x="540" y="330" width="6" height="6"/><rect x="570" y="330" width="6" height="6"/>' +
-                    '<rect x="620" y="310" width="6" height="6"/><rect x="635" y="310" width="6" height="6"/><rect x="650" y="310" width="6" height="6"/><rect x="680" y="310" width="6" height="6"/><rect x="695" y="310" width="6" height="6"/><rect x="710" y="310" width="6" height="6"/>' +
-                    '<rect x="620" y="345" width="6" height="6"/><rect x="650" y="345" width="6" height="6"/><rect x="680" y="345" width="6" height="6"/><rect x="710" y="345" width="6" height="6"/>' +
-                  '</g>' +
-                  // 抛起的小方块（学士帽抽象）
-                  '<g fill="#f5e9d6">' +
-                    '<rect x="280" y="140" width="22" height="6" rx="1" transform="rotate(15 291 143)"/>' +
-                    '<rect x="420" y="100" width="22" height="6" rx="1" transform="rotate(-22 431 103)"/>' +
-                    '<rect x="540" y="155" width="22" height="6" rx="1" transform="rotate(8 551 158)"/>' +
-                    '<rect x="350" y="195" width="22" height="6" rx="1" transform="rotate(-12 361 198)"/>' +
-                    '<rect x="500" y="210" width="22" height="6" rx="1" transform="rotate(28 511 213)"/>' +
-                    '<rect x="620" y="190" width="22" height="6" rx="1" transform="rotate(-8 631 193)"/>' +
-                  '</g>' +
-                  // 流苏
-                  '<g stroke="#e8d4a8" stroke-width="1.2" opacity="0.85">' +
-                    '<line x1="295" y1="146" x2="297" y2="166"/><line x1="435" y1="106" x2="437" y2="126"/><line x1="555" y1="161" x2="557" y2="181"/><line x1="365" y1="201" x2="367" y2="221"/><line x1="515" y1="216" x2="517" y2="236"/><line x1="635" y1="196" x2="637" y2="216"/>' +
-                  '</g>' +
-                  // 太阳/光源
-                  '<circle cx="680" cy="80" r="42" fill="#f3a25a" opacity="0.55"/>' +
-                '</svg>'
-              )
-            }}
-          />
-          <figcaption>毕业季 · 每一个选择都值得被认真对待</figcaption>
-        </figure>
-      </section>
 
-      {/* 跑马灯能力条（克制滚动，替代紫渐变条） */}
-      <div className="marquee" aria-hidden="true">
-        <div className="marquee-track">
-          {marqueeItems.map((m, i) => (
-            <span key={`a${i}`}>{m}</span>
-          ))}
-          {marqueeItems.map((m, i) => (
-            <span key={`b${i}`}>{m}</span>
-          ))}
-        </div>
+        <HardCard style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <figure style={{ margin: 0, position: 'relative', flex: 1, minHeight: 260 }}>
+            <img
+              src="https://images.pexels.com/photos/267885/pexels-photo-267885.jpeg?auto=compress&cs=tinysrgb&w=1200"
+              alt="毕业生抛起学士帽"
+              loading="lazy"
+              decoding="async"
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', minHeight: 260 }}
+              onError={(e) => {
+                // Pexels 万一被 hotlink 限流，自动切到内联 SVG 占位（绝对不破图）
+                const img = e.currentTarget as HTMLImageElement
+                const fig = img.parentElement
+                if (!fig || fig.dataset.fallback === '1') return
+                fig.dataset.fallback = '1'
+                img.style.display = 'none'
+                fig.insertAdjacentHTML(
+                  'afterbegin',
+                  '<svg class="hero-fallback" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">' +
+                    '<defs>' +
+                      '<linearGradient id="g" x1="0" y1="0" x2="0" y2="1">' +
+                        '<stop offset="0" stop-color="#7a2e0a"/>' +
+                        '<stop offset="1" stop-color="#3a1606"/>' +
+                      '</linearGradient>' +
+                    '</defs>' +
+                    '<rect width="800" height="600" fill="url(#g)"/>' +
+                    // 远景楼群
+                    '<g fill="#1a0a04" opacity="0.55">' +
+                      '<rect x="40" y="280" width="120" height="220"/>' +
+                      '<rect x="170" y="240" width="90" height="260"/>' +
+                      '<rect x="270" y="260" width="100" height="240"/>' +
+                      '<rect x="380" y="220" width="110" height="280"/>' +
+                      '<rect x="500" y="250" width="90" height="250"/>' +
+                      '<rect x="600" y="270" width="120" height="230"/>' +
+                      '<rect x="730" y="240" width="70" height="260"/>' +
+                    '</g>' +
+                    // 楼群窗户（暖黄点光）
+                    '<g fill="#f5c481" opacity="0.6">' +
+                      '<rect x="55" y="310" width="6" height="6"/><rect x="70" y="310" width="6" height="6"/><rect x="85" y="310" width="6" height="6"/><rect x="100" y="310" width="6" height="6"/><rect x="115" y="310" width="6" height="6"/><rect x="130" y="310" width="6" height="6"/>' +
+                      '<rect x="55" y="340" width="6" height="6"/><rect x="70" y="340" width="6" height="6"/><rect x="85" y="340" width="6" height="6"/><rect x="115" y="340" width="6" height="6"/><rect x="130" y="340" width="6" height="6"/>' +
+                      '<rect x="190" y="280" width="6" height="6"/><rect x="205" y="280" width="6" height="6"/><rect x="220" y="280" width="6" height="6"/><rect x="235" y="280" width="6" height="6"/>' +
+                      '<rect x="190" y="320" width="6" height="6"/><rect x="220" y="320" width="6" height="6"/><rect x="235" y="320" width="6" height="6"/>' +
+                      '<rect x="395" y="260" width="6" height="6"/><rect x="410" y="260" width="6" height="6"/><rect x="440" y="260" width="6" height="6"/><rect x="455" y="260" width="6" height="6"/>' +
+                      '<rect x="410" y="300" width="6" height="6"/><rect x="440" y="300" width="6" height="6"/><rect x="470" y="300" width="6" height="6"/>' +
+                      '<rect x="410" y="340" width="6" height="6"/><rect x="440" y="340" width="6" height="6"/>' +
+                      '<rect x="525" y="290" width="6" height="6"/><rect x="540" y="290" width="6" height="6"/><rect x="570" y="290" width="6" height="6"/>' +
+                      '<rect x="540" y="330" width="6" height="6"/><rect x="570" y="330" width="6" height="6"/>' +
+                      '<rect x="620" y="310" width="6" height="6"/><rect x="635" y="310" width="6" height="6"/><rect x="650" y="310" width="6" height="6"/><rect x="680" y="310" width="6" height="6"/><rect x="695" y="310" width="6" height="6"/><rect x="710" y="310" width="6" height="6"/>' +
+                      '<rect x="620" y="345" width="6" height="6"/><rect x="650" y="345" width="6" height="6"/><rect x="680" y="345" width="6" height="6"/><rect x="710" y="345" width="6" height="6"/>' +
+                    '</g>' +
+                    // 抛起的小方块（学士帽抽象）
+                    '<g fill="#f5e9d6">' +
+                      '<rect x="280" y="140" width="22" height="6" rx="1" transform="rotate(15 291 143)"/>' +
+                      '<rect x="420" y="100" width="22" height="6" rx="1" transform="rotate(-22 431 103)"/>' +
+                      '<rect x="540" y="155" width="22" height="6" rx="1" transform="rotate(8 551 158)"/>' +
+                      '<rect x="350" y="195" width="22" height="6" rx="1" transform="rotate(-12 361 198)"/>' +
+                      '<rect x="500" y="210" width="22" height="6" rx="1" transform="rotate(28 511 213)"/>' +
+                      '<rect x="620" y="190" width="22" height="6" rx="1" transform="rotate(-8 631 193)"/>' +
+                    '</g>' +
+                    // 流苏
+                    '<g stroke="#e8d4a8" stroke-width="1.2" opacity="0.85">' +
+                      '<line x1="295" y1="146" x2="297" y2="166"/><line x1="435" y1="106" x2="437" y2="126"/><line x1="555" y1="161" x2="557" y2="181"/><line x1="365" y1="201" x2="367" y2="221"/><line x1="515" y1="216" x2="517" y2="236"/><line x1="635" y1="196" x2="637" y2="216"/>' +
+                    '</g>' +
+                    // 太阳/光源
+                    '<circle cx="680" cy="80" r="42" fill="#f3a25a" opacity="0.55"/>' +
+                  '</svg>'
+                )
+              }}
+            />
+            <figcaption
+              style={{
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                bottom: 0,
+                fontFamily: MONO,
+                fontSize: 10.5,
+                letterSpacing: 1.5,
+                color: '#fff',
+                background: 'rgba(17,17,17,0.62)',
+                padding: '8px 12px',
+              }}
+            >
+              毕业季 · 每一个选择都值得被认真对待
+            </figcaption>
+          </figure>
+        </HardCard>
+      </div>
+
+      {/* 能力条：等宽标签 + 发丝线 */}
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 8,
+          borderTop: `1px solid ${HAIR}`,
+          borderBottom: `1px solid ${HAIR}`,
+          padding: '12px 0',
+          marginBottom: 18,
+        }}
+      >
+        {marqueeItems.map((m, i) => (
+          <Tag key={`m${i}`}>{m}</Tag>
+        ))}
       </div>
 
       {/* 实时数据条 */}
-      <div className="stats">
-        <div className="stat"><div className="n">8<span className="u">+</span></div><div className="lbl">在线工具</div></div>
-        <div className="stat"><div className="n">100<span className="u">%</span></div><div className="lbl">联网检索事实底座 · +50% AI 整理</div></div>
-        <div className="stat"><div className="n">5</div><div className="lbl">检索数据源</div></div>
-        <div className="stat"><div className="n">7×24</div><div className="lbl">免登录可用</div></div>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gap: 14,
+          marginBottom: 26,
+        }}
+      >
+        <Stat label="在线工具" value="8+" />
+        <Stat label="联网检索事实底座 + AI 整理" value="100%" />
+        <Stat label="检索数据源" value="5" />
+        <Stat label="免登录可用" value="7×24" />
       </div>
 
       {/* 工具索引（杂志式编号列表） */}
-      <h2 className="section-title">
-        <span className="eyebrow">Index</span>工具索引
-        <span className="sub">点开即用 · 全部免费</span>
-      </h2>
-      <div className="tools-index">
+      <SectionLabel index="01" label="Index · 工具索引" />
+      <p style={{ fontFamily: FONT, fontSize: 13, color: MUTED, marginTop: 0, marginBottom: 14 }}>点开即用 · 全部免费</p>
+      <IndexGrid min={260}>
         {toolCards.map((c, i) => (
-          <Link key={c.title} to={c.to} className="tool-row">
-            <span className="num">{String(i + 1).padStart(2, '0')}</span>
-            <div className="tool-ico">{c.ic ? <c.ic size={20} strokeWidth={1.9} /> : null}</div>
-            <div>
-              <h3>{c.title}</h3>
-              <p className="desc">{c.desc}</p>
-            </div>
-            <span className="go">进入 →</span>
+          <Link key={c.title} to={c.to} style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
+            <HardCard style={{ display: 'flex', flexDirection: 'column', height: '100%', cursor: 'pointer' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <span style={{ width: 40, height: 40, border: `2px solid ${INK}`, borderRadius: 2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: ACCENT }}>
+                  {c.ic ? <c.ic size={20} strokeWidth={1.9} /> : null}
+                </span>
+                <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: ACCENT }}>{String(i + 1).padStart(2, '0')}</span>
+              </div>
+              <h3 style={{ fontFamily: FONT, fontSize: 18, fontWeight: 700, color: INK, margin: '0 0 6px', letterSpacing: '-0.01em' }}>{c.title}</h3>
+              <p style={{ fontFamily: FONT, fontSize: 13, color: MUTED, margin: 0, lineHeight: 1.55 }}>{c.desc}</p>
+              <div style={{ marginTop: 12, fontFamily: MONO, fontSize: 11, letterSpacing: 1.5, color: INK }}>进入 →</div>
+            </HardCard>
           </Link>
         ))}
-      </div>
+      </IndexGrid>
 
       {/* 横向对比表 */}
-      <h2 className="section-title">
-        <span className="eyebrow">Compare</span>能力对比
-        <span className="sub">本站 vs 普通 AI vs 普通搜索</span>
-      </h2>
-      <div className="compare">
-        <table>
-          <thead>
-            <tr>
-              <th>能力</th>
-              <th>本站 · 择校通</th>
-              <th>普通 AI</th>
-              <th>普通搜索</th>
-            </tr>
-          </thead>
-          <tbody>
-            {features.map((f) => (
-              <tr key={f.f}>
-                <td>{f.f}</td>
-                <td>
-                  {f.yt === '是' ? <span className="pill-yes">✓ 已支持</span>
-                  : f.yt === '部分' ? <span className="pill-mid">部分支持</span>
-                  : f.yt}
-                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>{f.sd}</div>
-                </td>
-                <td>
-                  {f.ab === '是' ? <span className="pill-mid">部分</span>
-                  : f.ab === '—' ? '—'
-                  : <span className="pill-no">✗ 不支持</span>}
-                </td>
-                <td>
-                  <span className="pill-no">✗ 不支持</span>
-                </td>
+      <div style={{ marginTop: 30 }}>
+        <SectionLabel index="02" label="Compare · 能力对比" />
+        <p style={{ fontFamily: FONT, fontSize: 13, color: MUTED, marginTop: 0, marginBottom: 14 }}>本站 vs 普通 AI vs 普通搜索</p>
+        <div style={{ ...hard(), background: PAPER, padding: 0, overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT }}>
+            <thead>
+              <tr>
+                {['能力', '本站 · 择校通', '普通 AI', '普通搜索'].map((h, idx) => (
+                  <th
+                    key={h}
+                    style={{
+                      textAlign: 'left',
+                      fontFamily: MONO,
+                      fontSize: 11,
+                      letterSpacing: 1.5,
+                      textTransform: 'uppercase',
+                      color: idx === 1 ? ACCENT : INK,
+                      padding: '12px 14px',
+                      borderBottom: `2px solid ${INK}`,
+                      background: ACCENT_SOFT,
+                    }}
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {features.map((f) => (
+                <tr key={f.f} style={{ borderBottom: `1px solid ${HAIR}` }}>
+                  <td style={{ padding: '12px 14px', fontSize: 14, fontWeight: 600, color: INK }}>{f.f}</td>
+                  <td style={{ padding: '12px 14px', fontSize: 14, color: INK }}>
+                    {f.yt === '是' ? <Tag tone="accent">✓ 已支持</Tag>
+                      : f.yt === '部分' ? <Tag>部分支持</Tag>
+                      : <span style={{ fontSize: 14 }}>{f.yt}</span>}
+                    <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>{f.sd}</div>
+                  </td>
+                  <td style={{ padding: '12px 14px', fontSize: 14, color: MUTED }}>
+                    {f.ab === '是' ? <Tag>部分</Tag>
+                      : f.ab === '—' ? '—'
+                      : <span style={{ color: ACCENT, fontSize: 13 }}>✗ 不支持</span>}
+                  </td>
+                  <td style={{ padding: '12px 14px' }}>
+                    <span style={{ color: ACCENT, fontSize: 13 }}>✗ 不支持</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* 场景说明 */}
-      <h2 className="section-title">
-        <span className="eyebrow">Who</span>谁在用
-        <span className="sub">覆盖不同人群的真实场景</span>
-      </h2>
-      <div className="scene-grid">
-        {scenes.map((s) => (
-          <div className="scene" key={s.t}>
-            <h4>{s.ic ? <s.ic size={16} strokeWidth={1.9} style={{ marginRight: 6, verticalAlign: 'middle' }} /> : null} {s.t}</h4>
-            <p>{s.d}</p>
-          </div>
-        ))}
+      <div style={{ marginTop: 30 }}>
+        <SectionLabel index="03" label="Who · 谁在用" />
+        <p style={{ fontFamily: FONT, fontSize: 13, color: MUTED, marginTop: 0, marginBottom: 14 }}>覆盖不同人群的真实场景</p>
+        <IndexGrid min={300}>
+          {scenes.map((s) => (
+            <SoftCard key={s.t} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: FONT, fontSize: 16, fontWeight: 700, color: INK }}>
+                {s.ic ? <s.ic size={16} strokeWidth={1.9} style={{ color: ACCENT }} /> : <span style={{ width: 8, height: 8, background: ACCENT, borderRadius: 2, display: 'inline-block' }} />}
+                {s.t}
+              </div>
+              <p style={{ fontFamily: FONT, fontSize: 13, color: MUTED, margin: 0, lineHeight: 1.6 }}>{s.d}</p>
+            </SoftCard>
+          ))}
+        </IndexGrid>
       </div>
 
       {/* 免责声明 */}
-      <div className="disclaimer">
-        <b>关于数据：</b>答案 = <b>联网检索到的真实事实（事实底座 100% 来自检索）</b> + <b>AI 自身知识的组织与对比（约 50% 附加值，标【AI 整理】）</b>。
-        凡事实均标注来源，凡 AI 自己的判断均标注"AI 整理"，查不到的标"暂无法确认"，绝不编造。
-        涉及择校、求职、搞钱等重大决策，请以官方招生网、企业官方信息与实地核实为准。
+      <div style={{ marginTop: 26 }}>
+        <SoftCard style={{ border: `1px solid ${HAIR}`, background: '#fcfbf9' }}>
+          <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: 2, color: ACCENT, textTransform: 'uppercase', marginBottom: 8 }}>Disclaimer</div>
+          <p style={{ fontFamily: FONT, fontSize: 13, color: MUTED, margin: 0, lineHeight: 1.7 }}>
+            <b style={{ color: INK }}>关于数据：</b>答案 = <b style={{ color: INK }}>联网检索到的真实事实（事实底座 100% 来自检索）</b> + <b style={{ color: INK }}>AI 自身知识的组织与对比（约 50% 附加值，标【AI 整理】）</b>。
+            凡事实均标注来源，凡 AI 自己的判断均标注“AI 整理”，查不到的标“暂无法确认”，绝不编造。
+            涉及择校、求职、搞钱等重大决策，请以官方招生网、企业官方信息与实地核实为准。
+          </p>
+        </SoftCard>
       </div>
-    </>
+    </div>
   )
 }

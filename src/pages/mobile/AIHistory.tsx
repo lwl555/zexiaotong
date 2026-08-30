@@ -2,6 +2,19 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, Clock, Search, Bot, FileText, AlertTriangle, Trash2 } from 'lucide-react'
 import { getQueries, deleteQuery, QueryRecord } from '../../lib/history'
+import {
+  PageHeader,
+  SectionLabel,
+  SoftCard,
+  BtnGhost,
+  Tag,
+  INK,
+  MUTED,
+  FAINT,
+  ACCENT,
+  FONT,
+  MONO,
+} from '../../components/Editorial'
 
 const SRC_LABEL: Record<string, string> = {
   gnews: '新闻', hn: '技术讨论', bing: '网页', reddit: '社区',
@@ -40,56 +53,80 @@ export default function AIHistory() {
   })
 
   return (
-    <div className="px-4 pt-3 pb-10">
-      <div className="flex items-center gap-2 mb-3">
-        <button onClick={() => nav(-1)} className="text-gray-400"><ChevronLeft size={20} /></button>
-        <h1 className="text-lg font-black text-ink flex-1">AI 查询记录</h1>
-        {queries.length > 0 && (
-          <button onClick={handleClearAll} className="text-xs text-red-500">清空</button>
-        )}
-      </div>
+    <div style={{ padding: '8px 2px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
+      <PageHeader
+        eyebrow="AI History"
+        title="AI 查询记录"
+        desc="每一次提问与回答，按日期归档，随时回看。"
+        right={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button onClick={() => nav(-1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: MUTED, display: 'inline-flex' }}>
+              <ChevronLeft size={20} />
+            </button>
+            {queries.length > 0 && (
+              <BtnGhost onClick={handleClearAll} style={{ padding: '7px 12px', color: ACCENT, borderColor: ACCENT }}>
+                清空
+              </BtnGhost>
+            )}
+          </div>
+        }
+      />
 
       {queries.length > 0 && (
-        <div className="flex items-center gap-2 bg-gray-100 rounded-xl px-3 py-2.5 mb-3">
-          <Search size={18} className="text-gray-400" />
-          <input className="bg-transparent outline-none text-sm flex-1" placeholder="搜索查询记录" value={kw} onChange={e => setKw(e.target.value)} />
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            borderBottom: `2px solid ${INK}`,
+            paddingBottom: 10,
+            marginBottom: 18,
+          }}
+        >
+          <Search size={18} color={MUTED} />
+          <input
+            value={kw}
+            onChange={e => setKw(e.target.value)}
+            placeholder="搜索查询记录"
+            style={{ flex: 1, border: 'none', outline: 'none', fontFamily: FONT, fontSize: 15, color: INK, background: 'transparent' }}
+          />
+          <span style={{ fontFamily: MONO, fontSize: 11, color: MUTED, letterSpacing: 2 }}>
+            {String(filtered.length).padStart(2, '0')}
+          </span>
         </div>
       )}
 
       {filtered.length === 0 ? (
-        <div className="text-center text-gray-400 text-sm py-16">
+        <div style={{ textAlign: 'center', color: MUTED, fontSize: 14, padding: '64px 0' }}>
           {kw ? '没有匹配的记录' : '还没有 AI 查询记录'}
         </div>
       ) : (
-        <div className="space-y-4">
+        <div>
           {Object.entries(grouped).reverse().map(([date, items]) => (
-            <div key={date}>
-              <div className="flex items-center gap-2 mb-2">
-                <Clock size={12} className="text-gray-400" />
-                <span className="text-xs text-gray-500 font-medium">{date}</span>
-              </div>
-              <div className="space-y-2">
+            <div key={date} style={{ marginBottom: 22 }}>
+              <SectionLabel label={date} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {items.map(q => (
-                  <div key={q.id} className="card p-3 active:scale-[.99] transition">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-brand-50 text-brand-700 font-medium">{q.pageLabel}</span>
-                          {q.search?.ok && <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-50 text-green-700">已检索</span>}
-                        </div>
-                        <div className="text-sm font-medium truncate">{q.question}</div>
-                        <div className="text-xs text-gray-500 mt-1 line-clamp-2">{q.answer}</div>
-                        <div className="flex items-center gap-3 mt-2 text-[10px] text-gray-400">
-                          <span>{new Date(q.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>
-                          {q.links && q.links.length > 0 && <span>{q.links.length} 条链接</span>}
-                          {q.image && <span>有配图</span>}
-                        </div>
+                  <SoftCard key={q.id} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
+                        <Tag tone="accent">{q.pageLabel}</Tag>
+                        {q.search?.ok && <Tag tone="line">已检索</Tag>}
                       </div>
-                      <button onClick={() => handleDelete(q.id)} className="text-gray-300 hover:text-red-500 shrink-0">
-                        <Trash2 size={14} />
-                      </button>
+                      <div style={{ fontFamily: FONT, fontSize: 14, fontWeight: 700, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {q.question}
+                      </div>
+                      <div style={{ fontFamily: FONT, fontSize: 12, color: MUTED, marginTop: 4, lineHeight: 1.55 }}>{q.answer}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8, fontFamily: MONO, fontSize: 10.5, color: FAINT, letterSpacing: 0.5 }}>
+                        <span>{new Date(q.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>
+                        {q.links && q.links.length > 0 && <span>{q.links.length} 条链接</span>}
+                        {q.image && <span>有配图</span>}
+                      </div>
                     </div>
-                  </div>
+                    <button onClick={() => handleDelete(q.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: FAINT, flexShrink: 0, display: 'inline-flex', padding: 4 }}>
+                      <Trash2 size={15} />
+                    </button>
+                  </SoftCard>
                 ))}
               </div>
             </div>

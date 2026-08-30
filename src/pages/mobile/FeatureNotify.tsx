@@ -6,6 +6,18 @@ import WxIcon from '../../components/mobile/WxIcon'
 import {
   FEATURES, fetchFeatureChat, postFeatureChat, ensureSeed, FeatureChatMsg, FeatureRole, FeatureMeta,
 } from '../../lib/featureChat'
+import {
+  PageHeader,
+  btnGhost,
+  hard,
+  INK,
+  MUTED,
+  FAINT,
+  ACCENT,
+  HAIR,
+  FONT,
+  MONO,
+} from '../../components/Editorial'
 
 // 每条消息显示时分（微信聊天风格）
 function timeLabel(iso: string): string {
@@ -21,10 +33,10 @@ function Bubble({ m, meId, meta }: { m: FeatureChatMsg; meId: string; meta: Feat
   const time = timeLabel(m.created_at)
   if (m.author_role === 'system') {
     return (
-      <div className="flex justify-center my-2">
-        <div className="max-w-[88%] text-center text-[12px] leading-relaxed text-gray-500 bg-black/[0.04] rounded-lg px-3 py-2">
+      <div style={{ display: 'flex', justifyContent: 'center', margin: '8px 0' }}>
+        <div style={{ maxWidth: '88%', textAlign: 'center', fontFamily: FONT, fontSize: 12, lineHeight: 1.6, color: MUTED, background: 'rgba(17,17,17,0.04)', borderRadius: 3, padding: '8px 12px' }}>
           {m.content}
-          {time && <div className="text-[10px] text-gray-400 mt-1">{time}</div>}
+          {time && <div style={{ fontFamily: FONT, fontSize: 10, color: FAINT, marginTop: 4 }}>{time}</div>}
         </div>
       </div>
     )
@@ -32,24 +44,25 @@ function Bubble({ m, meId, meta }: { m: FeatureChatMsg; meId: string; meta: Feat
   const mine = m.author_role === 'user' && m.author_id === meId
   if (mine) {
     return (
-      <div className="flex justify-end">
-        <div className="max-w-[72%] px-3.5 py-2.5 rounded-2xl rounded-br-sm text-[15px] leading-relaxed text-white"
-          style={{ background: '#D8451F' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <div
+          style={{ maxWidth: '72%', padding: '10px 14px', borderRadius: 3, borderBottomRightRadius: 0, fontFamily: FONT, fontSize: 15, lineHeight: 1.6, color: '#ffffff', background: ACCENT, border: `2px solid ${INK}` }}
+        >
           {m.content}
-          {time && <div className="text-[10px] text-white/70 text-right mt-0.5">{time}</div>}
+          {time && <div style={{ fontFamily: FONT, fontSize: 10, color: 'rgba(255,255,255,0.75)', textAlign: 'right', marginTop: 4 }}>{time}</div>}
         </div>
       </div>
     )
   }
   // 管理员 / 其他（左白气泡，带头像 + 名称）
   return (
-    <div className="flex items-start gap-2">
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
       <WxIcon icon={meta.icon} size={36} />
-      <div className="max-w-[72%]">
-        <div className="text-[11px] text-gray-400 mb-0.5">{m.author_role === 'admin' ? '管理员' : m.author_name}</div>
-        <div className="px-3.5 py-2.5 rounded-2xl rounded-bl-sm text-[15px] leading-relaxed text-gray-900 bg-white border border-black/5">
+      <div style={{ maxWidth: '72%' }}>
+        <div style={{ fontFamily: FONT, fontSize: 11, color: MUTED, marginBottom: 4 }}>{m.author_role === 'admin' ? '管理员' : m.author_name}</div>
+        <div style={{ padding: '10px 14px', borderRadius: 3, borderBottomLeftRadius: 0, fontFamily: FONT, fontSize: 15, lineHeight: 1.6, color: INK, background: '#ffffff', border: `1.5px solid ${HAIR}` }}>
           {m.content}
-          {time && <div className="text-[10px] text-gray-400 mt-1">{time}</div>}
+          {time && <div style={{ fontFamily: FONT, fontSize: 10, color: MUTED, marginTop: 4 }}>{time}</div>}
         </div>
       </div>
     </div>
@@ -139,61 +152,68 @@ export default function FeatureNotify() {
   }
 
   return (
-    <div className="flex flex-col bg-[#ededed]" style={{ height: 'calc(100vh - 96px)' }}>
-      {/* 聊天区 */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto no-scrollbar px-3 py-4 space-y-3">
-        {/* 刷新 + 错误提示条 */}
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-[11px] text-gray-400">功能通知 · 可回复</span>
+    <div style={{ padding: '8px 2px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
+      <PageHeader
+        eyebrow="Feature"
+        title={meta.name}
+        desc="功能通知 · 可回复"
+        right={<button onClick={() => nav(-1)} style={btnGhost({ padding: '8px 15px', fontSize: 14 })}>返回</button>}
+      />
+
+      {/* 聊天主卡：粗黑边 + 硬阴影 */}
+      <div style={{ ...hard(), background: '#ffffff', display: 'flex', flexDirection: 'column', height: 'calc(100vh - 240px)', minHeight: 420, overflow: 'hidden' }}>
+        <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* 刷新 + 错误提示条 */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+            <span style={{ fontFamily: MONO, fontSize: 11, color: MUTED, letterSpacing: 1 }}>功能通知 · 可回复</span>
+            <button
+              onClick={() => load(true)}
+              disabled={refreshing}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: FONT, fontSize: 11, color: MUTED, background: 'none', border: 'none', cursor: 'pointer', opacity: refreshing ? 0.4 : 1 }}
+            >
+              <RefreshCw size={13} style={refreshing ? { animation: 'spin 1s linear infinite' } : undefined} /> 刷新
+            </button>
+          </div>
+          {error && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: FONT, fontSize: 12, color: ACCENT, background: '#fbeede', border: `1px solid ${ACCENT}`, borderRadius: 2, padding: '8px 12px' }}>
+              <AlertCircle size={14} /> {error}
+            </div>
+          )}
+          {loading && <div style={{ textAlign: 'center', fontFamily: FONT, fontSize: 12, color: MUTED, padding: '16px 0' }}>加载中…</div>}
+          {!loading && msgs.length === 0 && (
+            <div style={{ textAlign: 'center', fontFamily: FONT, fontSize: 12, color: MUTED, padding: '16px 0' }}>暂无消息，来留个言吧</div>
+          )}
+          {msgs.map(m => (
+            <Bubble key={m.id} m={m} meId={me.id} meta={meta} />
+          ))}
+        </div>
+
+        {/* 打开完整功能（醒目入口） */}
+        <button
+          onClick={() => nav(meta.to)}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '0 12px 12px', padding: '0 16px', height: 48, background: ACCENT, color: '#ffffff', border: `2px solid ${INK}`, borderRadius: 2, fontFamily: FONT, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
+        >
+          <span>打开完整功能</span>
+          <ChevronRight size={20} />
+        </button>
+
+        {/* 输入栏 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 12, borderTop: `2px solid ${INK}`, background: '#ffffff' }}>
+          <input
+            value={text}
+            onChange={e => setText(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && send()}
+            placeholder="回复 / 留言给该功能的负责团队…"
+            style={{ flex: 1, height: 40, padding: '0 12px', border: `2px solid ${INK}`, borderRadius: 2, background: '#ffffff', fontFamily: FONT, fontSize: 15, outline: 'none', color: INK }}
+          />
           <button
-            onClick={() => load(true)}
-            disabled={refreshing}
-            className="flex items-center gap-1 text-[11px] text-gray-400 active:opacity-60 disabled:opacity-40"
+            onClick={send}
+            disabled={!text.trim() || sending}
+            style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', background: ACCENT, color: '#ffffff', border: `2px solid ${INK}`, borderRadius: 2, cursor: 'pointer', opacity: (!text.trim() || sending) ? 0.4 : 1 }}
           >
-            <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} /> 刷新
+            <Send size={18} />
           </button>
         </div>
-        {error && (
-          <div className="flex items-center gap-1 text-[12px] text-red-500 bg-red-50 rounded-lg px-3 py-2">
-            <AlertCircle size={14} /> {error}
-          </div>
-        )}
-        {loading && <div className="text-center text-xs text-gray-400 py-4">加载中…</div>}
-        {!loading && msgs.length === 0 && (
-          <div className="text-center text-xs text-gray-400 py-4">暂无消息，来留个言吧</div>
-        )}
-        {msgs.map(m => (
-          <Bubble key={m.id} m={m} meId={me.id} meta={meta} />
-        ))}
-      </div>
-
-      {/* 打开完整功能（醒目入口） */}
-      <button
-        onClick={() => nav(meta.to)}
-        className="mx-3 mb-2 flex items-center justify-between px-4 h-12 rounded-xl text-white active:opacity-90"
-        style={{ background: meta.color }}
-      >
-        <span className="font-semibold text-[15px]">打开完整功能</span>
-        <ChevronRight size={20} />
-      </button>
-
-      {/* 输入栏 */}
-      <div className="flex items-center gap-2 p-2.5 bg-white border-t border-black/5">
-        <input
-          value={text}
-          onChange={e => setText(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && send()}
-          placeholder="回复 / 留言给该功能的负责团队…"
-          className="flex-1 h-10 px-3 rounded-full bg-[#f3f3f3] text-[15px] outline-none"
-        />
-        <button
-          onClick={send}
-          disabled={!text.trim() || sending}
-          className="w-10 h-10 flex items-center justify-center rounded-full text-white disabled:opacity-40"
-          style={{ background: '#07c160' }}
-        >
-          <Send size={18} />
-        </button>
       </div>
     </div>
   )

@@ -147,11 +147,14 @@ export async function registerUser(qq: string, password: string): Promise<Profil
   }
 
   // 走 db-write 的 register action（后端查重 + 插入，绕过 anon RLS 写限制）
-  const d = await dbWrite('register', { qq, password_hash: hash, nickname })
-  // [DEBUG] 临时排查 uid 与 DB 不一致
-  try { console.log('[DEBUG registerUser] resp=', JSON.stringify(d), 'storedId=', d?.profile?.id) } catch {}
-  const prof = rowToProfile(d.profile)
-  try { localStorage.setItem(STORAGE_KEY, prof.id) } catch {}
+  // 关键：把前端游客 uid 一并传过去，让后端用同一 id 落库，避免前后端 id 分裂。
+  // 前端游客 id 即权威 profile id，注册后无需依赖后端返回值再同步 localStorage。
+  const id = ensureUserId()
+  const d = await dbWrite('register', { uid: id, qq, password_hash: hash, nickname })
+  const prof = d?.profile
+    ? rowToProfile(d.profile)
+    : { id, qq, nickname, avatar: '', role: 'user', balance: 0, frozen: 0, status: 'active' } as Profile
+  try { localStorage.setItem(STORAGE_KEY, id) } catch {}
   return prof
 }
 

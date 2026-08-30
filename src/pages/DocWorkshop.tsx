@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import AIChat from '../components/AIChat'
 import { type ThemeKey } from '../components/Report'
+import { PageHeader, INK, ACCENT, PAPER, FONT } from '../components/Editorial'
 
 // 文档工坊 → 实时资讯台：从「表单 + 结果面板」改为微信聊天气泡（复用 AIChat）。
 // 四个视角（学校/就业/生活学习/各省通知）作为子频道 channel 切换，会话按 channel 隔离、可分别接着聊。
@@ -54,18 +55,38 @@ export default function DocWorkshop() {
   const cur = MODES.find((m) => m.key === mode)!
 
   return (
-    <>
-      <div className="page-head">
-        <h2>文档工坊</h2>
-        <p>输入学校 / 就业 / 生活学习 / 各省通知相关关键词，平台实时检索最新公开资料并由 AI 整理成清晰信息——查动态、政策与真实资料，辅助你做决策。</p>
-      </div>
+    <div style={{ padding: '8px 2px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
+      <PageHeader
+        eyebrow="Doc Workshop"
+        title="文档工坊"
+        desc="输入学校 / 就业 / 生活学习 / 各省通知相关关键词，平台实时检索最新公开资料并由 AI 整理成清晰信息——查动态、政策与真实资料，辅助你做决策。"
+      />
 
-      <div className="tabs">
-        {MODES.map((m) => (
-          <button key={m.key} className={m.key === mode ? 'active' : ''} onClick={() => setMode(m.key)}>
-            {m.label}
-          </button>
-        ))}
+      {/* 视角切换：粗黑边硬卡风按钮，激活态 ACCENT 填充 + 硬阴影 */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
+        {MODES.map((m) => {
+          const active = m.key === mode
+          return (
+            <button
+              key={m.key}
+              onClick={() => setMode(m.key)}
+              style={{
+                fontFamily: FONT,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: 'pointer',
+                padding: '9px 16px',
+                borderRadius: 2,
+                border: `2px solid ${INK}`,
+                background: active ? ACCENT : PAPER,
+                color: active ? '#fff' : INK,
+                boxShadow: active ? `4px 4px 0 ${INK}` : 'none',
+              }}
+            >
+              {m.label}
+            </button>
+          )
+        })}
       </div>
 
       <AIChat
@@ -87,6 +108,6 @@ export default function DocWorkshop() {
           '最新的政策变动对我有什么影响？'
         ]}
       />
-    </>
+    </div>
   )
 }

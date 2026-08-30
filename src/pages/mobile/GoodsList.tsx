@@ -2,6 +2,21 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Plus, MessageSquare, ArrowDownWideNarrow } from 'lucide-react'
 import { useStore } from '../../store/store'
+import {
+  PageHeader,
+  SectionLabel,
+  IndexGrid,
+  HardCard,
+  BtnPrimary,
+  Tag,
+  btnGhost,
+  INK,
+  MUTED,
+  FAINT,
+  ACCENT,
+  FONT,
+  MONO,
+} from '../../components/Editorial'
 
 export default function GoodsList() {
   const nav = useNavigate()
@@ -22,49 +37,120 @@ export default function GoodsList() {
   })
 
   return (
-    <div className="px-4 pt-3 pb-4">
-      <div className="flex items-center justify-between mb-3">
-        <h1 className="text-[18px] font-bold text-ink">二手集市</h1>
-        <button onClick={() => nav('/publish-goods')} className="flex items-center gap-1 text-sm text-brand-600 bg-brand-50 px-3 py-1.5 rounded-full">
-          <Plus size={15} /> 发布
-        </button>
+    <div style={{ padding: '8px 2px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
+      <PageHeader
+        eyebrow="Marketplace"
+        title="二手集市"
+        desc="校园闲置流转，好物不浪费。"
+        right={
+          <BtnPrimary onClick={() => nav('/publish-goods')}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Plus size={15} /> 发布
+            </span>
+          </BtnPrimary>
+        }
+      />
+
+      {/* 搜索：粗黑下边线，等宽计数 */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          borderBottom: `2px solid ${INK}`,
+          paddingBottom: 10,
+          marginBottom: 18,
+        }}
+      >
+        <Search size={18} color={MUTED} />
+        <input
+          value={kw}
+          onChange={e => setKw(e.target.value)}
+          placeholder="搜索二手好物"
+          style={{ flex: 1, border: 'none', outline: 'none', fontFamily: FONT, fontSize: 15, color: INK, background: 'transparent' }}
+        />
+        <span style={{ fontFamily: MONO, fontSize: 11, color: MUTED, letterSpacing: 2 }}>
+          {String(list.length).padStart(2, '0')} ITEMS
+        </span>
       </div>
 
-      <div className="flex items-center gap-2 bg-gray-100 rounded-xl px-3 py-2.5 mb-3">
-        <Search size={18} className="text-gray-400" />
-        <input className="bg-transparent outline-none text-sm flex-1" placeholder="搜索二手好物" value={kw} onChange={e => setKw(e.target.value)} />
-      </div>
-
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar mb-2">
+      {/* 分类筛选 + 排序 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflowX: 'auto', marginBottom: 20 }}>
         {['全部', ...cats.map(c => c.name)].map(c => (
-          <button key={c} onClick={() => setCat(c)}
-            className={'px-3 py-1.5 rounded-full text-sm whitespace-nowrap ' + (cat === c ? 'bg-brand-500 text-white' : 'bg-gray-100 text-gray-600')}>
+          <button
+            key={c}
+            onClick={() => setCat(c)}
+            style={
+              cat === c
+                ? { ...btnGhost({ padding: '7px 14px', fontSize: 13, background: ACCENT, color: '#ffffff', borderColor: INK }), whiteSpace: 'nowrap' }
+                : { ...btnGhost({ padding: '7px 14px', fontSize: 13 }), whiteSpace: 'nowrap' }
+            }
+          >
             {c}
           </button>
         ))}
-        <button onClick={() => setSort(s => s === 'priceAsc' ? 'priceDesc' : s === 'priceDesc' ? 'new' : 'priceAsc')}
-          className="ml-auto flex items-center gap-1 text-xs text-gray-500 bg-gray-100 px-3 py-1.5 rounded-full whitespace-nowrap">
+        <button
+          onClick={() => setSort(s => (s === 'priceAsc' ? 'priceDesc' : s === 'priceDesc' ? 'new' : 'priceAsc'))}
+          style={{ ...btnGhost({ padding: '7px 14px', fontSize: 12, marginLeft: 'auto', whiteSpace: 'nowrap' }), display: 'inline-flex', alignItems: 'center', gap: 6 }}
+        >
           <ArrowDownWideNarrow size={14} />
           {sort === 'new' ? '最新' : sort === 'priceAsc' ? '价格↑' : '价格↓'}
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 mt-2">
-        {list.length === 0 && <div className="col-span-2 text-center text-gray-400 text-sm py-16">暂无商品</div>}
-        {list.map(g => (
-          <div key={g.id} onClick={() => nav('/goods/' + g.id)} className="card overflow-hidden active:scale-[.98] transition">
-            <img src={g.images[0] || ''} className="w-full h-36 object-cover bg-gray-100" alt="" />
-            <div className="p-2.5">
-              <div className="text-sm font-medium truncate">{g.title}</div>
-              <div className="flex items-center justify-between mt-1.5">
-                <span className="text-brand-600 font-black">¥{g.price}</span>
-                <span className="text-[11px] text-gray-400">{g.category}</span>
-              </div>
-              <div className="text-[11px] text-gray-400 mt-1 truncate">{g.seller_name}</div>
-            </div>
+      <SectionLabel label="商品" />
+      <IndexGrid min={220}>
+        {list.length === 0 && (
+          <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: MUTED, fontSize: 14, padding: '64px 0' }}>
+            暂无商品
           </div>
+        )}
+        {list.map((g, i) => (
+          <HardCard key={g.id} onClick={() => nav('/goods/' + g.id)} style={{ display: 'flex', flexDirection: 'column', cursor: 'pointer' }}>
+            {g.images[0] ? (
+              <img
+                src={g.images[0]}
+                alt=""
+                style={{ width: '100%', height: 150, objectFit: 'cover', border: `2px solid ${INK}`, borderRadius: 2, marginBottom: 12, background: '#efefef' }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: '100%',
+                  height: 150,
+                  border: `2px solid ${INK}`,
+                  borderRadius: 2,
+                  marginBottom: 12,
+                  background: '#f4f2f2',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontFamily: MONO,
+                  fontSize: 11,
+                  color: FAINT,
+                  letterSpacing: 2,
+                }}
+              >
+                NO IMAGE
+              </div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ fontFamily: MONO, fontSize: 11, color: ACCENT, letterSpacing: 2 }}>
+                {String(i + 1).padStart(2, '0')}
+              </span>
+              {g.status === 'off' && <Tag tone="ink">已下架</Tag>}
+            </div>
+            <div style={{ fontFamily: FONT, fontSize: 16, fontWeight: 700, color: INK, lineHeight: 1.3, letterSpacing: '-0.01em' }}>
+              {g.title}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 }}>
+              <span style={{ fontFamily: FONT, fontSize: 18, fontWeight: 800, color: ACCENT }}>¥{g.price}</span>
+              <Tag tone="line">{g.category}</Tag>
+            </div>
+            <div style={{ fontFamily: FONT, fontSize: 12, color: MUTED, marginTop: 8 }}>{g.seller_name}</div>
+          </HardCard>
         ))}
-      </div>
+      </IndexGrid>
     </div>
   )
 }

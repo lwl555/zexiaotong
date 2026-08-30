@@ -12,6 +12,7 @@ import {
   Conversation, StoredMsg, getConversations, upsertConversation, deleteConversation, newId
 } from '../lib/history'
 import { useNavigate } from 'react-router-dom'
+import { INK, PAPER, ACCENT } from '../components/Editorial'
 
 // ─── 提示词 ─────────────────────────────────────────────────────
 
@@ -134,8 +135,8 @@ function renderMarkdown(text: string) {
           <div key={i} style={{ margin: '12px 0', overflowX: 'auto', borderRadius: 10, border: '1px solid #e5e7eb' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
               <thead>
-                <tr style={{ background: '#fef3c7' }}>
-                  {headers.map((h, j) => <th key={j} style={{ padding: '10px 14px', textAlign: 'left', borderBottom: '2px solid #f59e0b', fontWeight: 600, color: '#92400e' }}>{inlineRender(h)}</th>)}
+                <tr style={{ background: '#fbeede' }}>
+                  {headers.map((h, j) => <th key={j} style={{ padding: '10px 14px', textAlign: 'left', borderBottom: '2px solid #D8451F', fontWeight: 600, color: '#D8451F' }}>{inlineRender(h)}</th>)}
                 </tr>
               </thead>
               <tbody>
@@ -159,7 +160,7 @@ function renderMarkdown(text: string) {
     if (hMatch) {
       const Tag = `h${hMatch[1].length}` as keyof JSX.IntrinsicElements
       const size = hMatch[1].length === 1 ? 18 : hMatch[1].length === 2 ? 16 : 15
-      elements.push(<Tag key={i} style={{ margin: '14px 0 6px', fontSize: size, fontWeight: 600, color: '#1c1814' }}>{inlineRender(hMatch[2])}</Tag>)
+      elements.push(<Tag key={i} style={{ margin: '14px 0 6px', fontSize: size, fontWeight: 600, color: '#111111' }}>{inlineRender(hMatch[2])}</Tag>)
       i++; continue
     }
 
@@ -188,7 +189,7 @@ function inlineRender(text: string) {
   const parts = text.split(/(\*\*[^*]+\*\*)/g)
   return parts.map((p, i) => {
     const m = p.match(/^\*\*([^*]+)\*\*$/)
-    if (m) return <strong key={i} style={{ color: '#c2410c', fontWeight: 600 }}>{m[1]}</strong>
+    if (m) return <strong key={i} style={{ color: '#D8451F', fontWeight: 600 }}>{m[1]}</strong>
     if (!p) return null
     // 检测 URL 是否为图片链接
     const urlMatch = p.match(/(https?:\/\/[^\s]+\.(?:jpe?g|png|webp|gif)(?:\?[^\s]*)?)/i)
@@ -313,10 +314,10 @@ function HistoryPanel({
           padding: '14px 16px', borderBottom: '1px solid #f0f0f0',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between'
         }}>
-          <div style={{ fontSize: 16, fontWeight: 600, color: '#1c1814' }}>历史对话</div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: '#111111' }}>历史对话</div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => { onNew(); onClose() }} style={{
-              border: 'none', background: '#c2410c', color: '#fff',
+              border: 'none', background: '#D8451F', color: '#fff',
               borderRadius: 8, padding: '5px 12px', fontSize: 13, cursor: 'pointer',
               transition: 'transform .1s cubic-bezier(.4,0,.2,1)'
             }} onMouseDown={e => e.currentTarget.style.transform = 'scale(.94)'} onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>＋ 新对话</button>
@@ -340,8 +341,8 @@ function HistoryPanel({
             return (
               <div key={c.id} style={{
                 padding: '10px 16px', cursor: editing ? 'default' : 'pointer',
-                background: active ? '#fef3c7' : 'transparent',
-                borderLeft: active ? '3px solid #c2410c' : '3px solid transparent',
+                background: active ? '#fbeede' : 'transparent',
+                borderLeft: active ? '3px solid #D8451F' : '3px solid transparent',
                 borderBottom: '1px solid #f8f8f8',
                 transition: 'background .15s cubic-bezier(.4,0,.2,1)'
               }} onClick={() => !editing && onSelect(c)}>
@@ -355,12 +356,12 @@ function HistoryPanel({
                         if (e.key === 'Escape') { setEditingId(null); setEditingTitle('') }
                       }}
                       style={{
-                        flex: 1, border: '1px solid #c2410c', borderRadius: 6,
+                        flex: 1, border: '1px solid #D8451F', borderRadius: 6,
                         padding: '4px 8px', fontSize: 14, outline: 'none'
                       }}
                     />
                     <button onClick={() => commitRename(c.id)} style={{
-                      border: 'none', background: '#c2410c', color: '#fff',
+                      border: 'none', background: '#D8451F', color: '#fff',
                       borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer',
                       transition: 'transform .1s cubic-bezier(.4,0,.2,1)'
                     }} onMouseDown={e => e.currentTarget.style.transform = 'scale(.94)'} onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>保存</button>
@@ -368,7 +369,7 @@ function HistoryPanel({
                 ) : (
                   <>
                     <div style={{
-                      fontSize: 14, color: '#1c1814', fontWeight: active ? 600 : 500,
+                      fontSize: 14, color: '#111111', fontWeight: active ? 600 : 500,
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
                     }}>{c.title || '未命名对话'}</div>
                     <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
@@ -390,7 +391,7 @@ function HistoryPanel({
                           onDelete(c.id); refresh()
                         }
                       }} style={{
-                        border: 'none', background: 'transparent', color: '#c2410c',
+                        border: 'none', background: 'transparent', color: '#D8451F',
                         fontSize: 12, padding: 0, cursor: 'pointer',
                         display: 'flex', alignItems: 'center', gap: 3
                       }}><Trash2 size={12} strokeWidth={1.9} /> 删除</button>
@@ -814,7 +815,7 @@ export default function AITangdou() {
           {(['auto', 'manual', 'off'] as const).map(s => (
             <button key={s} onClick={() => setSearchMode(s)} style={{
               padding: '3px 8px', fontSize: 11, border: 'none', cursor: 'pointer',
-              background: searchMode === s ? '#1c1814' : '#fff',
+              background: searchMode === s ? '#111111' : '#fff',
               color: searchMode === s ? '#fff' : '#666',
               transition: 'all .15s',
               borderRight: s !== 'off' ? '1px solid #e5e5e5' : 'none'
@@ -837,7 +838,7 @@ export default function AITangdou() {
           return (
             <div key={c.id} style={{
               padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
-              background: active ? '#fef3c7' : 'transparent',
+              background: active ? '#fbeede' : 'transparent',
               marginBottom: 2
             }}
               onClick={() => { setSidebarEditingId(null); loadConv(c) }}
@@ -857,23 +858,23 @@ export default function AITangdou() {
                       if (e.key === 'Escape') setSidebarEditingId(null)
                     }}
                     style={{
-                      flex: 1, border: '1px solid #c2410c', borderRadius: 6,
+                      flex: 1, border: '1px solid #D8451F', borderRadius: 6,
                       padding: '3px 7px', fontSize: 13, outline: 'none',
-                      background: '#fff', color: '#1c1814'
+                      background: '#fff', color: '#111111'
                     }} />
                   <button onClick={() => {
                     const t = sidebarEditingTitle.trim()
                     if (t) renameConv(c.id, t)
                     setSidebarEditingId(null)
                   }} style={{
-                    border: 'none', background: '#c2410c', color: '#fff',
+                    border: 'none', background: '#D8451F', color: '#fff',
                     borderRadius: 6, padding: '3px 10px', fontSize: 12, cursor: 'pointer'
                   }}>保存</button>
                 </div>
               ) : (
                 <>
                   <div style={{
-                    fontSize: 13, color: '#1c1814', fontWeight: active ? 600 : 400,
+                    fontSize: 13, color: '#111111', fontWeight: active ? 600 : 400,
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
                   }}>{c.title || '未命名对话'}</div>
                   <div style={{ fontSize: 11, color: '#999', marginTop: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -895,7 +896,7 @@ export default function AITangdou() {
                           setSidebarEditingId(null)
                         }
                       }} style={{
-                        border: 'none', background: 'transparent', color: '#c2410c',
+                        border: 'none', background: 'transparent', color: '#D8451F',
                         fontSize: 11, padding: 0, cursor: 'pointer',
                         display: 'flex', alignItems: 'center', gap: 2
                       }}><Trash2 size={11} strokeWidth={1.9} /> 删除</button>
@@ -938,12 +939,12 @@ export default function AITangdou() {
                   border: '1px solid #e8e8e8',
                   background: '#fff',
                   fontSize: isMobile ? 12.5 : 13,
-                  color: '#1c1814',
+                  color: '#111111',
                   cursor: 'pointer',
                   boxShadow: '0 1px 2px rgba(0,0,0,.03)',
                   transition: 'all .15s'
                 }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = '#c2410c'; e.currentTarget.style.background = '#fafafa' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = '#D8451F'; e.currentTarget.style.background = '#fafafa' }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = '#e8e8e8'; e.currentTarget.style.background = '#fff' }}
                 onMouseDown={e => e.currentTarget.style.transform = 'scale(.97)'}
                 onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
@@ -958,7 +959,7 @@ export default function AITangdou() {
           {!isMobile ? (
             /* PC端：豆包风 —— 大标题 + 双 tab + 推荐气泡 */
             <>
-              <div style={{ fontSize: 26, fontWeight: 700, color: '#1c1814', marginBottom: 24 }}>
+              <div style={{ fontSize: 26, fontWeight: 700, color: '#111111', marginBottom: 24 }}>
                 有什么我能帮你的吗？
               </div>
               {/* 对话 / 工作 模式切换（豆包风） */}
@@ -968,14 +969,14 @@ export default function AITangdou() {
                 <button onClick={() => setMode('chat')} style={{
                   padding: '8px 28px', borderRadius: 20, border: 'none',
                   background: mode === 'chat' ? '#fff' : 'transparent',
-                  color: '#1c1814', fontSize: 14, cursor: 'pointer',
+                  color: '#111111', fontSize: 14, cursor: 'pointer',
                   fontWeight: mode === 'chat' ? 600 : 400,
                   boxShadow: mode === 'chat' ? '0 1px 3px rgba(0,0,0,.08)' : 'none'
                 }}>对话</button>
                 <button onClick={() => setMode('work')} style={{
                   padding: '8px 28px', borderRadius: 20, border: 'none',
                   background: mode === 'work' ? '#fff' : 'transparent',
-                  color: '#1c1814', fontSize: 14, cursor: 'pointer',
+                  color: '#111111', fontSize: 14, cursor: 'pointer',
                   fontWeight: mode === 'work' ? 600 : 400,
                   boxShadow: mode === 'work' ? '0 1px 3px rgba(0,0,0,.08)' : 'none'
                 }}>工作</button>
@@ -989,7 +990,7 @@ export default function AITangdou() {
                     background: '#fff', cursor: 'pointer', fontSize: 14, color: '#333',
                     textAlign: 'left', transition: 'all .15s'
                   }}
-                    onMouseEnter={e => { e.currentTarget.style.background = '#fafafa'; e.currentTarget.style.borderColor = '#c2410c' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#fafafa'; e.currentTarget.style.borderColor = '#D8451F' }}
                     onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = '#e8e8e8' }}>
                     {ex}
                   </button>
@@ -1001,10 +1002,10 @@ export default function AITangdou() {
             <>
               <div style={{
                 width: 56, height: 56, borderRadius: '50%',
-                background: '#1c1814', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: '#111111', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 marginBottom: 12
               }}><Sparkles size={26} color="#fff" strokeWidth={1.8} /></div>
-              <div style={{ fontSize: 19, fontWeight: 600, color: '#1c1814', marginBottom: 5 }}>
+              <div style={{ fontSize: 19, fontWeight: 600, color: '#111111', marginBottom: 5 }}>
                 你好，我是糖豆
               </div>
               <div style={{ fontSize: 12.5, color: '#999', marginBottom: 20, textAlign: 'center' }}>
@@ -1021,7 +1022,7 @@ export default function AITangdou() {
                     textAlign: 'left', lineHeight: 1.4, minHeight: 44,
                     transition: 'all .15s', boxShadow: '0 1px 2px rgba(0,0,0,.03)'
                   }}
-                    onMouseEnter={e => { e.currentTarget.style.background = '#fafafa'; e.currentTarget.style.borderColor = '#c2410c' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#fafafa'; e.currentTarget.style.borderColor = '#D8451F' }}
                     onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = '#ececec' }}>
                     {ex}
                   </button>
@@ -1041,7 +1042,7 @@ export default function AITangdou() {
         }}>
           {m.role === 'ai' && (
             <div style={{
-              width: isMobile ? 26 : 30, height: isMobile ? 26 : 30, borderRadius: '50%', background: '#5b7c99',
+              width: isMobile ? 26 : 30, height: isMobile ? 26 : 30, borderRadius: '50%', background: '#111111',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               flexShrink: 0, marginRight: 6
             }}><Sparkles size={isMobile ? 13 : 16} color="#fff" strokeWidth={2} /></div>
@@ -1050,9 +1051,9 @@ export default function AITangdou() {
             maxWidth: isMobile ? '82%' : '70%',
             padding: m.image ? 0 : (isMobile ? '8px 11px' : '10px 14px'),
             borderRadius: 14,
-            background: m.role === 'user' ? '#D8451F' : (m.error ? '#fef2f2' : '#ffffff'),
-            border: m.error ? '1px solid #fecaca' : '1px solid rgba(0,0,0,0.06)',
-            color: m.role === 'user' ? '#fff' : (m.error ? '#b42318' : '#1c1814'),
+            background: m.role === 'user' ? ACCENT : (m.error ? '#ffffff' : '#ffffff'),
+            border: m.error ? '1px solid rgba(216,69,31,0.45)' : '2px solid ' + INK,
+            color: m.role === 'user' ? '#fff' : (m.error ? '#D8451F' : '#111111'),
             fontSize: isMobile ? 13.5 : 14,
             lineHeight: isMobile ? 1.55 : 1.7,
             borderTopRightRadius: m.role === 'user' ? 4 : 14,
@@ -1119,7 +1120,7 @@ export default function AITangdou() {
                 <div style={{ color: '#888', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 4 }}><Link2 size={12} strokeWidth={1.9} /> 参考资料：</div>
                 {m.links.slice(0, 4).map((lk, j) => (
                   <a key={j} href={lk.url} target="_blank" rel="noopener noreferrer"
-                     style={{ display: 'block', color: '#1d4ed8', marginBottom: 2, textDecoration: 'none' }}>
+                     style={{ display: 'block', color: '#D8451F', marginBottom: 2, textDecoration: 'none' }}>
                     {lk.title || lk.url}
                   </a>
                 ))}
@@ -1149,7 +1150,7 @@ export default function AITangdou() {
           </div>
           {m.role === 'user' && !m.image && (
             <div style={{
-              width: isMobile ? 26 : 30, height: isMobile ? 26 : 30, borderRadius: '50%', background: '#e8e0d8',
+              width: isMobile ? 26 : 30, height: isMobile ? 26 : 30, borderRadius: '50%', background: '#fbeede',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: isMobile ? 11 : 13, flexShrink: 0, marginLeft: 6
             }}>我</div>
@@ -1160,14 +1161,14 @@ export default function AITangdou() {
       {loading && (
         <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: isMobile ? 8 : 14 }}>
           <div style={{
-            width: isMobile ? 26 : 30, height: isMobile ? 26 : 30, borderRadius: '50%', background: '#1c1814',
+            width: isMobile ? 26 : 30, height: isMobile ? 26 : 30, borderRadius: '50%', background: '#111111',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             flexShrink: 0, marginRight: 6
           }}><Sparkles size={isMobile ? 13 : 16} color="#fff" strokeWidth={2} /></div>
           <div style={{
             maxWidth: isMobile ? '82%' : '80%',
             padding: isMobile ? '8px 11px' : '10px 14px',
-            borderRadius: 14, background: '#f5f5f5',
+            borderRadius: 4, background: '#ffffff', border: '2px solid ' + INK,
             borderTopLeftRadius: 4,
             fontSize: isMobile ? 12.5 : 13,
             lineHeight: 1.55, color: '#666'
@@ -1189,12 +1190,12 @@ export default function AITangdou() {
                 }}>
                   {thinkPart}
                   {switched && (
-                    <div style={{ borderTop: '1px dashed #e0d8cf', margin: '5px 0 3px', color: '#c2410c', fontSize: 11 }}>
+                    <div style={{ borderTop: '1px dashed rgba(17,17,17,0.18)', margin: '5px 0 3px', color: '#D8451F', fontSize: 11 }}>
                       —— 正式回答 ——
                     </div>
                   )}
                   {answerPart}
-                  <span style={{ color: '#c2410c' }}>▍</span>
+                  <span style={{ color: '#D8451F' }}>▍</span>
                 </div>
               )
             })() : (
@@ -1215,13 +1216,13 @@ export default function AITangdou() {
       {pendingImage && (
         <div style={{
           padding: '6px 16px', display: 'flex', alignItems: 'center', gap: 8,
-          background: '#fef3c7', borderTop: '1px solid #fde68a'
+          background: '#fbeede', borderTop: '1px solid #fbeede'
         }}>
           <img src={pendingImage} alt="待发送" style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover' }} />
-          <span style={{ fontSize: 12, color: '#92400e' }}>图片已压缩</span>
+          <span style={{ fontSize: 12, color: '#D8451F' }}>图片已压缩</span>
           <button onClick={removePendingImage} style={{
             marginLeft: 'auto', border: 'none', background: 'transparent',
-            color: '#92400e', fontSize: 12, cursor: 'pointer', padding: 0
+            color: '#D8451F', fontSize: 12, cursor: 'pointer', padding: 0
           }}>移除</button>
         </div>
       )}
@@ -1234,7 +1235,7 @@ export default function AITangdou() {
           background: '#fafafa', borderTop: '1px solid #f5f5f5'
         }}>
           <span style={{
-            fontSize: 12, color: '#92400e', fontWeight: 600,
+            fontSize: 12, color: '#D8451F', fontWeight: 600,
             display: 'inline-flex', alignItems: 'center', gap: 4
           }}><Wand size={13} strokeWidth={2} /> {activeMode}模式</span>
           <button onClick={() => setActiveMode(null)} style={{
@@ -1285,7 +1286,7 @@ export default function AITangdou() {
               {(['auto', 'manual', 'off'] as const).map(s => (
                 <button key={s} onClick={() => setSearchMode(s)} style={{
                   padding: '4px 10px', fontSize: 11, border: 'none', cursor: 'pointer',
-                  background: searchMode === s ? '#1c1814' : '#fff',
+                  background: searchMode === s ? '#111111' : '#fff',
                   color: searchMode === s ? '#fff' : '#666',
                   transition: 'all .15s',
                   borderRight: s !== 'off' ? '1px solid #e5e5e5' : 'none'
@@ -1306,7 +1307,7 @@ export default function AITangdou() {
                 background: '#fff', cursor: 'pointer', color: '#555',
                 transition: 'all .15s'
               }}
-                onMouseEnter={e => e.currentTarget.style.borderColor = '#c2410c'}
+                onMouseEnter={e => e.currentTarget.style.borderColor = '#D8451F'}
                 onMouseLeave={e => e.currentTarget.style.borderColor = '#e5e5e5'}>
                 <span style={{ display: 'inline-flex', alignItems: 'center' }}><t.icon size={16} strokeWidth={1.9} /></span>
                 <span style={{ fontSize: 11, color: '#666' }}>{t.label}</span>
@@ -1322,7 +1323,7 @@ export default function AITangdou() {
               padding: '8px 4px', borderRadius: 8, border: '1px solid #e5e5e5',
               background: '#fff', cursor: 'pointer', color: '#555', transition: 'all .15s'
             }}
-              onMouseEnter={e => e.currentTarget.style.borderColor = '#c2410c'}
+              onMouseEnter={e => e.currentTarget.style.borderColor = '#D8451F'}
               onMouseLeave={e => e.currentTarget.style.borderColor = '#e5e5e5'}>
               <span style={{ display: 'inline-flex', alignItems: 'center' }}><ImageIcon size={16} strokeWidth={1.9} /></span>
               <span style={{ fontSize: 11, color: '#666' }}>图像生成</span>
@@ -1332,7 +1333,7 @@ export default function AITangdou() {
               padding: '8px 4px', borderRadius: 8, border: '1px solid #e5e5e5',
               background: '#fff', cursor: 'pointer', color: '#555', transition: 'all .15s'
             }}
-              onMouseEnter={e => e.currentTarget.style.borderColor = '#c2410c'}
+              onMouseEnter={e => e.currentTarget.style.borderColor = '#D8451F'}
               onMouseLeave={e => e.currentTarget.style.borderColor = '#e5e5e5'}>
               <span style={{ display: 'inline-flex', alignItems: 'center' }}><Clapperboard size={16} strokeWidth={1.9} /></span>
               <span style={{ fontSize: 11, color: '#666' }}>视频生成</span>
@@ -1357,14 +1358,14 @@ export default function AITangdou() {
           <button onClick={() => setDeepThink(v => !v)} style={{
             display: 'inline-flex', alignItems: 'center', gap: 5,
             padding: '4px 10px', borderRadius: 14, border: '1px solid',
-            borderColor: deepThink ? '#c2410c' : '#e5e5e5',
-            background: deepThink ? '#fff7ed' : '#fff',
-            color: deepThink ? '#c2410c' : '#666',
+            borderColor: deepThink ? '#D8451F' : '#e5e5e5',
+            background: deepThink ? '#fbeede' : '#fff',
+            color: deepThink ? '#D8451F' : '#666',
             fontSize: 12, cursor: 'pointer', transition: 'all .15s'
           }}>
             <span style={{
               width: 13, height: 13, borderRadius: '50%',
-              background: deepThink ? '#c2410c' : '#e5e5e5',
+              background: deepThink ? '#D8451F' : '#e5e5e5',
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
               color: '#fff', fontSize: 9, fontWeight: 700
             }}>{deepThink ? '✓' : ''}</span>
@@ -1384,13 +1385,13 @@ export default function AITangdou() {
         display: 'flex', alignItems: 'center', gap: 6,
         // mobile：浅灰底无缝融入页面（无 borderTop 白线）；PC 维持白底细线
         padding: isMobile ? '6px 10px' : '10px 20px',
-        background: isMobile ? '#f0f0f1' : '#fff',
+        background: isMobile ? '#ffffff' : '#fff',
         borderTop: isMobile ? 'none' : '1px solid #f0f0f0'
       }}>
         <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
         <button onClick={() => fileRef.current?.click()} title="图片" style={{
           width: isMobile ? 30 : 36, height: isMobile ? 30 : 36, borderRadius: '50%', border: 'none', cursor: 'pointer',
-          background: pendingImage ? '#c2410c' : '#f5f5f5',
+          background: pendingImage ? '#D8451F' : '#f5f5f5',
           color: pendingImage ? '#fff' : '#666',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           flexShrink: 0, fontSize: 16, transition: 'all .15s'
@@ -1398,7 +1399,7 @@ export default function AITangdou() {
 
         <div style={{
           flex: 1, display: 'flex', alignItems: 'center',
-          background: '#f5f5f5', borderRadius: isMobile ? 16 : 22,
+          background: PAPER, border: '2px solid ' + INK, borderRadius: 4,
           padding: '0 12px', height: isMobile ? 32 : 40,
           minHeight: isMobile ? 32 : 40, maxHeight: isMobile ? 32 : 40,
           overflow: 'hidden', boxSizing: 'border-box'
@@ -1426,7 +1427,7 @@ export default function AITangdou() {
         {isMobile && (
           <button onClick={() => setShowTags(v => !v)} title="功能" style={{
             width: 30, height: 30, borderRadius: '50%', border: 'none', cursor: 'pointer',
-            background: showTags ? '#c2410c' : '#f5f5f5',
+            background: showTags ? '#D8451F' : '#f5f5f5',
             color: showTags ? '#fff' : '#666',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             flexShrink: 0, fontSize: 14, transition: 'all .15s',
@@ -1453,7 +1454,7 @@ export default function AITangdou() {
               width: isMobile ? 30 : 36, height: isMobile ? 30 : 36, borderRadius: '50%',
               border: 'none',
               cursor: (input.trim() || pendingImage) ? 'pointer' : 'not-allowed',
-              background: (input.trim() || pendingImage) ? '#c2410c' : '#f5f5f5',
+              background: (input.trim() || pendingImage) ? '#D8451F' : '#f5f5f5',
               color: (input.trim() || pendingImage) ? '#fff' : '#bbb',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               flexShrink: 0, fontSize: 14,
@@ -1477,7 +1478,7 @@ export default function AITangdou() {
                 fontSize: 12, cursor: 'pointer', padding: 0,
                 display: 'flex', alignItems: 'center', gap: 4
               }}
-                onMouseEnter={e => e.currentTarget.style.color = '#c2410c'}
+                onMouseEnter={e => e.currentTarget.style.color = '#D8451F'}
                 onMouseLeave={e => e.currentTarget.style.color = '#666'}>
                 <Icon size={13} strokeWidth={1.9} /><span>{t.label}</span>
               </button>
@@ -1498,7 +1499,7 @@ export default function AITangdou() {
       flex: 1, display: 'flex', flexDirection: 'column',
       minWidth: 0, height: '100%',
       // mobile：整页微信原生浅灰底（对齐微信聊天背景），彻底去掉"顶部一排白"；PC 维持白底
-      background: isMobile ? '#ededed' : '#fff',
+      background: isMobile ? '#ffffff' : '#fff',
       position: 'relative'  // 给 mobile 浮顶按钮条做定位锚
     }}>
       {/* mobile：微信风顶栏 — 左 ‹ 返回首页 / 中 当前对话名（可点编辑）/ 右 ☰ 历史 */}
@@ -1511,7 +1512,7 @@ export default function AITangdou() {
         }}>
           <button onClick={() => nav('/')} title="返回首页" style={{
             border: 'none', background: 'transparent', cursor: 'pointer',
-            width: 44, height: 44, color: '#1c1814',
+            width: 44, height: 44, color: '#111111',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             transition: 'transform .1s cubic-bezier(.4,0,.2,1)',
             transform: 'scale(1)'
@@ -1539,10 +1540,10 @@ export default function AITangdou() {
                 }}
                 placeholder="糖豆"
                 style={{
-                  width: '100%', maxWidth: 220, border: '1px solid #c2410c',
+                  width: '100%', maxWidth: 220, border: '1px solid #D8451F',
                   borderRadius: 6, padding: '4px 10px', fontSize: 14,
                   outline: 'none', textAlign: 'center',
-                  background: '#fff', color: '#1c1814'
+                  background: '#fff', color: '#111111'
                 }} />
             ) : (
               <div
@@ -1553,7 +1554,7 @@ export default function AITangdou() {
                 }}
                 title={currentConvId ? '点击修改对话名' : '糖豆'}
                 style={{
-                  maxWidth: 240, fontSize: 14, fontWeight: 600, color: '#1c1814',
+                  maxWidth: 240, fontSize: 14, fontWeight: 600, color: '#111111',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                   cursor: currentConvId ? 'pointer' : 'default',
                   padding: '4px 12px', borderRadius: 6,
@@ -1569,7 +1570,7 @@ export default function AITangdou() {
           {/* 右侧：☰ 历史对话（移到右侧，符合微信「左返回、右功能」约定） */}
           <button onClick={() => setHistoryOpen(true)} title="历史对话" style={{
             border: 'none', background: 'transparent', cursor: 'pointer',
-            width: 44, height: 44, color: '#1c1814',
+            width: 44, height: 44, color: '#111111',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             transition: 'transform .1s cubic-bezier(.4,0,.2,1)',
             transform: 'scale(1)'
@@ -1602,7 +1603,7 @@ export default function AITangdou() {
       bottom: isMobile ? 40 : 0,
       display: 'flex',
       flexDirection: isMobile ? 'column' : 'row',
-      background: isMobile ? '#ededed' : '#fff',
+      background: isMobile ? '#ffffff' : '#fff',
       zIndex: isMobile ? 50 : 100,
       overflow: 'hidden'
     }}>
@@ -1633,7 +1634,7 @@ export default function AITangdou() {
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14
             }}>
-              <div style={{ fontSize: 16, fontWeight: 600, color: '#1c1814' }}>
+              <div style={{ fontSize: 16, fontWeight: 600, color: '#111111' }}>
                 {genDialog === 'image' ? '🖼️ AI 生图' : genDialog === 'video' ? '🎬 AI 生视频' : genDialog === 'generating' ? '⏳ 生成中…' : ''}
               </div>
               <button onClick={() => { setGenDialog('idle'); setGenError(''); setGenImage(null); setGenMode('text'); setGenVideoMode('text'); setGenDuration(121) }} style={{
@@ -1652,7 +1653,7 @@ export default function AITangdou() {
                     onClick={() => genDialog === 'image' ? setGenMode('text') : setGenVideoMode('text')}
                     style={{
                       padding: '6px 16px', fontSize: 13, border: 'none', cursor: 'pointer',
-                      background: (genDialog === 'image' ? genMode : genVideoMode) === 'text' ? '#1c1814' : '#fff',
+                      background: (genDialog === 'image' ? genMode : genVideoMode) === 'text' ? '#111111' : '#fff',
                       color: (genDialog === 'image' ? genMode : genVideoMode) === 'text' ? '#fff' : '#666',
                       transition: 'all .15s'
                     }}>
@@ -1662,7 +1663,7 @@ export default function AITangdou() {
                     onClick={() => genDialog === 'image' ? setGenMode('image') : setGenVideoMode('image')}
                     style={{
                       padding: '6px 16px', fontSize: 13, border: 'none', cursor: 'pointer',
-                      background: (genDialog === 'image' ? genMode : genVideoMode) === 'image' ? '#1c1814' : '#fff',
+                      background: (genDialog === 'image' ? genMode : genVideoMode) === 'image' ? '#111111' : '#fff',
                       color: (genDialog === 'image' ? genMode : genVideoMode) === 'image' ? '#fff' : '#666',
                       transition: 'all .15s'
                     }}>
@@ -1689,7 +1690,7 @@ export default function AITangdou() {
                         border: '2px dashed #d4d4d4', background: '#fafafa', cursor: 'pointer',
                         color: '#888', fontSize: 13, transition: 'all .15s'
                       }}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = '#c2410c'; e.currentTarget.style.background = '#fff7ed' }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = '#D8451F'; e.currentTarget.style.background = '#fbeede' }}
                         onMouseLeave={e => { e.currentTarget.style.borderColor = '#d4d4d4'; e.currentTarget.style.background = '#fafafa' }}>
                         📷 上传参考图片
                         <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>作为生成基础（支持 JPG/PNG）</div>
@@ -1711,9 +1712,9 @@ export default function AITangdou() {
                       ].map(opt => (
                         <button key={opt.frames} onClick={() => setGenDuration(opt.frames)} style={{
                           flex: 1, padding: '6px 4px', borderRadius: 8, border: '1px solid',
-                          borderColor: genDuration === opt.frames ? '#c2410c' : '#e5e5e5',
-                          background: genDuration === opt.frames ? '#fff7ed' : '#fff',
-                          color: genDuration === opt.frames ? '#c2410c' : '#666',
+                          borderColor: genDuration === opt.frames ? '#D8451F' : '#e5e5e5',
+                          background: genDuration === opt.frames ? '#fbeede' : '#fff',
+                          color: genDuration === opt.frames ? '#D8451F' : '#666',
                           fontSize: 12, cursor: 'pointer', transition: 'all .15s'
                         }}>
                           {opt.label}
@@ -1737,14 +1738,14 @@ export default function AITangdou() {
                     padding: '10px 12px', fontSize: 14, outline: 'none', resize: 'none',
                     boxSizing: 'border-box', color: '#333'
                   }} />
-                {genError && <div style={{ color: '#b42318', fontSize: 12, marginTop: 6 }}>{genError}</div>}
+                {genError && <div style={{ color: '#D8451F', fontSize: 12, marginTop: 6 }}>{genError}</div>}
                 <div style={{ display: 'flex', gap: 8, marginTop: 14, justifyContent: 'flex-end' }}>
                   <button onClick={() => { setGenDialog('idle'); setGenError(''); setGenImage(null); setGenMode('text'); setGenVideoMode('text'); setGenDuration(121) }} style={{
                     border: '1px solid #e5e5e5', background: '#fff', borderRadius: 8,
                     padding: '8px 16px', fontSize: 13, cursor: 'pointer', color: '#666'
                   }}>取消</button>
                   <button onClick={handleGen} disabled={!genPrompt.trim()} style={{
-                    border: 'none', background: genPrompt.trim() ? '#c2410c' : '#e5e5e5',
+                    border: 'none', background: genPrompt.trim() ? '#D8451F' : '#e5e5e5',
                     color: genPrompt.trim() ? '#fff' : '#999',
                     borderRadius: 8, padding: '8px 20px', fontSize: 13, cursor: genPrompt.trim() ? 'pointer' : 'not-allowed',
                     transition: 'all .15s'
@@ -1755,7 +1756,7 @@ export default function AITangdou() {
               <div style={{ textAlign: 'center', padding: '30px 0' }}>
                 <div style={{
                   width: 40, height: 40, borderRadius: '50%', border: '3px solid #e5e5e5',
-                  borderTopColor: '#c2410c', margin: '0 auto 14px',
+                  borderTopColor: '#D8451F', margin: '0 auto 14px',
                   animation: 'spin 1s linear infinite'
                 }} />
                 <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>

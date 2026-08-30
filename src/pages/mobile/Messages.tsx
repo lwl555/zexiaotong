@@ -3,6 +3,17 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import { ChevronLeft, Send } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { useMe } from '../../store/useMe'
+import {
+  PageHeader,
+  ListRow,
+  BtnPrimary,
+  INK,
+  MUTED,
+  ACCENT,
+  HAIR,
+  FONT,
+  PAPER,
+} from '../../components/Editorial'
 
 export default function Messages() {
   const nav = useNavigate()
@@ -45,21 +56,46 @@ export default function Messages() {
   // 会话列表视图
   if (!peerId) {
     return (
-      <div className="px-4 pt-3 pb-10">
-        <h1 className="text-[18px] font-bold text-ink mb-4">私信</h1>
-        <div className="space-y-1">
-          {convs.length === 0 && <div className="text-center text-gray-400 text-sm py-16">暂无会话</div>}
+      <div style={{ padding: '8px 2px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
+        <PageHeader eyebrow="Messages" title="私信" desc="和接单伙伴、护考前辈一对一聊聊。" />
+        {convs.length === 0 && (
+          <div style={{ textAlign: 'center', color: MUTED, fontSize: 14, padding: '64px 0' }}>暂无会话</div>
+        )}
+        <div>
           {convs.map(c => {
             const u = users.find(x => x.id === c.other)
+            const unreadDot = !c.read && c.sender_id !== me.id
             return (
-              <button key={c.other} onClick={() => nav('/messages?peer=' + c.other)} className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-gray-50 text-left">
-                <div className="w-11 h-11 rounded-full bg-brand-100 flex items-center justify-center text-brand-600 font-medium shrink-0">{u?.nickname.slice(-1)}</div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-sm">{u?.nickname}</div>
-                  <div className="text-xs text-gray-400 truncate">{c.content}</div>
+              <ListRow key={c.other} style={{ cursor: 'pointer' }} onClick={() => nav('/messages?peer=' + c.other)}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: '50%',
+                      border: `2px solid ${INK}`,
+                      background: PAPER,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontFamily: FONT,
+                      fontWeight: 700,
+                      color: INK,
+                      fontSize: 15,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {u?.nickname?.slice(-1) || '?'}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: FONT, fontSize: 14, fontWeight: 600, color: INK }}>{u?.nickname}</div>
+                    <div style={{ fontFamily: FONT, fontSize: 12, color: MUTED, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {c.content}
+                    </div>
+                  </div>
                 </div>
-                {!c.read && c.sender_id !== me.id && <span className="w-2 h-2 rounded-full bg-red-500" />}
-              </button>
+                {unreadDot && <span style={{ width: 8, height: 8, borderRadius: '50%', background: ACCENT, flexShrink: 0 }} />}
+              </ListRow>
             )
           })}
         </div>
@@ -69,19 +105,50 @@ export default function Messages() {
 
   // 聊天视图
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
-      <div className="flex items-center gap-2 px-3 h-12 bg-white border-b shrink-0">
-        <button onClick={() => nav('/messages')} className="text-gray-400"><ChevronLeft size={20} /></button>
-        <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-brand-600 text-sm">{peer?.nickname.slice(-1)}</div>
-        <div className="font-medium text-sm">{peer?.nickname}</div>
+    <div style={{ padding: '8px 2px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+        <button onClick={() => nav('/messages')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: MUTED, display: 'inline-flex' }}>
+          <ChevronLeft size={20} />
+        </button>
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
+            border: `2px solid ${INK}`,
+            background: PAPER,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontFamily: FONT,
+            fontWeight: 700,
+            color: INK,
+            fontSize: 13,
+          }}
+        >
+          {peer?.nickname?.slice(-1) || '?'}
+        </div>
+        <div style={{ fontFamily: FONT, fontSize: 15, fontWeight: 700, color: INK }}>{peer?.nickname}</div>
       </div>
 
-      <div className="flex-1 overflow-y-auto no-scrollbar px-3 py-4 space-y-3">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, height: 'calc(100vh - 210px)', overflowY: 'auto', paddingBottom: 8 }}>
         {chatMsgs.map(m => {
           const mine = m.sender_id === me.id
           return (
-            <div key={m.id} className={'flex ' + (mine ? 'justify-end' : 'justify-start')}>
-              <div className={'max-w-[72%] px-3.5 py-2 rounded-2xl text-sm ' + (mine ? 'bg-brand-500 text-white rounded-br-sm' : 'bg-white text-ink rounded-bl-sm shadow-sm')}>
+            <div key={m.id} style={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start' }}>
+              <div
+                style={{
+                  maxWidth: '72%',
+                  padding: '10px 14px',
+                  borderRadius: mine ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
+                  fontFamily: FONT,
+                  fontSize: 14,
+                  lineHeight: 1.5,
+                  ...(mine
+                    ? { background: ACCENT, color: '#ffffff' }
+                    : { background: PAPER, color: INK, border: `1.5px solid ${INK}` }),
+                }}
+              >
                 {m.content}
               </div>
             </div>
@@ -89,10 +156,21 @@ export default function Messages() {
         })}
       </div>
 
-      <div className="flex items-center gap-2 p-3 bg-white border-t">
-        <input className="input flex-1" value={text} onChange={e => setText(e.target.value)} placeholder="发消息…" onKeyDown={e => e.key === 'Enter' && send()} />
-        <button className="btn-primary w-12 h-11 flex items-center justify-center" onClick={send}><Send size={18} /></button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 14, borderTop: `1px solid ${HAIR}`, paddingTop: 14 }}>
+        <input
+          value={text}
+          onChange={e => setText(e.target.value)}
+          placeholder="发消息…"
+          onKeyDown={e => e.key === 'Enter' && send()}
+          style={{ flex: 1, border: `2px solid ${INK}`, borderRadius: 2, padding: '10px 12px', fontFamily: FONT, fontSize: 14, outline: 'none', color: INK, background: PAPER }}
+        />
+        <BtnPrimary onClick={send} style={{ padding: '10px 14px' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <Send size={16} /> 发送
+          </span>
+        </BtnPrimary>
       </div>
     </div>
   )
 }
+

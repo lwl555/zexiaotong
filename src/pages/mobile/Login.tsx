@@ -1,13 +1,49 @@
+import type { CSSProperties } from 'react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../store/store'
 import { CheckCircle, XCircle } from 'lucide-react'
 import { useIsMobile } from '../../lib/useIsMobile'
+import {
+  BtnPrimary,
+  btnGhost,
+  hard,
+  INK,
+  MUTED,
+  FAINT,
+  ACCENT,
+  FONT,
+  MONO,
+} from '../../components/Editorial'
 
 // 管理员不再硬编码：登录走统一 loginPwd，系统按 profiles.role 字段识别 admin
 const QQ_RE = /^[1-9]\d{4,10}$/
 // 密码两层验证 - 第一层：强度规则（6-20 位，含字母 + 数字）
 const PWD_RE = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{6,20}$/
+
+const inputStyle: CSSProperties = {
+  width: '100%',
+  border: `2px solid ${INK}`,
+  borderRadius: 2,
+  padding: '11px 12px',
+  fontFamily: FONT,
+  fontSize: 15,
+  color: INK,
+  outline: 'none',
+  marginTop: 6,
+  boxSizing: 'border-box',
+  background: '#fff',
+}
+
+const labelStyle: CSSProperties = {
+  fontFamily: MONO,
+  fontSize: 10.5,
+  letterSpacing: 2,
+  color: MUTED,
+  textTransform: 'uppercase',
+  display: 'block',
+  marginTop: 14,
+}
 
 function AuthForm({ mobile }: { mobile: boolean }) {
   const nav = useNavigate()
@@ -58,52 +94,102 @@ function AuthForm({ mobile }: { mobile: boolean }) {
   }
 
   return (
-    <div className="flex flex-col">
+    <div style={{ maxWidth: 420, margin: '0 auto', fontFamily: FONT }}>
       {toast && (
-        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium shadow-lg ${toast.type === 'ok' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
-          {toast.type === 'ok' ? <CheckCircle size={16} /> : <XCircle size={16} />}
+        <div
+          style={{
+            position: 'fixed',
+            top: 16,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 60,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '10px 16px',
+            fontFamily: FONT,
+            fontSize: 14,
+            fontWeight: 600,
+            ...hard({ background: '#ffffff', color: toast.type === 'ok' ? ACCENT : INK }),
+          }}
+        >
+          {toast.type === 'ok' ? <CheckCircle size={16} color={ACCENT} /> : <XCircle size={16} color={INK} />}
           {toast.msg}
         </div>
       )}
 
-      {mobile && <button onClick={() => nav(-1)} className="self-start text-gray-400 mb-6">‹ 返回</button>}
-      {mobile && <h1 className="text-2xl font-black text-ink">QQ号登录</h1>}
-      {mobile && <p className="text-gray-500 text-sm mt-1">使用QQ号与密码登录或注册</p>}
+      {mobile && (
+        <button
+          onClick={() => nav(-1)}
+          style={{ background: 'none', border: 'none', color: FAINT, fontFamily: FONT, fontSize: 14, cursor: 'pointer', marginBottom: 24 }}
+        >
+          ‹ 返回
+        </button>
+      )}
 
-      <div className="auth-tabs mt-6">
-        <button className={mode === 'login' ? 'active' : ''} onClick={() => setMode('login')}>登录</button>
-        <button className={mode === 'register' ? 'active' : ''} onClick={() => setMode('register')}>注册</button>
+      <div style={{ fontFamily: MONO, fontSize: 11, letterSpacing: 3, color: ACCENT, marginBottom: 8 }}>AUTH</div>
+      <h1 style={{ fontFamily: FONT, fontSize: 30, fontWeight: 800, color: INK, letterSpacing: '-0.02em', margin: 0, lineHeight: 1.1 }}>
+        QQ号登录
+      </h1>
+      <p style={{ fontFamily: FONT, fontSize: 14, color: MUTED, marginTop: 8, marginBottom: 0 }}>使用QQ号与密码登录或注册</p>
+
+      {/* tabs：粗黑边幽灵按钮，激活态陶土红填充 */}
+      <div style={{ display: 'flex', gap: 10, marginTop: 22, marginBottom: 18 }}>
+        <button
+          onClick={() => setMode('login')}
+          style={{ flex: 1, ...btnGhost({ padding: '9px 0', fontSize: 14, textAlign: 'center' }), ...(mode === 'login' ? { background: ACCENT, color: '#fff', borderColor: INK } : {}) }}
+        >
+          登录
+        </button>
+        <button
+          onClick={() => setMode('register')}
+          style={{ flex: 1, ...btnGhost({ padding: '9px 0', fontSize: 14, textAlign: 'center' }), ...(mode === 'register' ? { background: ACCENT, color: '#fff', borderColor: INK } : {}) }}
+        >
+          注册
+        </button>
       </div>
 
-      <label className="mt-6 text-sm text-gray-600">QQ号</label>
-      <input className="input mt-2" value={qq} onChange={(e) => setQq(e.target.value)} placeholder="请输入QQ号" inputMode="numeric" maxLength={11} />
+      <label style={labelStyle}>QQ号</label>
+      <input className="input" value={qq} onChange={(e) => setQq(e.target.value)} placeholder="请输入QQ号" inputMode="numeric" maxLength={11} style={inputStyle} />
 
-      <label className="mt-5 text-sm text-gray-600">密码</label>
-      <input className="input mt-2" value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder={mode === 'register' ? '6-20 位，含字母和数字' : '请输入密码'} type="password" maxLength={20} />
+      <label style={labelStyle}>密码</label>
+      <input className="input" value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder={mode === 'register' ? '6-20 位，含字母和数字' : '请输入密码'} type="password" maxLength={20} style={inputStyle} />
 
       {mode === 'register' && (
         <>
-          <label className="mt-5 text-sm text-gray-600">确认密码</label>
-          <input className="input mt-2" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="再次输入密码" type="password" maxLength={20} />
-          <p className="auth-hint">密码两层验证：① 满足强度规则（6-20 位，含字母和数字）② 两次输入完全一致</p>
-          <label className="mt-4 flex items-start gap-2 text-xs text-gray-500">
-            <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-0.5" />
+          <label style={labelStyle}>确认密码</label>
+          <input className="input" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="再次输入密码" type="password" maxLength={20} style={inputStyle} />
+          <p style={{ fontFamily: FONT, fontSize: 12, color: MUTED, marginTop: 10, marginBottom: 0, lineHeight: 1.6 }}>
+            密码两层验证：① 满足强度规则（6-20 位，含字母和数字）② 两次输入完全一致
+          </p>
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 12, fontFamily: FONT, fontSize: 12, color: MUTED, lineHeight: 1.6 }}>
+            <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} style={{ marginTop: 2 }} />
             <span>我已阅读并同意《用户协议》与《隐私政策》，了解平台「先冻结后分账」的资金规则。</span>
           </label>
         </>
       )}
 
-      <button className="btn-primary mt-8 w-full disabled:opacity-50" onClick={submit} disabled={loading}>
+      <button
+        onClick={submit}
+        disabled={loading}
+        style={{ ...hard({ padding: '12px', fontSize: 15, fontWeight: 700, color: '#fff', background: ACCENT, fontFamily: FONT, width: '100%', marginTop: 20, opacity: loading ? 0.5 : 1, cursor: loading ? 'default' : 'pointer' }) }}
+      >
         {loading ? '处理中…' : mode === 'register' ? '注册并登录' : '登录'}
       </button>
 
       {mode === 'login' && (
-        <button className="mt-3 text-sm text-gray-400 w-full text-center" onClick={() => setMode('register')}>
+        <button
+          onClick={() => setMode('register')}
+          style={{ background: 'none', border: 'none', color: FAINT, fontFamily: FONT, fontSize: 13, marginTop: 14, width: '100%', cursor: 'pointer' }}
+        >
           没有账号？去注册
         </button>
       )}
       {mode === 'register' && (
-        <button className="mt-3 text-sm text-gray-400 w-full text-center" onClick={() => setMode('login')}>
+        <button
+          onClick={() => setMode('login')}
+          style={{ background: 'none', border: 'none', color: FAINT, fontFamily: FONT, fontSize: 13, marginTop: 14, width: '100%', cursor: 'pointer' }}
+        >
           已有账号？去登录
         </button>
       )}
@@ -113,28 +199,21 @@ function AuthForm({ mobile }: { mobile: boolean }) {
 
 export default function Login() {
   const isMobile = useIsMobile()
-  if (!isMobile) {
-    // PC 专属居中卡片
-    return (
-      <div className="pc-login">
-        <div className="pc-login-card">
-          <div className="pc-login-brand">
-            <div className="pc-login-logo">择</div>
-            <div>
-              <div className="pc-login-title">择校通</div>
-              <div className="pc-login-sub">校园综合服务平台 · 登录 / 注册</div>
-            </div>
-          </div>
-          <AuthForm mobile={false} />
-          <div className="pc-login-foot">真实 · 直接 · 不客气</div>
-        </div>
-      </div>
-    )
-  }
-  // 手机端：竖排 H5 表单（壳由 MobileLayout 提供）
   return (
-    <div className="app-shell flex flex-col px-6 pt-14" style={{ minHeight: '100vh' }}>
-      <AuthForm mobile={true} />
+    <div style={{ padding: isMobile ? '0' : '40px 2px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
+      <div style={{ ...hard(), background: '#fff', padding: isMobile ? 20 : 32, maxWidth: 480, margin: '0 auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
+          <div style={{ width: 40, height: 40, border: `3px solid ${INK}`, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, fontWeight: 800, fontSize: 20, color: INK }}>
+            择
+          </div>
+          <div>
+            <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 16, color: INK }}>择校通</div>
+            <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: 1.5, color: MUTED }}>校园综合服务平台</div>
+          </div>
+        </div>
+        <AuthForm mobile={isMobile} />
+        <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: 2, color: FAINT, textAlign: 'center', marginTop: 20 }}>真实 · 直接 · 不客气</div>
+      </div>
     </div>
   )
 }

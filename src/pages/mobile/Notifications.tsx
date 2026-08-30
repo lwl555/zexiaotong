@@ -2,6 +2,18 @@ import { useNavigate } from 'react-router-dom'
 import { CheckCircle2, UserCheck, Clock, Scale, MessageCircle, Mail, Megaphone, CheckCheck, ChevronLeft } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { useMe } from '../../store/useMe'
+import {
+  PageHeader,
+  ListRow,
+  BtnGhost,
+  Tag,
+  INK,
+  MUTED,
+  FAINT,
+  ACCENT,
+  FONT,
+  MONO,
+} from '../../components/Editorial'
 
 const META: any = {
   task_status: { icon: CheckCircle2, color: 'text-green-600 bg-green-50', label: '任务状态' },
@@ -31,33 +43,68 @@ export default function Notifications() {
   }
 
   return (
-    <div className="pb-10">
-      <div className="flex items-center gap-2 px-4 h-14 border-b border-gray-100 sticky top-0 bg-white z-10">
-        <button onClick={() => nav(-1)} className="text-gray-400"><ChevronLeft size={20} /></button>
-        <h1 className="text-lg font-black text-ink flex-1">消息通知</h1>
-        {unread.length > 0 && (
-          <button onClick={readAll} className="text-xs text-brand-600 flex items-center gap-1"><CheckCheck size={14} /> 全部已读</button>
-        )}
-      </div>
+    <div style={{ padding: '8px 2px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
+      <PageHeader
+        eyebrow="Notifications"
+        title="消息通知"
+        desc="任务、评论、私信与平台公告，一处看全。"
+        right={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button onClick={() => nav(-1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: MUTED, display: 'inline-flex' }}>
+              <ChevronLeft size={20} />
+            </button>
+            {unread.length > 0 && (
+              <BtnGhost onClick={readAll} style={{ padding: '7px 12px' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                  <CheckCheck size={14} /> 全部已读
+                </span>
+              </BtnGhost>
+            )}
+          </div>
+        }
+      />
 
-      <div className="px-4 pt-3 space-y-2">
-        {list.length === 0 && <div className="text-center text-gray-400 text-sm py-16">暂无通知</div>}
+      {list.length === 0 && (
+        <div style={{ textAlign: 'center', color: MUTED, fontSize: 14, padding: '64px 0' }}>暂无通知</div>
+      )}
+
+      <div>
         {list.map(n => {
           const m = META[n.type] || META.announce
           const Icon = m.icon
           return (
-            <button key={n.id} onClick={() => open(n)} className={'w-full flex gap-3 p-3 rounded-2xl text-left transition ' + (n.read ? 'bg-white' : 'bg-brand-50/60')}>
-              <div className={'w-10 h-10 rounded-full flex items-center justify-center shrink-0 ' + m.color}><Icon size={18} /></div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400">{m.label}</span>
-                  {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-red-500" />}
+            <ListRow key={n.id} style={{ cursor: 'pointer', alignItems: 'flex-start', padding: '16px 2px' }} onClick={() => open(n)}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: '50%',
+                    border: `2px solid ${INK}`,
+                    background: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <Icon size={18} color={INK} />
                 </div>
-                <div className="text-sm font-medium text-ink truncate">{n.title}</div>
-                <div className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.content}</div>
-                <div className="text-[11px] text-gray-300 mt-1">{new Date(n.created_at).toLocaleString('zh-CN')}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <Tag tone="accent">{m.label}</Tag>
+                    {!n.read && <span style={{ width: 7, height: 7, borderRadius: '50%', background: ACCENT, flexShrink: 0 }} />}
+                  </div>
+                  <div style={{ fontFamily: FONT, fontSize: 14, fontWeight: 700, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {n.title}
+                  </div>
+                  <div style={{ fontFamily: FONT, fontSize: 12, color: MUTED, marginTop: 3, lineHeight: 1.5 }}>{n.content}</div>
+                  <div style={{ fontFamily: MONO, fontSize: 11, color: FAINT, marginTop: 6, letterSpacing: 0.5 }}>
+                    {new Date(n.created_at).toLocaleString('zh-CN')}
+                  </div>
+                </div>
               </div>
-            </button>
+            </ListRow>
           )
         })}
       </div>
