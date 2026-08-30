@@ -3,6 +3,19 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, Heart, Star, MessageCircle, Search } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { useMe } from '../../store/useMe'
+import {
+  PageHeader,
+  IndexGrid,
+  HardCard,
+  BtnPrimary,
+  INK,
+  MUTED,
+  FAINT,
+  ACCENT,
+  HAIR,
+  FONT,
+  MONO,
+} from '../../components/Editorial'
 
 export default function Community() {
   const nav = useNavigate()
@@ -16,43 +29,126 @@ export default function Community() {
   if (kw) list = list.filter(p => p.title.includes(kw) || p.content.includes(kw))
 
   return (
-    <div className="px-3.5 pt-3 pb-4">
-      <div className="flex items-center justify-between mb-2.5">
-        <h1 className="text-[17px] font-bold text-ink">校园社区</h1>
-        <button onClick={() => nav('/publish-post')} className="flex items-center gap-1 text-[13px] text-brand-600 bg-brand-50 px-2.5 py-1.5 rounded-full active:bg-brand-100">
-          <Plus size={15} /> 发帖
-        </button>
+    <div style={{ padding: '8px 2px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
+      <PageHeader
+        eyebrow="Community"
+        title="校园社区"
+        desc="护考前辈的真实经验、避坑清单与资料共享。用大白话，不整虚的。"
+        right={
+          <BtnPrimary onClick={() => nav('/publish-post')}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Plus size={15} /> 发帖
+            </span>
+          </BtnPrimary>
+        }
+      />
+
+      {/* 搜索：粗黑下边线，等宽计数 */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          borderBottom: `2px solid ${INK}`,
+          paddingBottom: 10,
+          marginBottom: 18,
+        }}
+      >
+        <Search size={18} color={MUTED} />
+        <input
+          value={kw}
+          onChange={e => setKw(e.target.value)}
+          placeholder="搜索帖子 / 关键词"
+          style={{ flex: 1, border: 'none', outline: 'none', fontFamily: FONT, fontSize: 15, color: INK, background: 'transparent' }}
+        />
+        <span style={{ fontFamily: MONO, fontSize: 11, color: MUTED, letterSpacing: 2 }}>
+          {String(list.length).padStart(2, '0')} POSTS
+        </span>
       </div>
 
-      <div className="flex items-center gap-2 bg-gray-100 rounded-xl px-3 py-2 mb-2.5">
-        <Search size={17} className="text-gray-400" />
-        <input className="bg-transparent outline-none text-[13px] flex-1" placeholder="搜索帖子" value={kw} onChange={e => setKw(e.target.value)} />
-      </div>
+      {list.length === 0 && (
+        <div style={{ textAlign: 'center', color: MUTED, fontSize: 14, padding: '64px 0' }}>
+          暂无帖子，来发第一篇。
+        </div>
+      )}
 
-      <div className="space-y-2.5">
-        {list.length === 0 && <div className="text-center text-gray-400 text-[13px] py-16">暂无帖子</div>}
-        {list.map(p => (
-          <div key={p.id} className="card p-3.5">
-            {p.images[0] && <img src={p.images[0]} className="w-full h-32 object-cover rounded-xl mb-2.5 bg-gray-100" alt="" />}
-            <div className="font-semibold text-[15px] text-ink leading-snug" onClick={() => nav('/post/' + p.id)}>{p.title}</div>
-            <div className="text-[13px] text-gray-500 mt-1 line-clamp-2" onClick={() => nav('/post/' + p.id)}>{p.content}</div>
-            <div className="flex items-center justify-between mt-2.5">
-              <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
-                <img src={p.author_avatar} className="w-5 h-5 rounded-full" alt="" />{p.author_name}
+      <IndexGrid>
+        {list.map((p, i) => (
+          <HardCard key={p.id} onClick={() => nav('/post/' + p.id)} style={{ display: 'flex', flexDirection: 'column', cursor: 'pointer' }}>
+            {p.images[0] ? (
+              <img
+                src={p.images[0]}
+                alt=""
+                style={{ width: '100%', height: 150, objectFit: 'cover', border: `2px solid ${INK}`, borderRadius: 2, marginBottom: 12, background: '#efefef' }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: '100%',
+                  height: 150,
+                  border: `2px solid ${INK}`,
+                  borderRadius: 2,
+                  marginBottom: 12,
+                  background: '#f4f2ee',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontFamily: MONO,
+                  fontSize: 11,
+                  color: FAINT,
+                  letterSpacing: 2,
+                }}
+              >
+                NO COVER
               </div>
-              <div className="flex items-center gap-3.5 text-[13px]">
-                <button onClick={() => likePost(p.id)} className={'flex items-center gap-1 ' + (p.liked ? 'text-red-500' : 'text-gray-400')}>
-                  <Heart size={15} /> {p.likes}
+            )}
+            <div style={{ fontFamily: MONO, fontSize: 11, color: ACCENT, letterSpacing: 2, marginBottom: 6 }}>
+              {String(i + 1).padStart(2, '0')}
+            </div>
+            <div style={{ fontFamily: FONT, fontSize: 17, fontWeight: 700, color: INK, lineHeight: 1.3, letterSpacing: '-0.01em' }}>
+              {p.title}
+            </div>
+            <div
+              style={{
+                fontFamily: FONT,
+                fontSize: 13,
+                color: MUTED,
+                marginTop: 6,
+                lineHeight: 1.55,
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}
+            >
+              {p.content}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, paddingTop: 12, borderTop: `1px solid ${HAIR}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: FONT, fontSize: 12, color: MUTED }}>
+                <img src={p.author_avatar} alt="" style={{ width: 22, height: 22, borderRadius: '50%', border: `1.5px solid ${INK}` }} />
+                {p.author_name}
+              </div>
+              <div style={{ display: 'flex', gap: 12, fontFamily: FONT, fontSize: 12, color: MUTED }}>
+                <button
+                  onClick={e => { e.stopPropagation(); likePost(p.id) }}
+                  style={{ display: 'inline-flex', gap: 4, alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', color: p.liked ? ACCENT : MUTED }}
+                >
+                  <Heart size={14} /> {p.likes}
                 </button>
-                <button onClick={() => collectPost(p.id)} className={'flex items-center gap-1 ' + (p.collected ? 'text-amber-500' : 'text-gray-400')}>
-                  <Star size={15} /> {p.collects}
+                <button
+                  onClick={e => { e.stopPropagation(); collectPost(p.id) }}
+                  style={{ display: 'inline-flex', gap: 4, alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', color: p.collected ? ACCENT : MUTED }}
+                >
+                  <Star size={14} /> {p.collects}
                 </button>
-                <span className="flex items-center gap-1 text-gray-400"><MessageCircle size={15} /> {p.comments}</span>
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+                  <MessageCircle size={14} /> {p.comments}
+                </span>
               </div>
             </div>
-          </div>
+          </HardCard>
         ))}
-      </div>
+      </IndexGrid>
     </div>
   )
 }
