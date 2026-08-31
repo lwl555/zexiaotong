@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom'
 import { Search, Building2, MapPin, Radio, FileText, AlertTriangle, Coins, Info, BookOpen, Compass } from 'lucide-react'
 import {
-  PageHeader,
   SectionLabel,
   IndexGrid,
   HardCard,
@@ -58,20 +57,6 @@ const scenes = [
 export default function Home() {
   return (
     <div style={{ padding: '8px 2px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
-      <PageHeader
-        eyebrow="ZEXIAOTONG · 高校与职业决策工具"
-        title="选学校、挑公司，我们把实话摊在桌面上。"
-        desc="不粉饰、不绕弯、不回避。关于分数、食堂、薪资、加班这些硬事实，一半来自联网检索的真实资料，一半来自 AI 的整理与对比——每条都标明白，哪句是事实、哪句是判断。"
-        right={
-          <Link
-            to="/ai-search?tab=school"
-            style={{ ...hard({ padding: '9px 16px', fontSize: 14, fontWeight: 700, color: PAPER, background: ACCENT, display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }) }}
-          >
-            <Compass size={15} strokeWidth={2} /> 开始一次查询
-          </Link>
-        }
-      />
-
       {/* 编辑式 Hero：左文右图，非对称 */}
       <div
         style={{
