@@ -1,89 +1,116 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, User, Shield, LogOut, Info, Bell, Camera } from 'lucide-react'
-import { useStore, compressImageToDataUrl } from '../../store/store'
+import { ChevronRight, Shield, LogOut, Info, Bell } from 'lucide-react'
+import { useStore } from '../../store/store'
 import { useMe } from '../../store/useMe'
+import {
+  PageHeader,
+  SectionLabel,
+  HardCard,
+  SoftCard,
+  ListRow,
+  BtnGhost,
+  INK,
+  MUTED,
+  FAINT,
+  ACCENT,
+  FONT,
+  MONO,
+} from '../../components/Editorial'
 
 export default function Settings() {
   const nav = useNavigate()
   const me = useMe()
   const logout = useStore(s => s.logout)
   const switchRole = useStore(s => s.switchRole)
-  const updateProfile = useStore(s => s.updateProfile)
   const isGuest = !me.qq
   const isAdmin = me.role === 'admin'
   const [avatarErr, setAvatarErr] = useState(false)
 
-  const onAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
-    const dataUrl = await compressImageToDataUrl(file, 256, 0.82)
-    if (dataUrl) await updateProfile({ avatar: dataUrl })
-  }
-
   return (
-    <div className="wx-chat">
-      <header className="wx-chat-header">
-        <button className="wx-chat-back" onClick={() => nav(-1)} aria-label="返回"><ChevronLeft size={22} /></button>
-        <div className="wx-chat-title"><div className="wx-chat-name">设置</div></div>
-        <span />
-      </header>
+    <div style={{ padding: '8px 2px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
+      <PageHeader eyebrow="Settings" title="设置" desc="账号信息、通知与账号安全。" />
 
-      <div className="wx-chat-body" style={{ background: '#f5f5f5' }}>
-        {/* 账号 */}
-        <div className="card mt-3 divide-y divide-gray-50">
-          <div className="flex items-center gap-3 px-4 py-3.5">
-            {me.avatar && !avatarErr ? (
-              <img src={me.avatar} className="w-12 h-12 rounded-full object-cover" alt="" onError={() => setAvatarErr(true)} />
-            ) : (
-              <div className="w-12 h-12 rounded-full bg-brand-100 flex items-center justify-center text-xl text-brand-600">
-                {me.nickname.slice(0, 1)}
-              </div>
-            )}
-            <div className="flex-1">
-              <div className="text-sm font-medium">{me.nickname}</div>
-              <div className="text-xs text-gray-400">{isGuest ? '未登录' : `QQ ${me.qq}`}</div>
-            </div>
-            {!isGuest && (
-              <label className="text-brand-600 text-sm flex items-center gap-1">
-                <Camera size={16} /> 换头像
-                <input type="file" accept="image/*" hidden onChange={onAvatar} />
-              </label>
-            )}
+      {/* 账号卡 */}
+      <HardCard style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 24 }}>
+        {me.avatar && !avatarErr ? (
+          <img
+            src={me.avatar}
+            alt=""
+            onError={() => setAvatarErr(true)}
+            style={{ width: 56, height: 56, borderRadius: '50%', border: `2px solid ${INK}`, objectFit: 'cover', background: '#f4f2ee', flexShrink: 0 }}
+          />
+        ) : (
+          <div
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: '50%',
+              border: `2px solid ${INK}`,
+              background: '#f4f2ee',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontFamily: FONT,
+              fontWeight: 700,
+              color: MUTED,
+              fontSize: 18,
+              flexShrink: 0,
+            }}
+          >
+            {me.nickname.slice(0, 1)}
+          </div>
+        )}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: FONT, fontSize: 17, fontWeight: 800, color: INK }}>{me.nickname}</div>
+          <div style={{ fontFamily: MONO, fontSize: 11, color: MUTED, marginTop: 4, letterSpacing: 0.5 }}>
+            {isGuest ? '未登录' : `QQ ${me.qq}`}
           </div>
         </div>
+      </HardCard>
 
-        {/* 功能 */}
-        <div className="card mt-3 divide-y divide-gray-50">
-          <button onClick={() => nav('/notifications')} className="w-full flex items-center gap-3 px-4 py-3.5 text-left">
-            <Bell size={20} className="text-gray-500" /><span className="flex-1 text-sm">消息通知</span>
-          </button>
-          <button onClick={() => nav('/about')} className="w-full flex items-center gap-3 px-4 py-3.5 text-left">
-            <Info size={20} className="text-gray-500" /><span className="flex-1 text-sm">关于择校通</span>
-          </button>
-          {isAdmin && (
-            <button onClick={() => nav('/admin')} className="w-full flex items-center gap-3 px-4 py-3.5 text-left">
-              <Shield size={20} className="text-gray-500" /><span className="flex-1 text-sm">管理后台</span>
-            </button>
-          )}
-          {!isGuest && !isAdmin && (
-            <button onClick={() => { switchRole(); nav('/admin') }} className="w-full flex items-center gap-3 px-4 py-3.5 text-left">
-              <Shield size={20} className="text-gray-500" /><span className="flex-1 text-sm">切换为管理员（演示）</span>
-            </button>
-          )}
-        </div>
-
-        {!isGuest && (
-          <button
-            onClick={() => { logout(); nav('/splash') }}
-            className="w-full mt-3 py-3 text-red-500 text-sm flex items-center justify-center gap-1 rounded-lg bg-white">
-            <LogOut size={16} /> 退出登录
-          </button>
+      {/* 功能 */}
+      <SectionLabel label="功能" />
+      <SoftCard style={{ padding: 0, marginBottom: 24 }}>
+        <ListRow style={{ padding: '14px 16px' }} onClick={() => nav('/notifications')}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, flex: 1, fontFamily: FONT, fontSize: 14, color: INK }}>
+            <Bell size={16} color={MUTED} /> 消息通知
+          </span>
+          <ChevronRight size={16} color={FAINT} />
+        </ListRow>
+        <ListRow style={{ padding: '14px 16px' }} onClick={() => nav('/about')}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, flex: 1, fontFamily: FONT, fontSize: 14, color: INK }}>
+            <Info size={16} color={MUTED} /> 关于择校通
+          </span>
+          <ChevronRight size={16} color={FAINT} />
+        </ListRow>
+        {isAdmin && (
+          <ListRow style={{ padding: '14px 16px' }} onClick={() => nav('/admin')}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, flex: 1, fontFamily: FONT, fontSize: 14, color: ACCENT }}>
+              <Shield size={16} color={ACCENT} /> 管理后台
+            </span>
+            <ChevronRight size={16} color={FAINT} />
+          </ListRow>
         )}
+        {!isGuest && !isAdmin && (
+          <ListRow style={{ padding: '14px 16px' }} onClick={() => { switchRole(); nav('/admin') }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, flex: 1, fontFamily: FONT, fontSize: 14, color: INK }}>
+              <Shield size={16} color={MUTED} /> 切换为管理员（演示）
+            </span>
+            <ChevronRight size={16} color={FAINT} />
+          </ListRow>
+        )}
+      </SoftCard>
 
-        <p className="text-center text-xs text-gray-300 mt-6">择校通 · 校园综合服务</p>
-      </div>
+      {!isGuest && (
+        <BtnGhost onClick={() => { logout(); nav('/splash') }} style={{ width: '100%', color: MUTED }}>
+          退出登录
+        </BtnGhost>
+      )}
+
+      <p style={{ textAlign: 'center', fontFamily: MONO, fontSize: 11, color: FAINT, marginTop: 24, letterSpacing: 1 }}>
+        择校通 · 校园综合服务
+      </p>
     </div>
   )
 }

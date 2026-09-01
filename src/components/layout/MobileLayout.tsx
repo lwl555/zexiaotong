@@ -26,6 +26,8 @@ const ROUTE_TITLE: Record<string, string> = {
   '/news': '实时资讯台',
   '/wallet': '我的钱包',
   '/mine': '个人中心',
+  '/settings': '设置',
+  '/chat': 'AI 聊天',
   '/about': '关于择校通',
   '/my-tasks': '我的任务'
 }
@@ -37,11 +39,11 @@ function titleOf(path: string): string {
   return '择校通'
 }
 
-// 底部 Tab 配色由白底结合版（墨黑选中态 + 粗黑边）控制
+// 底部 Tab：标签必须与落地页实际内容一致（此前「通讯录/发现」实际跳社区/搞钱，属错位）
 const tabs = [
-  { to: '/', label: '首页', icon: MessageSquare, end: true },
-  { to: '/community', label: '通讯录', icon: Users, end: false },
-  { to: '/money', label: '发现', icon: Compass, end: false },
+  { to: '/', label: '首页', icon: HomeIcon, end: true },
+  { to: '/community', label: '社区', icon: Users, end: false },
+  { to: '/money', label: '搞钱', icon: Compass, end: false },
   { to: '/mine', label: '我', icon: User, end: false }
 ]
 

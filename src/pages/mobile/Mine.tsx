@@ -19,6 +19,7 @@ import {
 } from '../../components/Editorial'
 
 const aiTools = [
+  { to: '/chat', label: 'AI 聊天' },
   { to: '/ai-search', label: 'AI 百事通' },
   { to: '/ai-tangdou', label: '糖豆·学习搭子' },
   { to: '/ai-tutor', label: '学习导师' },
@@ -132,7 +133,7 @@ export default function Mine() {
       {/* 设置 */}
       <SectionLabel label="设置" />
       <SoftCard style={{ padding: 0, marginBottom: 24 }}>
-        <ListRow style={{ cursor: 'pointer', padding: '14px 16px' }}>
+        <ListRow style={{ cursor: 'pointer', padding: '14px 16px' }} onClick={() => nav('/settings')}>
           <span style={{ flex: 1, fontFamily: FONT, fontSize: 14, color: INK }}>设置中心</span>
           <ChevronRight size={16} color={FAINT} />
         </ListRow>

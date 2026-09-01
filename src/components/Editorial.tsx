@@ -150,9 +150,27 @@ export function HardCard({
 }
 
 // 细黑线分隔卡（密集列表项用，避免硬阴影脏重）
-export function SoftCard({ children, style }: { children: ReactNode; style?: CSSProperties }) {
+export function SoftCard({
+  children,
+  style,
+  onClick,
+}: {
+  children: ReactNode
+  style?: CSSProperties
+  onClick?: () => void
+}) {
   return (
-    <div style={{ background: PAPER, border: `1px solid ${HAIR}`, borderRadius: 3, padding: 16, ...style }}>
+    <div
+      onClick={onClick}
+      style={{
+        background: PAPER,
+        border: `1px solid ${HAIR}`,
+        borderRadius: 3,
+        padding: 16,
+        ...(onClick ? { cursor: 'pointer' } : null),
+        ...style,
+      }}
+    >
       {children}
     </div>
   )
@@ -173,9 +191,18 @@ export function IndexGrid({ children, min = 260 }: { children: ReactNode; min?: 
   )
 }
 
-export function ListRow({ children, style }: { children: ReactNode; style?: CSSProperties }) {
+export function ListRow({
+  children,
+  style,
+  onClick,
+}: {
+  children: ReactNode
+  style?: CSSProperties
+  onClick?: () => void
+}) {
   return (
     <div
+      onClick={onClick}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -183,6 +210,7 @@ export function ListRow({ children, style }: { children: ReactNode; style?: CSSP
         gap: 12,
         padding: '14px 2px',
         borderBottom: `1px solid ${HAIR}`,
+        ...(onClick ? { cursor: 'pointer' } : null),
         ...style,
       }}
     >

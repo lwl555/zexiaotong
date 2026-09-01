@@ -45,6 +45,8 @@ const FeatureNotify = lazy(() => import('./pages/mobile/FeatureNotify').then(m =
 const News          = lazy(() => import('./pages/mobile/News').then(m => ({ default: m.default })))
 const MobileMoney   = lazy(() => import('./pages/mobile/Money').then(m => ({ default: m.default })))
 const ThemePreview  = lazy(() => import('./pages/mobile/ThemePreview').then(m => ({ default: m.default })))
+const Settings      = lazy(() => import('./pages/mobile/Settings').then(m => ({ default: m.default })))
+const Chat          = lazy(() => import('./pages/mobile/Chat').then(m => ({ default: m.default })))
 
 // PC 管理后台（同一平台内的模块，自身响应式）
 const Dashboard     = lazy(() => import('./pages/admin/Dashboard').then(m => ({ default: m.default })))
@@ -179,6 +181,9 @@ export default function App() {
             <Route path="ai-history" element={<AIHistory />} />
             <Route path="wallet" element={<Wallet />} />
             <Route path="mine" element={<Mine />} />
+            <Route path="settings" element={<Settings />} />
+            {/* AI 聊天（多角色 + 图片/视频生成 + 历史会话），此前零引用，现接入 */}
+            <Route path="chat" element={<Chat />} />
             {/* 功能通知聊天层：首页每个功能块点进去先到这里，再「打开完整功能」 */}
             <Route path="m/notify/:id" element={<FeatureNotify />} />
             <Route path="news" element={<News />} />
