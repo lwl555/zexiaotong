@@ -17,7 +17,7 @@ import { Conversation, StoredMsg, getConversation, getConversations, upsertConve
 // ===== 基础类型 =====
 
 type MsgSide = 'them' | 'me'
-interface ChatMsg { side: MsgSide; text: string; image?: string | null; error?: boolean }
+interface ChatMsg { side: MsgSide; text: string; image?: string | null; video?: string | null; genPending?: 'image' | 'video' | null; error?: boolean }
 interface ChatDef {
   name: string
   Icon: LucideIcon
@@ -254,6 +254,7 @@ function StaticChatView({ chat, nav, me }: { chat: ChatDef; nav: ReturnType<type
         )}
       </div>
       <ChatInputBar
+          genLock={null}
         input={input} setInput={setInput} onSend={send}
         plusOpen={plusOpen} setPlusOpen={setPlusOpen}
         chat={chat} nav={nav}
@@ -313,12 +314,13 @@ function MessageRow({ m, chat, me, meNick, meImgErr, onMeErr }: {
 }
 
 function ChatInputBar({
-  input, setInput, onSend, plusOpen, setPlusOpen, chat, nav
+  input, setInput, onSend, plusOpen, setPlusOpen, chat, nav, genLock
 }: {
   input: string; setInput: (v: string) => void
   onSend: () => void
   plusOpen: boolean; setPlusOpen: React.Dispatch<React.SetStateAction<boolean>>
   chat: ChatDef; nav: ReturnType<typeof useNavigate>
+  genLock: 'image' | 'video' | null
 }) {
   return (
     <div className="wx-chat-input">
@@ -328,7 +330,7 @@ function ChatInputBar({
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') onSend() }}
-          placeholder="输入消息..."
+          placeholder={genLock === 'image' ? '描述你要生成的图像,发出去就开画…' : genLock === 'video' ? '描述你要生成的视频,发出去就开拍…' : '输入消息...'}
         />
         <Smile size={20} className="text-gray-400" />
       </div>
@@ -381,7 +383,8 @@ function AIChatView({ chat, nav, me }: { chat: ChatDef; nav: ReturnType<typeof u
   const [topTime] = useState(formatTime(new Date()))
   const [meImgErr, setMeImgErr] = useState(false)
   // 图/视频生成对话框:'idle'=关闭; 'image'/ 'video'=打开对应模态
-  const [genDialog, setGenDialog] = useState<'idle' | 'image' | 'video'>('idle')
+  // 豆包式生成:锁定下一次发送的生成模式(+ 菜单触发),结果直接长进对话流
+  const [genLock, setGenLock] = useState<'image' | 'video' | null>(null)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const endRef = useRef<HTMLDivElement>(null)
@@ -493,6 +496,83 @@ function AIChatView({ chat, nav, me }: { chat: ChatDef; nav: ReturnType<typeof u
     setHistoryOpen(false)
   }
 
+  // ===== 对话式生成(豆包式):直接在输入框说"画…/生成视频…"即触发,结果以气泡长进对话流 =====
+  // 意图识别(本地正则,零延迟)。疑问句前缀不当生成指令,避免"怎么做视频剪辑"误触发。
+  function detectGenIntent(text: string): 'image' | 'video' | null {
+    const t = text.trim()
+    if (t.length < 3) return null
+    if (/^(怎么|如何|什么是|为啥|为什么|请问|帮我看看|查一下)/.test(t)) return null
+    if (/(生成|制作|做|拍|来一段|来个|出).{0,10}(视频|短片|动画)|视频生成|做视频/.test(t)) return 'video'
+    if (/(画|绘|生成|制作|设计|来).{0,14}(图|图片|插画|海报|头像|照片|logo|Logo|LOGO)|(画|绘)一|^画|^绘/.test(t)) return 'image'
+    return null
+  }
+
+  // 会话内生成:占位气泡 → 完成后原地替换为图/视频,全程不打断对话流
+  async function sendGen(userText: string, kind: 'image' | 'video', base: ChatMsg[]) {
+    setLoading(true)
+    setError('')
+    startTimer()
+    let cur: ChatMsg[] = [...base, {
+      side: 'them',
+      text: kind === 'image'
+        ? '收到,正在为你生成图像…(约 10 秒)'
+        : '收到,开始生成视频…(通常 1-3 分钟,请稍候)',
+      genPending: kind,
+    }]
+    setMessages(cur)
+    const ac = new AbortController()
+    abortRef.current = ac
+    const patch = (p: Partial<ChatMsg>) => {
+      for (let i = cur.length - 1; i >= 0; i--) {
+        if (cur[i].genPending) { cur[i] = { ...cur[i], ...p, genPending: null }; break }
+      }
+      setMessages([...cur])
+    }
+    try {
+      if (kind === 'image') {
+        const t = setTimeout(() => ac.abort(), 90_000)
+        const r = await agnesImageGen({ prompt: userText, signal: ac.signal })
+        clearTimeout(t)
+        if (r.ok && r.url) patch({ text: '图生成好了,不满意就再说一句,我重画 👇', image: r.url })
+        else patch({ text: `图像生成失败:${(r.error || '请稍后重试').slice(0, 80)}`, error: true })
+      } else {
+        const r = await agnesVideoSubmit({ prompt: userText, height: 768, width: 1152, num_frames: 121, frame_rate: 24 })
+        if (!r.ok || !r.video_id) {
+          patch({ text: `视频提交失败:${(r.error || '请稍后重试').slice(0, 80)}`, error: true })
+        } else {
+          let done = false
+          for (let attempts = 1; attempts <= 80 && !done; attempts++) {
+            await new Promise(res => setTimeout(res, 3000))
+            try {
+              const p = await agnesVideoPoll(r.video_id, ac.signal)
+              if (p.ok && p.status === 'completed' && p.url) {
+                patch({ text: '视频生成好了,点开就能看 👇', video: p.url })
+                done = true
+              } else if (p.ok === false && p.status === 'failed') {
+                patch({ text: `视频生成失败:${(p.error || '请稍后重试').slice(0, 80)}`, error: true })
+                done = true
+              }
+            } catch {}
+          }
+          if (!done) patch({ text: '视频生成超时了,换个简单点的描述再试试 🙏', error: true })
+        }
+      }
+    } catch (e: any) {
+      if (e?.name === 'AbortError') {
+        // 用户中止:移除未完成的占位气泡
+        cur = cur.filter(m => !m.genPending)
+        setMessages(cur)
+      } else {
+        patch({ text: `出错了:${String(e?.message || e).slice(0, 80)}`, error: true })
+      }
+    } finally {
+      setGenLock(null)
+      setLoading(false)
+      stopTimer()
+      persist(cur.filter(m => !m.genPending))
+    }
+  }
+
   // 真正发送
   async function send(text?: string) {
     const userText = (text ?? input).trim()
@@ -504,6 +584,14 @@ function AIChatView({ chat, nav, me }: { chat: ChatDef; nav: ReturnType<typeof u
     setMessages(next)
     setInput('')
     setPendingImage(null)
+
+    // 豆包式生成拦截:锁定模式(+)或消息意图命中 → 直接生成,不走 LLM
+    const gen = genLock || detectGenIntent(userText)
+    if (gen && !pendingImage) {
+      await sendGen(userText, gen, next)
+      return
+    }
+
     setLoading(true)
     setError('')
     startTimer()
@@ -707,6 +795,16 @@ function AIChatView({ chat, nav, me }: { chat: ChatDef; nav: ReturnType<typeof u
                   <img className="wx-msg-image" src={m.image} alt=""
                     onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
                 )}
+                {m.video && (
+                  <video className="wx-msg-image" src={m.video} controls playsInline
+                    style={{ width: '100%', borderRadius: 8, background: '#1c1814' }} />
+                )}
+                {m.genPending && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#6b6258', fontSize: 12, padding: '2px 0' }}>
+                    <Loader2 size={13} className="wx-gen-spin" />
+                    <span>{m.genPending === 'image' ? '图像生成中…' : '视频生成中…'}</span>
+                  </div>
+                )}
                 {isMarkdown ? (
                   renderMarkdown(m.text)
                 ) : (
@@ -755,6 +853,7 @@ function AIChatView({ chat, nav, me }: { chat: ChatDef; nav: ReturnType<typeof u
       )}
 
       <ChatInputBar
+          genLock={genLock}
         input={input} setInput={setInput} onSend={() => send()}
         plusOpen={plusOpen} setPlusOpen={setPlusOpen}
         chat={chat} nav={nav}
@@ -803,11 +902,11 @@ function AIChatView({ chat, nav, me }: { chat: ChatDef; nav: ReturnType<typeof u
             {/* 媒体入口:图像生成 / 视频生成(调 agnes 图/视频 API,完整对齐老糖豆) */}
             <div className="wx-chat-plus-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
               <div className="wx-chat-plus-item"
-                onClick={() => { setPlusOpen(false); setGenDialog('image') }}>
+                onClick={() => { setPlusOpen(false); setGenLock('image') }}>
                 <ImageIcon size={22} /><span>图像生成</span>
               </div>
               <div className="wx-chat-plus-item"
-                onClick={() => { setPlusOpen(false); setGenDialog('video') }}>
+                onClick={() => { setPlusOpen(false); setGenLock('video') }}>
                 <Clapperboard size={22} /><span>视频生成</span>
               </div>
             </div>
@@ -837,12 +936,6 @@ function AIChatView({ chat, nav, me }: { chat: ChatDef; nav: ReturnType<typeof u
         </div>,
         document.body
       )}
-
-      {/* 图/视频生成对话框(点击 + 弹层里的"图像生成/视频生成"打开) */}
-      <GenerateDialog
-        open={genDialog}
-        onClose={() => { setGenDialog('idle'); setGenError('') }}
-      />
 
       {/* 历史抽屉 */}
       <HistoryDrawer
@@ -981,135 +1074,3 @@ export default function Chat() {
   return <StaticChatView chat={chat} nav={nav} me={me} />
 }
 
-// ===== 图/视频生成对话框 =====
-// 点击 + 弹层里的"图像生成/视频生成"打开。
-// 图像走 agnesImageGen(同步,~10s);视频走 agnesVideoSubmit + 轮询 agnesVideoPoll (~1-3min)。
-function GenerateDialog({ open, onClose }: { open: 'idle' | 'image' | 'video'; onClose: () => void }) {
-  const [prompt, setPrompt] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<string | null>(null)        // 单图 image URL 或 视频 URL
-  const [error, setError] = useState('')
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const abortRef = useRef<AbortController | null>(null)
-  const isVideo = open === 'video'
-  const isImage = open === 'image'
-
-  // 关闭时清状态与轮询
-  useEffect(() => {
-    if (open === 'idle') {
-      setPrompt(''); setLoading(false); setResult(null); setError('')
-      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
-      abortRef.current?.abort()
-    }
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current)
-      abortRef.current?.abort()
-    }
-  }, [open])
-
-  if (open === 'idle') return null
-
-  async function submit() {
-    if (loading) return
-    const text = prompt.trim()
-    if (!text) { setError('请输入生成描述'); return }
-    setLoading(true); setError(''); setResult(null)
-    abortRef.current = new AbortController()
-    try {
-      if (isImage) {
-        // 文/图生图 同步,timeout 60s
-        const ac = abortRef.current
-        const t = setTimeout(() => ac?.abort(), 60_000)
-        const r = await agnesImageGen({ prompt: text, signal: ac.signal })
-        clearTimeout(t)
-        if (r.ok && r.url) setResult(r.url)
-        else setError(r.error || '生成失败,请重试')
-      } else {
-        // 视频异步
-        const r = await agnesVideoSubmit({ prompt: text, height: 768, width: 1152, num_frames: 121, frame_rate: 24 })
-        if (!r.ok || !r.video_id) {
-          setError(r.error || '提交失败'); setLoading(false); return
-        }
-        const vid = r.video_id
-        let attempts = 0
-        const MAX = 60   // 60 * 3s = 180s 上限
-        pollRef.current = setInterval(async () => {
-          attempts++
-          if (attempts > MAX) {
-            clearInterval(pollRef.current!); pollRef.current = null
-            setLoading(false); setError('生成超时,请稍后重试'); return
-          }
-          try {
-            const p = await agnesVideoPoll(vid, abortRef.current?.signal)
-            if (p.ok && p.status === 'completed' && p.url) {
-              clearInterval(pollRef.current!); pollRef.current = null
-              setResult(p.url); setLoading(false)
-            } else if (p.ok === false && p.status === 'failed') {
-              clearInterval(pollRef.current!); pollRef.current = null
-              setLoading(false); setError(p.error || '生成失败')
-            }
-          } catch {}
-        }, 3000)
-      }
-    } catch (e: any) {
-      if (e?.name !== 'AbortError') setError(e?.message || '出错了')
-    } finally {
-      if (!isVideo) setLoading(false)
-    }
-  }
-
-  const onBackdrop = () => {
-    if (loading) {
-      if (!confirm('生成正在进行中,确定要关闭吗?')) return
-      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
-      abortRef.current?.abort()
-    }
-    onClose()
-  }
-
-  return (
-    <div className="wx-gen-backdrop" onClick={onBackdrop}>
-      <div className="wx-gen-panel" onClick={e => e.stopPropagation()}>
-        <div className="wx-gen-head">
-          <span>{isImage ? '图像生成' : '视频生成'}</span>
-          <button className="wx-gen-close" onClick={onBackdrop} aria-label="关闭"><X size={14} /></button>
-        </div>
-        <div className="wx-gen-body">
-          <textarea
-            value={prompt}
-            onChange={e => setPrompt(e.target.value)}
-            placeholder={isImage ? '描述要生成的图像,例如:一只橘猫在窗台看夕阳,胶片质感' : '描述要生成的视频,例如:延时摄影下城市天际线日落至夜晚,慢动作'}
-            rows={3}
-            className="wx-gen-textarea"
-            disabled={loading}
-          />
-          {error && <div className="wx-gen-err">{error}</div>}
-          {loading && (
-            <div className="wx-gen-loading">
-              <Loader2 size={14} className="wx-gen-spin" />
-              <span>{isImage ? '正在生成图像,约 10s…' : '视频生成中,通常 1-3 分钟,请稍候…'}</span>
-            </div>
-          )}
-          {result && isImage && (
-            <div className="wx-gen-result">
-              <img src={result} alt="" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
-              <a href={result} target="_blank" rel="noreferrer">在新窗口打开</a>
-            </div>
-          )}
-          {result && isVideo && (
-            <div className="wx-gen-result">
-              <video src={result} controls playsInline />
-              <a href={result} target="_blank" rel="noreferrer">在新窗口打开 / 下载</a>
-            </div>
-          )}
-        </div>
-        <div className="wx-gen-foot">
-          <button onClick={onBackdrop} disabled={loading} className="wx-gen-cancel">取消</button>
-          <button onClick={submit} disabled={loading || !prompt.trim()} className="wx-gen-submit">
-            {loading ? '生成中…' : '开始生成'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}

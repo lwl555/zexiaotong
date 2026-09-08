@@ -185,7 +185,8 @@ export default function App() {
             <Route path="settings" element={<Settings />} />
             <Route path="discover" element={<Discover />} />
             {/* AI 聊天（多角色 + 图片/视频生成 + 历史会话），此前零引用，现接入 */}
-            <Route path="chat" element={<Chat />} />
+            <Route path="chat" element={<Navigate to="/chat/tangdou" replace />} />
+            <Route path="chat/:type" element={<Chat />} />
             {/* 功能通知聊天层：首页每个功能块点进去先到这里，再「打开完整功能」 */}
             <Route path="m/notify/:id" element={<FeatureNotify />} />
             <Route path="news" element={<News />} />
