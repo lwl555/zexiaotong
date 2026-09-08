@@ -1,40 +1,108 @@
 import { useNavigate } from 'react-router-dom'
-import { Radio, Clock, Star, Megaphone, Compass, FileText, AlertTriangle, Coins } from 'lucide-react'
+import { ChevronRight, MessageSquare, ShoppingBag, ClipboardList, Coins, Radio, Clock, Bot, Compass, Sparkles, GraduationCap, FileText, AlertTriangle } from 'lucide-react'
+import {
+  PageHeader,
+  SectionLabel,
+  SoftCard,
+  ListRow,
+  INK,
+  MUTED,
+  FAINT,
+  ACCENT,
+  FONT,
+} from '../../components/Editorial'
 
-// 发现：去 AI 化、贴近"朋友圈/视频号/直播/附近"那种自然入口
-const ITEMS = [
-  { to: '/community', icon: Megaphone, glyph: '圈', color: '#1aad19', label: '朋友圈', desc: '同学动态 · 点赞' },
-  { to: '/ai-tutor', icon: Radio, glyph: '讯', color: '#1d4ed8', label: '资讯台', desc: '最新快讯' },
-  { to: '/ai-history', icon: Clock, glyph: '历', color: '#0f766e', label: '历史对话', desc: '过往问答' },
-  { to: '/mine', icon: Star, glyph: '藏', color: '#be123c', label: '收藏', desc: '帖子 · 报告' },
-  { to: '/ai-search', icon: Compass, glyph: '百', color: '#0f766e', label: '百事通', desc: '随手问' },
-  { to: '/document-workshop', icon: FileText, glyph: '档', color: '#5b21b6', label: '文档工坊', desc: '生成报告' },
-  { to: '/warnings', icon: AlertTriangle, glyph: '⚠', color: '#b91c1c', label: '避雷', desc: '院校预警' },
-  { to: '/money', icon: Coins, glyph: '¥', color: '#a16207', label: '搞钱', desc: '佣金任务' },
+// 分组聚合入口（暖陶土编辑风）：图标方块 + 名称 + 描述 + chevron
+interface Entry {
+  to: string
+  icon: React.ComponentType<{ size?: number; strokeWidth?: number; color?: string }>
+  label: string
+  desc: string
+}
+
+const GROUPS: { label: string; items: Entry[] }[] = [
+  {
+    label: '社区',
+    items: [
+      { to: '/community', icon: MessageSquare, label: '择校社区', desc: '帖子 · 互助 · 问答' },
+      { to: '/goods', icon: ShoppingBag, label: '二手市场', desc: '校内闲置 · 好物流转' },
+      { to: '/publish', icon: ClipboardList, label: '任务大厅', desc: '发任务 · 接单赚钱' },
+    ],
+  },
+  {
+    label: '机会',
+    items: [
+      { to: '/money', icon: Coins, label: '搞钱项目', desc: '兼职 / 副业 / 创业聚合' },
+    ],
+  },
+  {
+    label: '资讯',
+    items: [
+      { to: '/news', icon: Radio, label: '实时资讯台', desc: '联网检索 · 每日快讯' },
+      { to: '/ai-history', icon: Clock, label: 'AI 查询记录', desc: '接着聊，不重问' },
+    ],
+  },
+  {
+    label: 'AI 工具',
+    items: [
+      { to: '/chat', icon: Bot, label: 'AI 聊天', desc: '多角色 · 图文视频生成' },
+      { to: '/ai-search', icon: Compass, label: 'AI 百事通', desc: '查院校 · 查公司 · 按城市' },
+      { to: '/ai-tangdou', icon: Sparkles, label: '糖豆·学习搭子', desc: '复习计划 · 答疑' },
+      { to: '/ai-tutor', icon: GraduationCap, label: '学习导师', desc: 'AI 1v1 路径规划' },
+      { to: '/document-workshop', icon: FileText, label: '文档工坊', desc: '报告 / 简历 一键生成' },
+      { to: '/warnings', icon: AlertTriangle, label: '避雷清单', desc: '公共看板 · 人人可加' },
+    ],
+  },
 ]
 
 export default function Discover() {
   const nav = useNavigate()
   return (
-    <div className="wx-page">
-      <header className="wx-header">
-        <button className="wx-h-icon" aria-label="返回">‹‹</button>
-        <div className="wx-title">发现</div>
-        <div className="wx-h-right"><span className="wx-h-icon" style={{ visibility: 'hidden' }}>＋</span></div>
-      </header>
+    <div style={{ padding: '8px 16px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
+      <PageHeader eyebrow="Discover" title="发现" desc="社区、市场与 AI 工具，一站聚合。" />
 
-      <div className="wx-discover">
-        {ITEMS.map(it => (
-          <button key={it.to} className="wx-discover-row" onClick={() => nav(it.to)}>
-            <span className="wx-discover-avatar" style={{ background: it.color }}>{it.glyph}</span>
-            <span className="wx-discover-text">
-              <span className="wx-discover-name">{it.label}</span>
-              <span className="wx-discover-desc">{it.desc}</span>
-            </span>
-            <span className="wx-discover-arrow">›</span>
-          </button>
-        ))}
-      </div>
+      {GROUPS.map(g => (
+        <div key={g.label} style={{ marginBottom: 22 }}>
+          <SectionLabel label={g.label} />
+          <SoftCard style={{ padding: 0 }}>
+            {g.items.map((it, i) => (
+              <ListRow
+                key={it.to}
+                onClick={() => nav(it.to)}
+                style={{ padding: '13px 14px', borderBottom: i === g.items.length - 1 ? 'none' : `1px solid rgba(28,24,20,0.06)` }}
+              >
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+                  <span
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 4,
+                      border: '1px solid #e3d9c6',
+                      background: '#fbeede',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: ACCENT,
+                      flexShrink: 0,
+                    }}
+                  >
+                    <it.icon size={17} strokeWidth={1.9} />
+                  </span>
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: 'block', fontFamily: FONT, fontSize: 14.5, fontWeight: 600, color: INK }}>{it.label}</span>
+                    <span style={{ display: 'block', fontFamily: FONT, fontSize: 11.5, color: MUTED, marginTop: 2 }}>{it.desc}</span>
+                  </span>
+                </span>
+                <ChevronRight size={16} color={FAINT} />
+              </ListRow>
+            ))}
+          </SoftCard>
+        </div>
+      ))}
+
+      <p style={{ textAlign: 'center', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace', fontSize: 11, color: FAINT, marginTop: 8, letterSpacing: 1 }}>
+        ZEXIAO · DISCOVER
+      </p>
     </div>
   )
 }

@@ -27,6 +27,7 @@ const ROUTE_TITLE: Record<string, string> = {
   '/wallet': '我的钱包',
   '/mine': '个人中心',
   '/settings': '设置',
+  '/discover': '发现',
   '/chat': 'AI 聊天',
   '/about': '关于择校通',
   '/my-tasks': '我的任务'
@@ -43,7 +44,7 @@ function titleOf(path: string): string {
 const tabs = [
   { to: '/', label: '首页', icon: HomeIcon, end: true },
   { to: '/community', label: '社区', icon: Users, end: false },
-  { to: '/money', label: '搞钱', icon: Compass, end: false },
+  { to: '/discover', label: '发现', icon: Compass, end: false },
   { to: '/mine', label: '我', icon: User, end: false }
 ]
 

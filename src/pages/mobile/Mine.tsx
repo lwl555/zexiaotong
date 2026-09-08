@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { useMe } from '../../store/useMe'
+import { getQueries } from '../../lib/history'
 import {
   PageHeader,
   SectionLabel,
@@ -32,8 +33,11 @@ export default function Mine() {
   const nav = useNavigate()
   const me = useMe()
   const tasks = useStore(s => s.tasks)
+  const posts = useStore(s => s.posts)
   const myPosted = tasks.filter(t => t.poster_id === me.id).length
   const myTaken = tasks.filter(t => t.accepted_id === me.id).length
+  const myCollected = posts.filter(p => p.collected).length
+  const queryCount = getQueries().length
   const unread = useStore(s => s.notifications.filter(n => n.user_id === me.id && !n.read).length)
   const logout = useStore(s => s.logout)
   const isGuest = !me.qq
@@ -41,8 +45,8 @@ export default function Mine() {
   const myRows = [
     { label: '我的发布', val: myPosted, onClick: () => nav('/my-tasks?role=poster') },
     { label: '我的接单', val: myTaken, onClick: () => nav('/my-tasks?role=worker') },
-    { label: 'AI 查询记录', val: 0, onClick: () => nav('/ai-history') },
-    { label: '我的收藏', val: 0, onClick: () => nav('/community') },
+    { label: 'AI 查询记录', val: queryCount, onClick: () => nav('/ai-history') },
+    { label: '我的收藏', val: myCollected, onClick: () => nav('/community') },
     { label: '消息通知', val: unread, onClick: () => nav('/notifications') }
   ]
 
@@ -84,21 +88,45 @@ export default function Mine() {
           <ChevronRight size={18} color={FAINT} />
         </HardCard>
       ) : (
-        <HardCard style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 24 }}>
-          <img
-            src={me.avatar}
-            alt=""
-            style={{ width: 56, height: 56, borderRadius: '50%', border: `1px solid #e3d9c6`, background: '#f4f2ee', flexShrink: 0 }}
-          />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: FONT, fontSize: 18, fontWeight: 800, color: INK }}>{me.nickname}</div>
-            <div style={{ fontFamily: FONT, fontSize: 12, color: MUTED, marginTop: 4 }}>
-              {me.qq} · {me.status === 'banned' ? '已封禁' : '正常'}
+        <HardCard style={{ marginBottom: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <img
+              src={me.avatar}
+              alt=""
+              style={{ width: 56, height: 56, borderRadius: '50%', border: `1px solid #e3d9c6`, background: '#f4f2ee', flexShrink: 0 }}
+            />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: FONT, fontSize: 18, fontWeight: 800, color: INK }}>{me.nickname}</div>
+              <div style={{ fontFamily: FONT, fontSize: 12, color: MUTED, marginTop: 4 }}>
+                {me.qq} · {me.status === 'banned' ? '已封禁' : '正常'}
+              </div>
             </div>
+            <BtnGhost onClick={() => nav('/wallet')} style={{ padding: '7px 12px', color: ACCENT, borderColor: ACCENT }}>
+              钱包
+            </BtnGhost>
           </div>
-          <BtnGhost onClick={() => nav('/wallet')} style={{ padding: '7px 12px', color: ACCENT, borderColor: ACCENT }}>
-            钱包
-          </BtnGhost>
+          {/* 三格统计：发布 / 接单 / 可用余额 */}
+          <div style={{ display: 'flex', marginTop: 14, paddingTop: 12, borderTop: '1px solid rgba(28,24,20,0.08)' }}>
+            {[
+              { v: String(myPosted), l: '发布', to: '/my-tasks?role=poster' },
+              { v: String(myTaken), l: '接单', to: '/my-tasks?role=worker' },
+              { v: '¥' + (me.balance ?? 0).toFixed(2), l: '可用', to: '/wallet' },
+            ].map((s, i) => (
+              <div
+                key={s.l}
+                onClick={() => nav(s.to)}
+                style={{
+                  flex: 1,
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  borderLeft: i > 0 ? '1px solid rgba(28,24,20,0.08)' : 'none',
+                }}
+              >
+                <div style={{ fontFamily: FONT, fontSize: 16, fontWeight: 800, color: i === 2 ? ACCENT : INK }}>{s.v}</div>
+                <div style={{ fontFamily: MONO, fontSize: 10, color: MUTED, letterSpacing: 2, marginTop: 2 }}>{s.l}</div>
+              </div>
+            ))}
+          </div>
         </HardCard>
       )}
 
