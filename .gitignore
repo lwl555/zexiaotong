@@ -10,3 +10,5 @@ dist-ssr
 supabase/.temp/
 
 supabase/.temp/
+shot-mobile.mjs
+shot-*.png

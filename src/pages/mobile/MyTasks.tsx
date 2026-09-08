@@ -34,7 +34,7 @@ export default function MyTasks() {
   const list = tasks.filter(t => (tab === 'poster' ? t.poster_id === me.id : t.accepted_id === me.id))
 
   return (
-    <div style={{ padding: '8px 2px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
+    <div style={{ padding: '8px 16px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
         <button onClick={() => nav(-1)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: MUTED, display: 'inline-flex', padding: 4 }}>
           <ChevronLeft size={20} />

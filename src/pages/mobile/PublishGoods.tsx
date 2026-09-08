@@ -61,7 +61,7 @@ export default function PublishGoods() {
   }
 
   return (
-    <div style={{ padding: '8px 2px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT, position: 'relative' }}>
+    <div style={{ padding: '8px 16px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT, position: 'relative' }}>
       {/* Toast：白底 + 硬边 + ACCENT 文字 */}
       {toast && (
         <div

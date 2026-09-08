@@ -6,7 +6,7 @@ import { PageHeader, FONT } from '../components/Editorial'
 // 把分数 / 位次 / 意向交给 AI 在对话里逐步澄清，保持与百事通一致的聊天体验。
 export default function AITutor() {
   return (
-    <div style={{ padding: '8px 2px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
+    <div style={{ padding: '8px 16px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
       <PageHeader
         eyebrow="AI Tutor"
         title="学习导师"

@@ -81,7 +81,7 @@ export function PageHeader({
         <h1
           style={{
             fontFamily: FONT,
-            fontSize: 30,
+            fontSize: 'clamp(22px, 6vw, 30px)',
             fontWeight: 800,
             color: INK,
             letterSpacing: '-0.02em',

@@ -56,7 +56,7 @@ const scenes = [
 
 export default function Home() {
   return (
-    <div style={{ padding: '8px 2px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
+    <div style={{ padding: '8px 16px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
       {/* 编辑式 Hero：左文右图，非对称 */}
       <div
         style={{

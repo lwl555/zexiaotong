@@ -43,7 +43,7 @@ export default function PostDetail() {
 
   if (!post) {
     return (
-      <div style={{ padding: '8px 2px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
+      <div style={{ padding: '8px 16px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
         <HardCard>
           <div style={{ textAlign: 'center', color: MUTED, fontSize: 14 }}>帖子不存在或已删除</div>
         </HardCard>

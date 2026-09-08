@@ -55,7 +55,7 @@ export default function DocWorkshop() {
   const cur = MODES.find((m) => m.key === mode)!
 
   return (
-    <div style={{ padding: '8px 2px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
+    <div style={{ padding: '8px 16px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
       <PageHeader
         eyebrow="Doc Workshop"
         title="文档工坊"

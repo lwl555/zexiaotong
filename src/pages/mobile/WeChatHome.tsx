@@ -118,13 +118,7 @@ export default function WeChatHome() {
         style={{ borderColor: '#111111' }}
       >
         {isGuest ? (
-          <button
-            aria-label="折叠"
-            className="w-9 h-9 flex items-center justify-center active:bg-black/5 rounded-full"
-            style={{ color: MUTED }}
-            onClick={() => nav('/splash')}>
-            <span className="text-lg leading-none">«</span>
-          </button>
+          <div className="w-9 h-9" />
         ) : (
           <button
             aria-label="我的"
@@ -176,7 +170,17 @@ export default function WeChatHome() {
             <div style={{ marginTop: 6, fontSize: 11, color: MUTED, lineHeight: 1.5 }}>用数据，不熬鸡汤。</div>
             <div onClick={() => nav('/ai-search')} style={{ marginTop: 10, display: 'inline-block', background: ACCENT, color: '#ffffff', fontSize: 12, padding: '7px 14px', borderRadius: 2, fontWeight: 600 }}>开始测评 →</div>
           </div>
-          <div style={{ width: 96, height: 120, background: '#efefef', border: '3px solid #111111', borderRadius: 2, display: 'flex', alignItems: 'flex-end', padding: 7, fontSize: 9, color: MUTED }}>校园实景照片</div>
+          <div style={{ position: 'relative', width: 96, height: 120, background: '#efefef', border: '3px solid #111111', borderRadius: 2, flexShrink: 0, overflow: 'hidden' }}>
+            <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'flex-end', padding: 7, fontSize: 9, color: MUTED }}>校园实景照片</span>
+            <img
+              src="https://images.pexels.com/photos/159490/yale-university-landscape-universities-schools-159490.jpeg?auto=compress&cs=tinysrgb&w=400"
+              alt="校园实景"
+              loading="lazy"
+              decoding="async"
+              style={{ position: 'relative', width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              onError={(e) => { e.currentTarget.style.display = 'none' }}
+            />
+          </div>
         </div>
       </div>
 

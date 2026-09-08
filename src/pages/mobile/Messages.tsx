@@ -56,7 +56,7 @@ export default function Messages() {
   // 会话列表视图
   if (!peerId) {
     return (
-      <div style={{ padding: '8px 2px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
+      <div style={{ padding: '8px 16px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
         <PageHeader eyebrow="Messages" title="私信" desc="和接单伙伴、护考前辈一对一聊聊。" />
         {convs.length === 0 && (
           <div style={{ textAlign: 'center', color: MUTED, fontSize: 14, padding: '64px 0' }}>暂无会话</div>
@@ -105,7 +105,7 @@ export default function Messages() {
 
   // 聊天视图
   return (
-    <div style={{ padding: '8px 2px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
+    <div style={{ padding: '8px 16px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
         <button onClick={() => nav('/messages')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: MUTED, display: 'inline-flex' }}>
           <ChevronLeft size={20} />

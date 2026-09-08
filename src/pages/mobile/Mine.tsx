@@ -8,7 +8,6 @@ import {
   HardCard,
   SoftCard,
   ListRow,
-  BtnPrimary,
   BtnGhost,
   INK,
   MUTED,
@@ -48,7 +47,7 @@ export default function Mine() {
   ]
 
   return (
-    <div style={{ padding: '8px 2px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
+    <div style={{ padding: '8px 16px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
       <PageHeader eyebrow="Mine" title="我的" desc="账号、任务与择校通 AI 工具，一站式入口。" />
 
       {/* 头部：用户卡片 */}
@@ -114,10 +113,6 @@ export default function Mine() {
           </ListRow>
         ))}
       </SoftCard>
-
-      <BtnPrimary onClick={() => nav('/wallet')} style={{ width: '100%', marginBottom: 24 }}>
-        进入钱包中心
-      </BtnPrimary>
 
       {/* 择校通 AI 工具 */}
       <SectionLabel label="择校通 · AI 工具" />

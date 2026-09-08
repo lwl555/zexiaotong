@@ -74,7 +74,7 @@ export default function TaskDetail() {
   }
 
   return (
-    <div style={{ padding: '8px 2px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
+    <div style={{ padding: '8px 16px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
       <button onClick={() => nav(-1)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT, fontSize: 13, color: MUTED, marginBottom: 8 }}>‹ 返回</button>
 
       {task.images[0] && (

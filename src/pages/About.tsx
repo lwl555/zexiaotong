@@ -11,7 +11,7 @@ import {
 
 export default function About() {
   return (
-    <div style={{ padding: '8px 2px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
+    <div style={{ padding: '8px 16px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
       <PageHeader
         eyebrow="About"
         title="关于我们"
