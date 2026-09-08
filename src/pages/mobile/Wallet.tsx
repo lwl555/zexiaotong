@@ -14,6 +14,7 @@ import {
   ACCENT,
   HAIR,
   FONT,
+  MONO,
   POS,
   NEG,
 } from '../../components/Editorial'
