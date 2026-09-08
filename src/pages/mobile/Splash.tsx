@@ -24,7 +24,7 @@ export default function Splash() {
           height: 80,
           border: `3px solid ${INK}`,
           borderRadius: 2,
-          background: '#fffdf8',
+          background: '#ffffff',
           boxShadow: `5px 5px 0 ${INK}`,
           display: 'flex',
           alignItems: 'center',

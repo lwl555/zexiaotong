@@ -65,7 +65,7 @@ export default function PublishTask() {
           value={title}
           onChange={e => setTitle(e.target.value)}
           placeholder="例如：代取快递到宿舍楼下"
-          style={{ width: '100%', boxSizing: 'border-box', border: `1px solid #e3d9c6`, borderRadius: 2, padding: '10px 12px', fontFamily: FONT, fontSize: 15, color: INK, outline: 'none' }}
+          style={{ width: '100%', boxSizing: 'border-box', border: `1px solid #e8e8e8`, borderRadius: 2, padding: '10px 12px', fontFamily: FONT, fontSize: 15, color: INK, outline: 'none' }}
         />
       </div>
 
@@ -94,7 +94,7 @@ export default function PublishTask() {
             onChange={e => setAmount(e.target.value.replace(/[^\d.]/g, ''))}
             placeholder="0.00"
             inputMode="decimal"
-            style={{ width: '100%', boxSizing: 'border-box', border: `1px solid #e3d9c6`, borderRadius: 2, padding: '10px 12px', fontFamily: FONT, fontSize: 15, color: INK, outline: 'none' }}
+            style={{ width: '100%', boxSizing: 'border-box', border: `1px solid #e8e8e8`, borderRadius: 2, padding: '10px 12px', fontFamily: FONT, fontSize: 15, color: INK, outline: 'none' }}
           />
         </div>
         <div style={{ flex: 1 }}>
@@ -103,7 +103,7 @@ export default function PublishTask() {
             type="datetime-local"
             value={deadline}
             onChange={e => setDeadline(e.target.value)}
-            style={{ width: '100%', boxSizing: 'border-box', border: `1px solid #e3d9c6`, borderRadius: 2, padding: '10px 12px', fontFamily: FONT, fontSize: 15, color: INK, outline: 'none' }}
+            style={{ width: '100%', boxSizing: 'border-box', border: `1px solid #e8e8e8`, borderRadius: 2, padding: '10px 12px', fontFamily: FONT, fontSize: 15, color: INK, outline: 'none' }}
           />
         </div>
       </div>
@@ -118,7 +118,7 @@ export default function PublishTask() {
           value={desc}
           onChange={e => setDesc(e.target.value)}
           placeholder="详细说明任务要求、交付标准…"
-          style={{ width: '100%', boxSizing: 'border-box', height: 112, resize: 'none', border: `1px solid #e3d9c6`, borderRadius: 2, padding: '10px 12px', fontFamily: FONT, fontSize: 14, color: INK, outline: 'none' }}
+          style={{ width: '100%', boxSizing: 'border-box', height: 112, resize: 'none', border: `1px solid #e8e8e8`, borderRadius: 2, padding: '10px 12px', fontFamily: FONT, fontSize: 14, color: INK, outline: 'none' }}
         />
       </div>
 
@@ -128,7 +128,7 @@ export default function PublishTask() {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {images.map((s, i) => (
             <div key={i} style={{ position: 'relative', width: 64, height: 64 }}>
-              <img src={s} alt="" style={{ width: 64, height: 64, objectFit: 'cover', border: `1px solid #e3d9c6`, borderRadius: 2 }} />
+              <img src={s} alt="" style={{ width: 64, height: 64, objectFit: 'cover', border: `1px solid #e8e8e8`, borderRadius: 2 }} />
               <button
                 onClick={() => rmImg(i)}
                 style={{ position: 'absolute', top: -8, right: -8, width: 20, height: 20, borderRadius: '50%', background: INK, color: PAPER, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}

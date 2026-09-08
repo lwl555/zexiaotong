@@ -30,13 +30,13 @@ const HOME_ICON: Record<string, string> = {
 const INK = '#1c1814'
 const MUTED = '#8a7f72'
 const ACCENT = '#c2410c' // 陶土：登录链接 / 活跃态 / CTA / 编号
-const LINE = '#e3d9c6'
+const LINE = '#e8e8e8'
 const ACTIVE = 'rgba(194,65,12,0.06)' // 行按压极淡陶土
 const UNREAD = '#fa5151' // 微信原生未读红，保留
 
 // 编辑风卡片：1px 暖线 + 微圆角 + 极轻投影
 function hard(extra: CSSProperties = {}): CSSProperties {
-  return { border: `1px solid ${LINE}`, borderRadius: 4, boxShadow: '0 1px 3px rgba(28,24,20,0.05)', background: '#fffdf8', ...extra }
+  return { border: `1px solid ${LINE}`, borderRadius: 4, boxShadow: '0 1px 3px rgba(28,24,20,0.05)', background: '#ffffff', ...extra }
 }
 
 // ===== 功能分组：每行一个"聊天对象"= 一个平台功能 =====
@@ -97,7 +97,7 @@ export default function WeChatHome() {
   const isGuest = !me?.qq
 
   return (
-    <div style={{ background: '#f7f5f0', minHeight: '100%', color: INK, fontFamily: FONT }}>
+    <div style={{ background: '#ffffff', minHeight: '100%', color: INK, fontFamily: FONT }}>
       {/* 噪点 overlay：覆盖全屏、不可点击、极淡 */}
       <div
         aria-hidden
@@ -115,7 +115,7 @@ export default function WeChatHome() {
       {/* ===== 顶部导航 ===== */}
       <div
         className="sticky top-0 z-20 flex items-center justify-between px-2 h-12 border-b-2 bg-white"
-        style={{ borderColor: '#e3d9c6' }}
+        style={{ borderColor: '#e8e8e8' }}
       >
         {isGuest ? (
           <div className="w-9 h-9" />
@@ -170,7 +170,7 @@ export default function WeChatHome() {
             <div style={{ marginTop: 6, fontSize: 11, color: MUTED, lineHeight: 1.5 }}>用数据，不熬鸡汤。</div>
             <div onClick={() => nav('/ai-search')} style={{ marginTop: 10, display: 'inline-block', background: ACCENT, color: '#ffffff', fontSize: 12, padding: '7px 14px', borderRadius: 4, fontWeight: 600 }}>开始测评 →</div>
           </div>
-          <div style={{ position: 'relative', width: 96, height: 120, background: '#efe9dd', border: '1px solid #e3d9c6', borderRadius: 4, flexShrink: 0, overflow: 'hidden' }}>
+          <div style={{ position: 'relative', width: 96, height: 120, background: '#f2f2f2', border: '1px solid #e8e8e8', borderRadius: 4, flexShrink: 0, overflow: 'hidden' }}>
             <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'flex-end', padding: 7, fontSize: 9, color: MUTED }}>校园实景照片</span>
             <img
               src="https://images.pexels.com/photos/159490/yale-university-landscape-universities-schools-159490.jpeg?auto=compress&cs=tinysrgb&w=400"
@@ -210,7 +210,7 @@ export default function WeChatHome() {
       </div>
 
       {/* ===== 功能列表（换皮：等宽 eyebrow + 陶土红强调 + 白底） ===== */}
-      <div style={{ background: '#fffdf8', marginTop: 16, borderTop: '1px solid #e3d9c6' }}>
+      <div style={{ background: '#ffffff', marginTop: 16, borderTop: '1px solid #e8e8e8' }}>
         {GROUPS.map((g, gi) => (
           <div key={g.title}>
             <div className="flex items-baseline gap-2 px-4 pt-3 pb-1">
@@ -267,7 +267,7 @@ export default function WeChatHome() {
       </div>
 
       {/* 列表底部留白，避免被底部导航遮住 */}
-      <div className="h-20" style={{ background: '#f7f5f0' }} />
+      <div className="h-20" style={{ background: '#ffffff' }} />
     </div>
   )
 }

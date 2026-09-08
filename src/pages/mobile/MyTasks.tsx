@@ -48,7 +48,7 @@ export default function MyTasks() {
           <button
             key={t.key}
             onClick={() => setTab(t.key as any)}
-            style={{ flex: 1, padding: '10px 0', borderRadius: 2, fontFamily: FONT, fontSize: 14, fontWeight: 600, cursor: 'pointer', border: `1px solid #e3d9c6`, background: tab === t.key ? ACCENT : PAPER, color: tab === t.key ? PAPER : INK }}
+            style={{ flex: 1, padding: '10px 0', borderRadius: 2, fontFamily: FONT, fontSize: 14, fontWeight: 600, cursor: 'pointer', border: `1px solid #e8e8e8`, background: tab === t.key ? ACCENT : PAPER, color: tab === t.key ? PAPER : INK }}
           >
             {t.label}
           </button>

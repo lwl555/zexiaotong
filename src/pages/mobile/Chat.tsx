@@ -293,7 +293,7 @@ function MessageRow({ m, chat, me, meNick, meImgErr, onMeErr }: {
           <img className="wx-msg-avatar wx-msg-photo" src={me.avatar} alt=""
             onError={onMeErr} />
         ) : (
-          <div className="wx-msg-avatar wx-ic" style={{ color: '#6b6258' }}>
+          <div className="wx-msg-avatar wx-ic" style={{ color: '#6b6b6b' }}>
             <span style={{ fontSize: 15, fontWeight: 600 }}>{meNick.slice(0, 1)}</span>
           </div>
         )
@@ -719,7 +719,7 @@ function AIChatView({ chat, nav, me }: { chat: ChatDef; nav: ReturnType<typeof u
   const showWelcome = messages.length <= chat.messages.length && messages.every(m => m.side === 'them')
 
   return (
-    <div className="wx-chat" style={chat.accent ? { background: '#f7f5f0' } : undefined}>
+    <div className="wx-chat" style={chat.accent ? { background: '#ffffff' } : undefined}>
       <ChatHeader chat={chat} nav={nav} />
 
       {/* 快捷模式条：放在 header 之下、正文滚动区之外，避免嵌套 sticky 与 fixed 输入栏冲突 */}
@@ -785,7 +785,7 @@ function AIChatView({ chat, nav, me }: { chat: ChatDef; nav: ReturnType<typeof u
                   <img className="wx-msg-avatar wx-msg-photo" src={me.avatar} alt=""
                     onError={() => setMeImgErr(true)} />
                 ) : (
-                  <div className="wx-msg-avatar wx-ic" style={{ color: '#6b6258' }}>
+                  <div className="wx-msg-avatar wx-ic" style={{ color: '#6b6b6b' }}>
                     <span style={{ fontSize: 15, fontWeight: 600 }}>{meNick.slice(0, 1)}</span>
                   </div>
                 )
@@ -800,7 +800,7 @@ function AIChatView({ chat, nav, me }: { chat: ChatDef; nav: ReturnType<typeof u
                     style={{ width: '100%', borderRadius: 8, background: '#1c1814' }} />
                 )}
                 {m.genPending && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#6b6258', fontSize: 12, padding: '2px 0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#6b6b6b', fontSize: 12, padding: '2px 0' }}>
                     <Loader2 size={13} className="wx-gen-spin" />
                     <span>{m.genPending === 'image' ? '图像生成中…' : '视频生成中…'}</span>
                   </div>
@@ -912,7 +912,7 @@ function AIChatView({ chat, nav, me }: { chat: ChatDef; nav: ReturnType<typeof u
             </div>
 
             {/* 5 张基础卡:拍照(已选文件触发图片输入)、历史、清空、新会话、关于 */}
-            <div className="wx-chat-plus-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)', paddingTop: 4, borderTop: '1px solid #e3d9c6' }}>
+            <div className="wx-chat-plus-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)', paddingTop: 4, borderTop: '1px solid #e8e8e8' }}>
               <div className="wx-chat-plus-item" onClick={pickImage}>
                 <ImageIcon size={22} /><span>照片</span>
               </div>
@@ -1004,26 +1004,26 @@ function HistoryDrawer({
       }} />
       <aside style={{
         position: 'fixed', top: 0, right: 0, bottom: 0, width: 'min(320px, 86vw)',
-        background: '#fffdf8', zIndex: 101, display: 'flex', flexDirection: 'column',
+        background: '#ffffff', zIndex: 101, display: 'flex', flexDirection: 'column',
         boxShadow: '-2px 0 12px rgba(0,0,0,.08)',
         transform: `translateX(${panelX})`,
         transition: 'transform .28s cubic-bezier(.4,0,.2,1)',
         willChange: 'transform',
       }}>
         <div style={{
-          padding: '14px 16px', borderBottom: '1px solid #e3d9c6',
+          padding: '14px 16px', borderBottom: '1px solid #e8e8e8',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div style={{ fontSize: 16, fontWeight: 600, color: '#1c1814' }}>对话历史</div>
           <button onClick={onClose} style={{
-            border: 'none', background: '#f3ece2', color: '#6b6258',
+            border: 'none', background: '#f5f5f5', color: '#6b6b6b',
             borderRadius: 8, width: 28, height: 28,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}><X size={14} /></button>
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
           {convs.length === 0 && (
-            <div style={{ padding: '40px 20px', textAlign: 'center', color: '#9a9085', fontSize: 14 }}>
+            <div style={{ padding: '40px 20px', textAlign: 'center', color: '#9a9a9a', fontSize: 14 }}>
               还没有历史对话
             </div>
           )}
@@ -1037,17 +1037,17 @@ function HistoryDrawer({
                 padding: '10px 16px', cursor: 'pointer',
                 background: active ? '#fbeede' : 'transparent',
                 borderLeft: active ? '3px solid #c2410c' : '3px solid transparent',
-                borderBottom: '1px solid #e3d9c6',
+                borderBottom: '1px solid #e8e8e8',
               }}>
                 <div style={{
                   fontSize: 14, fontWeight: active ? 600 : 500, color: '#1c1814',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>{c.title || '糖豆对话'}</div>
                 <div style={{
-                  fontSize: 11, color: '#9a9085', marginTop: 2,
+                  fontSize: 11, color: '#9a9a9a', marginTop: 2,
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>{previewText(preview, 50)}</div>
-                <div style={{ fontSize: 10, color: '#9a9085', marginTop: 3 }}>
+                <div style={{ fontSize: 10, color: '#9a9a9a', marginTop: 3 }}>
                   {c.messages.length} 条 · {new Date(c.updatedAt).toLocaleDateString('zh-CN')}
                 </div>
               </div>

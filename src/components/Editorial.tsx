@@ -1,20 +1,20 @@
 import type { CSSProperties, ReactNode } from 'react'
 
 /* =====================================================================
- * 暖陶土编辑风版式组件库（2026-09-08 定稿，替代白底结合版）
- * 视觉语言：纸感底 #f7f5f0 + 暖白卡 #fffdf8 + 暖墨 #1c1814 +
- *          陶土 #c2410c 唯一彩色强调 + 1px 暖线边框（无粗边/无硬阴影）+
+ * 白底编辑风版式组件库（2026-09-09 由暖陶土纸感底改为纯白 + 中性灰线）
+ * 视觉语言：纯白底 #ffffff + 纯白卡 #ffffff + 墨黑 #1c1814 +
+ *          陶土 #c2410c 唯一彩色强调 + 1px 中性灰线边框 #e8e8e8（无粗边/无硬阴影）+
  *          等宽 eyebrow + 编号索引。手机/PC 同一张脸。
  * 组件全部内联 style，自洽、不依赖 styles.css 的 card/brand 体系。
  * ===================================================================== */
 
 export const INK = '#1c1814'
-export const PAPER = '#fffdf8'
-export const PAPER_BG = '#f7f5f0' // 页面纸感底
-export const LINE = '#e3d9c6' // 1px 暖线边框
-export const MUTED = '#6b6258'
-export const FAINT = '#9a9085'
-export const HAIR = 'rgba(28,24,20,0.10)' // 细暖发丝线（密集列表分隔）
+export const PAPER = '#ffffff'
+export const PAPER_BG = '#ffffff' // 页面纯白底
+export const LINE = '#e8e8e8' // 1px 中性灰线边框
+export const MUTED = '#6b6b6b'
+export const FAINT = '#9a9a9a'
+export const HAIR = 'rgba(0,0,0,0.08)' // 细发丝线（密集列表分隔，中性）
 export const ACCENT = '#c2410c' // 陶土：唯一彩色强调（品牌动作/编号/激活）
 export const ACCENT_SOFT = '#fbeede' // 陶土浅底
 export const FONT =
@@ -24,9 +24,9 @@ export const MONO = 'ui-monospace, "SF Mono", "JetBrains Mono", "Roboto Mono", M
 export const POS = '#15803d'
 export const NEG = '#c2410c'
 
-// 编辑风卡：1px 暖线 + 微圆角 + 极轻投影（全站统一卡面）
+// 编辑风卡：1px 中性灰线 + 微圆角 + 极轻投影（全站统一卡面）
 export function hard(extra: CSSProperties = {}): CSSProperties {
-  return { border: `1px solid ${LINE}`, borderRadius: 4, boxShadow: '0 1px 3px rgba(28,24,20,0.05)', ...extra }
+  return { border: `1px solid ${LINE}`, borderRadius: 4, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', ...extra }
 }
 
 // 幽灵按钮：1px 暖线 + 暖墨字

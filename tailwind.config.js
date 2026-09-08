@@ -12,7 +12,7 @@ export default {
         },
         clay: '#c2410c',
         ink: '#16181d',
-        paper: '#f7f5f0'
+        paper: '#ffffff'
       },
       fontFamily: {
         sans: ['"Noto Sans SC"', 'system-ui', '-apple-system', 'sans-serif'],

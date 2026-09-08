@@ -132,12 +132,12 @@ export default function MobileLayout() {
   const notifyMeta = notifyMatch ? FEATURES[notifyMatch[1]] : undefined
 
   return (
-    <div className="app-shell flex flex-col" style={{ minHeight: '100vh', background: '#f7f5f0' }}>
+    <div className="app-shell flex flex-col" style={{ minHeight: '100vh', background: '#ffffff' }}>
       <div className="flex-1 overflow-y-auto no-scrollbar" style={{ paddingBottom: 48 }}>
         {showTopBar && (
           <div
-            className="sticky top-0 z-20 flex items-center gap-2 px-2 h-12 border-b bg-[#fffdf8]"
-            style={{ borderColor: '#e3d9c6' }}
+            className="sticky top-0 z-20 flex items-center gap-2 px-2 h-12 border-b bg-[#ffffff]"
+            style={{ borderColor: '#e8e8e8' }}
           >
             <button
               aria-label="返回"
@@ -160,11 +160,11 @@ export default function MobileLayout() {
       </div>
       {/* 底部固定导航：微信风格 4 Tab（微信绿高亮） */}
       <nav
-        className="fixed bottom-0 inset-x-0 mx-auto w-full max-w-[480px] h-12 bg-[#f7f5f0] border-t border-[#e3d9c6] flex items-center px-2 z-30"
+        className="fixed bottom-0 inset-x-0 mx-auto w-full max-w-[480px] h-12 bg-[#ffffff] border-t border-[#e8e8e8] flex items-center px-2 z-30"
         style={{ transform: 'translateY(0)' }}>
         {tabs.map(t => (
           <NavLink key={t.to} to={t.to} end={t.end}
-            className={({ isActive }) => 'flex-1 flex flex-col items-center gap-0 py-1 ' + (isActive ? 'text-[#c2410c] font-semibold' : 'text-[#9a9085]')}>
+            className={({ isActive }) => 'flex-1 flex flex-col items-center gap-0 py-1 ' + (isActive ? 'text-[#c2410c] font-semibold' : 'text-[#9a9a9a]')}>
             <t.icon size={20} strokeWidth={1.6} />
             <span className="text-[10px] leading-none mt-0.5">{t.label}</span>
           </NavLink>

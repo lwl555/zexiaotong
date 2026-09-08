@@ -304,7 +304,7 @@ function HistoryPanel({
       }} />
       <aside style={{
         position: 'fixed', top: 0, left: 0, bottom: 0, width: 'min(320px, 86vw)',
-        background: '#fffdf8', zIndex: 101, display: 'flex', flexDirection: 'column',
+        background: '#ffffff', zIndex: 101, display: 'flex', flexDirection: 'column',
         boxShadow: '2px 0 12px rgba(0,0,0,.08)',
         transform: `translateX(${panelX})`,
         transition: 'transform .28s cubic-bezier(.4,0,.2,1)',
@@ -860,7 +860,7 @@ export default function AITangdou() {
                     style={{
                       flex: 1, border: '1px solid #D8451F', borderRadius: 6,
                       padding: '3px 7px', fontSize: 13, outline: 'none',
-                      background: '#fffdf8', color: '#111111'
+                      background: '#ffffff', color: '#111111'
                     }} />
                   <button onClick={() => {
                     const t = sidebarEditingTitle.trim()
@@ -937,7 +937,7 @@ export default function AITangdou() {
                   marginBottom: isMobile ? 20 : 24,
                   borderRadius: 999,
                   border: '1px solid #e8e8e8',
-                  background: '#fffdf8',
+                  background: '#ffffff',
                   fontSize: isMobile ? 12.5 : 13,
                   color: '#111111',
                   cursor: 'pointer',
@@ -987,7 +987,7 @@ export default function AITangdou() {
                 {WELCOME_EXAMPLES.map(ex => (
                   <button key={ex} onClick={() => send(ex)} style={{
                     padding: '12px 16px', borderRadius: 10, border: '1px solid #e8e8e8',
-                    background: '#fffdf8', cursor: 'pointer', fontSize: 14, color: '#333',
+                    background: '#ffffff', cursor: 'pointer', fontSize: 14, color: '#333',
                     textAlign: 'left', transition: 'all .15s'
                   }}
                     onMouseEnter={e => { e.currentTarget.style.background = '#fafafa'; e.currentTarget.style.borderColor = '#D8451F' }}
@@ -1018,7 +1018,7 @@ export default function AITangdou() {
                 {WELCOME_EXAMPLES.map(ex => (
                   <button key={ex} onClick={() => send(ex)} style={{
                     padding: '10px 12px', borderRadius: 12, border: '1px solid #ececec',
-                    background: '#fffdf8', cursor: 'pointer', fontSize: 13, color: '#555',
+                    background: '#ffffff', cursor: 'pointer', fontSize: 13, color: '#555',
                     textAlign: 'left', lineHeight: 1.4, minHeight: 44,
                     transition: 'all .15s', boxShadow: '0 1px 2px rgba(0,0,0,.03)'
                   }}
@@ -1168,7 +1168,7 @@ export default function AITangdou() {
           <div style={{
             maxWidth: isMobile ? '82%' : '80%',
             padding: isMobile ? '8px 11px' : '10px 14px',
-            borderRadius: 4, background: '#fffdf8', border: '2px solid ' + INK,
+            borderRadius: 4, background: '#ffffff', border: '2px solid ' + INK,
             borderTopLeftRadius: 4,
             fontSize: isMobile ? 12.5 : 13,
             lineHeight: 1.55, color: '#666'
@@ -1211,7 +1211,7 @@ export default function AITangdou() {
 
   // ─── 底部输入区 ───────────────────────────────────────────
   const bottomBar = (
-    <div style={{ flexShrink: 0, background: '#fffdf8' }}>
+    <div style={{ flexShrink: 0, background: '#ffffff' }}>
       {/* 待发送图片预览 */}
       {pendingImage && (
         <div style={{
@@ -1304,7 +1304,7 @@ export default function AITangdou() {
               <button key={t.label} onClick={() => useTag(t)} style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
                 padding: '8px 4px', borderRadius: 8, border: '1px solid #e5e5e5',
-                background: '#fffdf8', cursor: 'pointer', color: '#555',
+                background: '#ffffff', cursor: 'pointer', color: '#555',
                 transition: 'all .15s'
               }}
                 onMouseEnter={e => e.currentTarget.style.borderColor = '#D8451F'}
@@ -1321,7 +1321,7 @@ export default function AITangdou() {
             <button onClick={() => { setShowTags(false); setGenDialog('image') }} style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
               padding: '8px 4px', borderRadius: 8, border: '1px solid #e5e5e5',
-              background: '#fffdf8', cursor: 'pointer', color: '#555', transition: 'all .15s'
+              background: '#ffffff', cursor: 'pointer', color: '#555', transition: 'all .15s'
             }}
               onMouseEnter={e => e.currentTarget.style.borderColor = '#D8451F'}
               onMouseLeave={e => e.currentTarget.style.borderColor = '#e5e5e5'}>
@@ -1331,7 +1331,7 @@ export default function AITangdou() {
             <button onClick={() => { setShowTags(false); setGenDialog('video') }} style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
               padding: '8px 4px', borderRadius: 8, border: '1px solid #e5e5e5',
-              background: '#fffdf8', cursor: 'pointer', color: '#555', transition: 'all .15s'
+              background: '#ffffff', cursor: 'pointer', color: '#555', transition: 'all .15s'
             }}
               onMouseEnter={e => e.currentTarget.style.borderColor = '#D8451F'}
               onMouseLeave={e => e.currentTarget.style.borderColor = '#e5e5e5'}>
@@ -1507,7 +1507,7 @@ export default function AITangdou() {
         <div style={{
           position: 'absolute', top: 0, left: 0, right: 0, height: 44,
           display: 'flex', alignItems: 'center',
-          background: '#fffdf8', borderBottom: '1px solid #f0f0f0',
+          background: '#ffffff', borderBottom: '1px solid #f0f0f0',
           zIndex: 8, paddingLeft: 4, paddingRight: 4
         }}>
           <button onClick={() => nav('/')} title="返回首页" style={{
@@ -1543,7 +1543,7 @@ export default function AITangdou() {
                   width: '100%', maxWidth: 220, border: '1px solid #D8451F',
                   borderRadius: 6, padding: '4px 10px', fontSize: 14,
                   outline: 'none', textAlign: 'center',
-                  background: '#fffdf8', color: '#111111'
+                  background: '#ffffff', color: '#111111'
                 }} />
             ) : (
               <div
@@ -1628,7 +1628,7 @@ export default function AITangdou() {
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
         }}>
           <div onClick={e => e.stopPropagation()} style={{
-            background: '#fffdf8', borderRadius: 16, padding: '20px 24px', width: '100%', maxWidth: 420,
+            background: '#ffffff', borderRadius: 16, padding: '20px 24px', width: '100%', maxWidth: 420,
             boxShadow: '0 8px 32px rgba(0,0,0,.18)', animation: 'popIn .2s cubic-bezier(.4,0,.2,1)'
           }}>
             <div style={{
@@ -1741,7 +1741,7 @@ export default function AITangdou() {
                 {genError && <div style={{ color: '#D8451F', fontSize: 12, marginTop: 6 }}>{genError}</div>}
                 <div style={{ display: 'flex', gap: 8, marginTop: 14, justifyContent: 'flex-end' }}>
                   <button onClick={() => { setGenDialog('idle'); setGenError(''); setGenImage(null); setGenMode('text'); setGenVideoMode('text'); setGenDuration(121) }} style={{
-                    border: '1px solid #e5e5e5', background: '#fffdf8', borderRadius: 8,
+                    border: '1px solid #e5e5e5', background: '#ffffff', borderRadius: 8,
                     padding: '8px 16px', fontSize: 13, cursor: 'pointer', color: '#666'
                   }}>取消</button>
                   <button onClick={handleGen} disabled={!genPrompt.trim()} style={{

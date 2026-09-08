@@ -73,7 +73,7 @@ export default function Messages() {
                       width: 40,
                       height: 40,
                       borderRadius: '50%',
-                      border: `1px solid #e3d9c6`,
+                      border: `1px solid #e8e8e8`,
                       background: PAPER,
                       display: 'flex',
                       alignItems: 'center',
@@ -115,7 +115,7 @@ export default function Messages() {
             width: 32,
             height: 32,
             borderRadius: '50%',
-            border: `1px solid #e3d9c6`,
+            border: `1px solid #e8e8e8`,
             background: PAPER,
             display: 'flex',
             alignItems: 'center',
@@ -162,7 +162,7 @@ export default function Messages() {
           onChange={e => setText(e.target.value)}
           placeholder="发消息…"
           onKeyDown={e => e.key === 'Enter' && send()}
-          style={{ flex: 1, border: `1px solid #e3d9c6`, borderRadius: 2, padding: '10px 12px', fontFamily: FONT, fontSize: 14, outline: 'none', color: INK, background: PAPER }}
+          style={{ flex: 1, border: `1px solid #e8e8e8`, borderRadius: 2, padding: '10px 12px', fontFamily: FONT, fontSize: 14, outline: 'none', color: INK, background: PAPER }}
         />
         <BtnPrimary onClick={send} style={{ padding: '10px 14px' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>

@@ -88,7 +88,7 @@ export default function Wallet() {
             fontFamily: FONT,
             fontSize: 14,
             fontWeight: 600,
-            ...hard({ background: '#fffdf8', color: toast.type === 'ok' ? ACCENT : INK }),
+            ...hard({ background: '#ffffff', color: toast.type === 'ok' ? ACCENT : INK }),
           }}
         >
           {toast.type === 'ok' ? <CheckCircle size={16} color={ACCENT} /> : <XCircle size={16} color={INK} />}
@@ -99,7 +99,7 @@ export default function Wallet() {
       <PageHeader eyebrow="Wallet" title="我的钱包" desc="余额、冻结与每一笔流水，清清楚楚。" />
 
       {/* 账户总览：单卡三行（替代原三块硬边卡竖堆，减重） */}
-      <div style={{ ...hard(), background: '#fffdf8', padding: 18, marginBottom: 18 }}>
+      <div style={{ ...hard(), background: '#ffffff', padding: 18, marginBottom: 18 }}>
         <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: 2, color: MUTED }}>账户余额</div>
         <div style={{ fontFamily: FONT, fontSize: 34, fontWeight: 800, color: INK, marginTop: 6, letterSpacing: '-0.02em', lineHeight: 1.1 }}>
           ¥{me.balance.toFixed(2)}
@@ -117,10 +117,10 @@ export default function Wallet() {
       </div>
 
       {/* 操作区：粗黑边硬卡 */}
-      <div style={{ ...hard(), background: '#fffdf8', padding: 18, marginBottom: 24 }}>
+      <div style={{ ...hard(), background: '#ffffff', padding: 18, marginBottom: 24 }}>
         <SectionLabel label="操作" />
         <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
-          <BtnPrimary onClick={() => setMode('in')} style={mode === 'in' ? {} : { background: '#fffdf8', color: INK }}>
+          <BtnPrimary onClick={() => setMode('in')} style={mode === 'in' ? {} : { background: '#ffffff', color: INK }}>
             充值
           </BtnPrimary>
           <BtnGhost
@@ -136,7 +136,7 @@ export default function Wallet() {
             onChange={e => setAmt(e.target.value.replace(/[^\d.]/g, ''))}
             placeholder={mode === 'in' ? '充值金额' : '提现金额'}
             inputMode="decimal"
-            style={{ flex: 1, border: `1px solid #e3d9c6`, borderRadius: 2, padding: '10px 12px', fontFamily: FONT, fontSize: 15, outline: 'none' }}
+            style={{ flex: 1, border: `1px solid #e8e8e8`, borderRadius: 2, padding: '10px 12px', fontFamily: FONT, fontSize: 15, outline: 'none' }}
           />
           <BtnPrimary onClick={doIt}>{mode === 'in' ? '充值' : '申请'}</BtnPrimary>
         </div>

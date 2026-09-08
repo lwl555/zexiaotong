@@ -91,7 +91,7 @@ export default function Warnings() {
             <select
               value={form.target_type}
               onChange={(e) => setForm({ ...form, target_type: e.target.value as any })}
-              style={{ border: `1px solid #e3d9c6`, borderRadius: 2, padding: '9px 10px', fontFamily: FONT, fontSize: 14, background: '#fffdf8', color: INK, outline: 'none' }}
+              style={{ border: `1px solid #e8e8e8`, borderRadius: 2, padding: '9px 10px', fontFamily: FONT, fontSize: 14, background: '#ffffff', color: INK, outline: 'none' }}
             >
               <option value="school">院校</option>
               <option value="company">公司</option>
@@ -103,7 +103,7 @@ export default function Warnings() {
               value={form.title}
               placeholder="如：某某大学 转专业极难"
               onChange={(e) => setForm({ ...form, title: e.target.value })}
-              style={{ border: `1px solid #e3d9c6`, borderRadius: 2, padding: '9px 10px', fontFamily: FONT, fontSize: 14, outline: 'none' }}
+              style={{ border: `1px solid #e8e8e8`, borderRadius: 2, padding: '9px 10px', fontFamily: FONT, fontSize: 14, outline: 'none' }}
             />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -113,7 +113,7 @@ export default function Warnings() {
               placeholder="直说，别客气"
               onChange={(e) => setForm({ ...form, content: e.target.value })}
               rows={4}
-              style={{ border: `1px solid #e3d9c6`, borderRadius: 2, padding: '9px 10px', fontFamily: FONT, fontSize: 14, outline: 'none', resize: 'vertical' }}
+              style={{ border: `1px solid #e8e8e8`, borderRadius: 2, padding: '9px 10px', fontFamily: FONT, fontSize: 14, outline: 'none', resize: 'vertical' }}
             />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -122,7 +122,7 @@ export default function Warnings() {
               value={form.tags}
               placeholder="如：宿舍,就业,管理"
               onChange={(e) => setForm({ ...form, tags: e.target.value })}
-              style={{ border: `1px solid #e3d9c6`, borderRadius: 2, padding: '9px 10px', fontFamily: FONT, fontSize: 14, outline: 'none' }}
+              style={{ border: `1px solid #e8e8e8`, borderRadius: 2, padding: '9px 10px', fontFamily: FONT, fontSize: 14, outline: 'none' }}
             />
           </div>
           <BtnPrimary onClick={add} disabled={saving || !form.title.trim() || !form.content.trim()} style={saving || !form.title.trim() || !form.content.trim() ? { opacity: 0.5, cursor: 'not-allowed' } : {}}>

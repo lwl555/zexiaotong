@@ -38,7 +38,7 @@ export default function Settings() {
             src={me.avatar}
             alt=""
             onError={() => setAvatarErr(true)}
-            style={{ width: 56, height: 56, borderRadius: '50%', border: `1px solid #e3d9c6`, objectFit: 'cover', background: '#f4f2ee', flexShrink: 0 }}
+            style={{ width: 56, height: 56, borderRadius: '50%', border: `1px solid #e8e8e8`, objectFit: 'cover', background: '#f2f2f2', flexShrink: 0 }}
           />
         ) : (
           <div
@@ -46,8 +46,8 @@ export default function Settings() {
               width: 56,
               height: 56,
               borderRadius: '50%',
-              border: `1px solid #e3d9c6`,
-              background: '#f4f2ee',
+              border: `1px solid #e8e8e8`,
+              background: '#f2f2f2',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',

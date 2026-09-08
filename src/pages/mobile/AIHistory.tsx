@@ -78,7 +78,7 @@ export default function AIHistory() {
             display: 'flex',
             alignItems: 'center',
             gap: 10,
-            borderBottom: `1px solid #e3d9c6`,
+            borderBottom: `1px solid #e8e8e8`,
             paddingBottom: 10,
             marginBottom: 18,
           }}

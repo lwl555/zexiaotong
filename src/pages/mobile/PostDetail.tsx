@@ -129,7 +129,7 @@ export default function PostDetail() {
         {comments.map(c => (
           <ListRow key={c.id} style={{ alignItems: 'flex-start' }}>
             <div style={{ display: 'flex', gap: 10, width: '100%' }}>
-              <div style={{ width: 32, height: 32, borderRadius: '50%', border: `1px solid #e3d9c6`, background: '#fffdf8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, fontSize: 14, fontWeight: 700, color: INK, flexShrink: 0 }}>
+              <div style={{ width: 32, height: 32, borderRadius: '50%', border: `1px solid #e8e8e8`, background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, fontSize: 14, fontWeight: 700, color: INK, flexShrink: 0 }}>
                 {c.author_name.slice(-1)}
               </div>
               <div style={{ flex: 1 }}>
@@ -147,13 +147,13 @@ export default function PostDetail() {
       </div>
 
       {/* 固定评论输入栏：白底 + 粗黑边 */}
-      <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 1200, height: 64, background: '#fffdf8', borderTop: `1px solid #e3d9c6`, display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', zIndex: 30 }}>
+      <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 1200, height: 64, background: '#ffffff', borderTop: `1px solid #e8e8e8`, display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', zIndex: 30 }}>
         <input
           value={comment}
           onChange={e => setComment(e.target.value)}
           placeholder="友善评论…"
           onKeyDown={e => e.key === 'Enter' && send()}
-          style={{ flex: 1, border: `1px solid #e3d9c6`, borderRadius: 2, padding: '10px 12px', fontFamily: FONT, fontSize: 15, outline: 'none', background: '#fffdf8', color: INK }}
+          style={{ flex: 1, border: `1px solid #e8e8e8`, borderRadius: 2, padding: '10px 12px', fontFamily: FONT, fontSize: 15, outline: 'none', background: '#ffffff', color: INK }}
         />
         <BtnPrimary onClick={send}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>

@@ -77,7 +77,7 @@ export default function DocWorkshop() {
                 cursor: 'pointer',
                 padding: '9px 16px',
                 borderRadius: 2,
-                border: `1px solid #e3d9c6`,
+                border: `1px solid #e8e8e8`,
                 background: active ? ACCENT : PAPER,
                 color: active ? '#fff' : INK,
                 boxShadow: active ? `4px 4px 0 ${INK}` : 'none',

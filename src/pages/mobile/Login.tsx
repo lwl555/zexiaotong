@@ -23,7 +23,7 @@ const PWD_RE = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{6,20}$/
 
 const inputStyle: CSSProperties = {
   width: '100%',
-  border: `1px solid #e3d9c6`,
+  border: `1px solid #e8e8e8`,
   borderRadius: 2,
   padding: '11px 12px',
   fontFamily: FONT,
@@ -32,7 +32,7 @@ const inputStyle: CSSProperties = {
   outline: 'none',
   marginTop: 6,
   boxSizing: 'border-box',
-  background: '#fffdf8',
+  background: '#ffffff',
 }
 
 const labelStyle: CSSProperties = {
@@ -110,7 +110,7 @@ function AuthForm({ mobile }: { mobile: boolean }) {
             fontFamily: FONT,
             fontSize: 14,
             fontWeight: 600,
-            ...hard({ background: '#fffdf8', color: toast.type === 'ok' ? ACCENT : INK }),
+            ...hard({ background: '#ffffff', color: toast.type === 'ok' ? ACCENT : INK }),
           }}
         >
           {toast.type === 'ok' ? <CheckCircle size={16} color={ACCENT} /> : <XCircle size={16} color={INK} />}
@@ -201,7 +201,7 @@ export default function Login() {
   const isMobile = useIsMobile()
   return (
     <div style={{ padding: isMobile ? '0' : '40px 2px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
-      <div style={{ ...hard(), background: '#fffdf8', padding: isMobile ? 20 : 32, maxWidth: 480, margin: '0 auto' }}>
+      <div style={{ ...hard(), background: '#ffffff', padding: isMobile ? 20 : 32, maxWidth: 480, margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
           <div style={{ width: 40, height: 40, border: `3px solid ${INK}`, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, fontWeight: 800, fontSize: 20, color: INK }}>
             择

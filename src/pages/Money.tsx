@@ -93,7 +93,7 @@ export default function Money() {
             <select
               value={form.category}
               onChange={(e) => setForm({ ...form, category: e.target.value })}
-              style={{ border: `1px solid #e3d9c6`, borderRadius: 2, padding: '9px 10px', fontFamily: FONT, fontSize: 14, background: '#fffdf8', color: INK, outline: 'none' }}
+              style={{ border: `1px solid #e8e8e8`, borderRadius: 2, padding: '9px 10px', fontFamily: FONT, fontSize: 14, background: '#ffffff', color: INK, outline: 'none' }}
             >
               {CATS.map((c) => (
                 <option key={c}>{c}</option>
@@ -106,7 +106,7 @@ export default function Money() {
               value={form.title}
               placeholder="如：周末展会派单 200/天"
               onChange={(e) => setForm({ ...form, title: e.target.value })}
-              style={{ border: `1px solid #e3d9c6`, borderRadius: 2, padding: '9px 10px', fontFamily: FONT, fontSize: 14, outline: 'none' }}
+              style={{ border: `1px solid #e8e8e8`, borderRadius: 2, padding: '9px 10px', fontFamily: FONT, fontSize: 14, outline: 'none' }}
             />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -116,7 +116,7 @@ export default function Money() {
               placeholder="做什么、要求、结算方式、真实情况…"
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               rows={4}
-              style={{ border: `1px solid #e3d9c6`, borderRadius: 2, padding: '9px 10px', fontFamily: FONT, fontSize: 14, outline: 'none', resize: 'vertical' }}
+              style={{ border: `1px solid #e8e8e8`, borderRadius: 2, padding: '9px 10px', fontFamily: FONT, fontSize: 14, outline: 'none', resize: 'vertical' }}
             />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -125,7 +125,7 @@ export default function Money() {
               value={form.contact}
               placeholder="微信 / 群 / 链接（选填）"
               onChange={(e) => setForm({ ...form, contact: e.target.value })}
-              style={{ border: `1px solid #e3d9c6`, borderRadius: 2, padding: '9px 10px', fontFamily: FONT, fontSize: 14, outline: 'none' }}
+              style={{ border: `1px solid #e8e8e8`, borderRadius: 2, padding: '9px 10px', fontFamily: FONT, fontSize: 14, outline: 'none' }}
             />
           </div>
           <BtnPrimary onClick={add} disabled={saving || !form.title.trim() || !form.description.trim()} style={saving || !form.title.trim() || !form.description.trim() ? { opacity: 0.5, cursor: 'not-allowed' } : {}}>

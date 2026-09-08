@@ -48,7 +48,7 @@ export default function GoodsDetail() {
         <img
           src={good.images[imgIdx] || ''}
           alt=""
-          style={{ width: '100%', height: 260, objectFit: 'cover', border: `1px solid #e3d9c6`, borderRadius: 2, background: '#efefef', display: 'block' }}
+          style={{ width: '100%', height: 260, objectFit: 'cover', border: `1px solid #e8e8e8`, borderRadius: 2, background: '#efefef', display: 'block' }}
         />
         {good.images.length > 1 && (
           <div style={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 6 }}>
@@ -101,8 +101,8 @@ export default function GoodsDetail() {
           transform: 'translateX(-50%)',
           width: '100%',
           maxWidth: 1200,
-          background: '#fffdf8',
-          borderTop: `1px solid #e3d9c6`,
+          background: '#ffffff',
+          borderTop: `1px solid #e8e8e8`,
           display: 'flex',
           alignItems: 'center',
           gap: 12,
@@ -127,9 +127,9 @@ function btnGhostMinimal(): any {
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    border: `1px solid #e3d9c6`,
+    border: `1px solid #e8e8e8`,
     borderRadius: 2,
-    background: '#fffdf8',
+    background: '#ffffff',
     color: INK,
     fontFamily: FONT,
     fontWeight: 600,

@@ -77,7 +77,7 @@ export default function Discover() {
                       width: 36,
                       height: 36,
                       borderRadius: 4,
-                      border: '1px solid #e3d9c6',
+                      border: '1px solid #e8e8e8',
                       background: '#fbeede',
                       display: 'inline-flex',
                       alignItems: 'center',
