@@ -1,0 +1,25 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 学士帽（毕业帽）前景：白色描边，居中，适配自适应图标安全区 -->
+    <group android:translateX="30" android:translateY="34">
+        <!-- 帽顶（菱形） -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M24 8 L0 22 L24 36 L48 22 Z" />
+        <!-- 帽檐（前板） -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:fillAlpha="0.92"
+            android:pathData="M2 24 L46 24 L46 30 L2 30 Z" />
+        <!-- 帽穗（左侧垂下） -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M2 26 L2 52 L7 52 L7 31 Z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M1.5 50 a3.5 3.5 0 1 0 7 0 a3.5 3.5 0 1 0 -7 0 Z" />
+    </group>
+</vector>

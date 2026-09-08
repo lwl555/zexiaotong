@@ -1,0 +1,6 @@
+<resources xmlns:android="http://schemas.android.com/apk/res/android">
+    <style name="Theme.Zexiaotong" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#c2410c</item>
+        <item name="android:navigationBarColor">#ffffff</item>
+    </style>
+</resources>
