@@ -12,6 +12,8 @@ jobs:
   build:
     name: Build debug APK
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # 用于发布 Release 附件（GITHUB_TOKEN 自动提供，无需用户 PAT）
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -38,9 +40,21 @@ jobs:
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
 
-      - name: Upload APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: zexiaotong-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      - name: Publish APK to Release (apk-latest)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-latest
+          name: 择校通 APK（最新构建）
+          body: |
+            自动构建的 debug 签名 APK，直接加载线上站点 https://lwl555.github.io/zexiaotong/。
+            每次推送 android/** 或手动触发工作流都会更新此附件。
+          files: android/app/build/outputs/apk/debug/app-debug.apk
+          prerelease: false
+          make_latest: true
