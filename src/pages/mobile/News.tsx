@@ -42,7 +42,7 @@ export default function News() {
               {String(i + 1).padStart(2, '0')} · {new Date(p.created_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
             </div>
             {p.images?.[0] && (
-              <img src={p.images[0]} alt="" style={{ width: '100%', height: 140, objectFit: 'cover', border: `2px solid ${INK}`, borderRadius: 2, marginBottom: 12, background: '#efefef' }} />
+              <img src={p.images[0]} alt="" style={{ width: '100%', height: 140, objectFit: 'cover', border: `1px solid #e3d9c6`, borderRadius: 2, marginBottom: 12, background: '#efefef' }} />
             )}
             <div style={{ fontFamily: FONT, fontSize: 17, fontWeight: 700, color: INK, lineHeight: 1.3, letterSpacing: '-0.01em' }}>
               {p.title}

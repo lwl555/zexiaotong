@@ -40,6 +40,13 @@ export interface FeatureMeta {
 // 推送文案原则：不写「我是 XX 助手」式自我介绍，改为具体、有颗粒度、带观点/提醒的信息，
 // 像真实服务号在推一条有用的通知；克制使用 📌 / ⚠️ 作为信息标记。
 const RAW: Record<string, Omit<FeatureMeta, 'color'>> = {
+  aichat: {
+    id: 'aichat', name: 'AI 聊天', to: '/chat', icon: 'chat',
+    notifications: [
+      '📌 随时开口：选校纠结、报告赶不出来、想查一个公司靠不靠谱——打字就行，还能直接生成图片和视频。',
+      '上周一位同学用聊天把个人简历从零稿改到可投递版本，全程 20 分钟。你也试试。',
+    ],
+  },
   baishitong: {
     id: 'baishitong', name: 'AI 百事通', to: '/ai-search', icon: 'search',
     notifications: [

@@ -49,7 +49,7 @@ export default function Community() {
           display: 'flex',
           alignItems: 'center',
           gap: 10,
-          borderBottom: `2px solid ${INK}`,
+          borderBottom: `1px solid #e3d9c6`,
           paddingBottom: 10,
           marginBottom: 18,
         }}
@@ -79,14 +79,14 @@ export default function Community() {
               <img
                 src={p.images[0]}
                 alt=""
-                style={{ width: '100%', height: 150, objectFit: 'cover', border: `2px solid ${INK}`, borderRadius: 2, marginBottom: 12, background: '#efefef' }}
+                style={{ width: '100%', height: 150, objectFit: 'cover', border: `1px solid #e3d9c6`, borderRadius: 2, marginBottom: 12, background: '#efefef' }}
               />
             ) : (
               <div
                 style={{
                   width: '100%',
                   height: 150,
-                  border: `2px solid ${INK}`,
+                  border: `1px solid #e3d9c6`,
                   borderRadius: 2,
                   marginBottom: 12,
                   background: '#f4f2ee',

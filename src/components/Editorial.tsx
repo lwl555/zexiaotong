@@ -1,38 +1,39 @@
 import type { CSSProperties, ReactNode } from 'react'
 
 /* =====================================================================
- * PC 白底结合版版式组件库（2026-08-30 确立）
- * 视觉语言：白底 + 墨黑（文字/边框）+ 陶土红唯一彩色强调 +
- *          粗黑边 3px + 克制硬阴影 + 等宽 eyebrow + 大字号系统无衬线 +
- *          编号索引 01/02。与手机版「白底结合版」同一张脸。
- * 组件全部内联 style，自洽、不依赖 styles.css 的 card/brand 体系，
- * 便于在各 mobile/* 页面（被 Layout 包进 1200px 宽屏）下直接复用。
+ * 暖陶土编辑风版式组件库（2026-09-08 定稿，替代白底结合版）
+ * 视觉语言：纸感底 #f7f5f0 + 暖白卡 #fffdf8 + 暖墨 #1c1814 +
+ *          陶土 #c2410c 唯一彩色强调 + 1px 暖线边框（无粗边/无硬阴影）+
+ *          等宽 eyebrow + 编号索引。手机/PC 同一张脸。
+ * 组件全部内联 style，自洽、不依赖 styles.css 的 card/brand 体系。
  * ===================================================================== */
 
-export const INK = '#111111'
-export const PAPER = '#ffffff'
-export const MUTED = '#6b6258' // 次级文字（沿用 theme-home 暖灰，白底下不刺眼）
+export const INK = '#1c1814'
+export const PAPER = '#fffdf8'
+export const PAPER_BG = '#f7f5f0' // 页面纸感底
+export const LINE = '#e3d9c6' // 1px 暖线边框
+export const MUTED = '#6b6258'
 export const FAINT = '#9a9085'
-export const HAIR = 'rgba(17,17,17,0.12)' // 细黑发丝线（密集列表分隔）
-export const ACCENT = '#D8451F' // 陶土红：唯一彩色强调（品牌动作/编号/激活）
+export const HAIR = 'rgba(28,24,20,0.10)' // 细暖发丝线（密集列表分隔）
+export const ACCENT = '#c2410c' // 陶土：唯一彩色强调（品牌动作/编号/激活）
 export const ACCENT_SOFT = '#fbeede' // 陶土浅底
 export const FONT =
   '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Heiti SC", "微软雅黑", sans-serif'
 export const MONO = 'ui-monospace, "SF Mono", "JetBrains Mono", "Roboto Mono", Menlo, Consolas, monospace'
 // 财务语义色（仅用于流水正负，不破坏"唯一彩色"原则下的可读性原则）
 export const POS = '#15803d'
-export const NEG = '#D8451F'
+export const NEG = '#c2410c'
 
-// 硬边卡：粗黑边 + 无模糊实色硬阴影（克制使用：Hero / 主卡 / CTA）
+// 编辑风卡：1px 暖线 + 微圆角 + 极轻投影（全站统一卡面）
 export function hard(extra: CSSProperties = {}): CSSProperties {
-  return { border: `3px solid ${INK}`, borderRadius: 2, boxShadow: `5px 5px 0 ${INK}`, ...extra }
+  return { border: `1px solid ${LINE}`, borderRadius: 4, boxShadow: '0 1px 3px rgba(28,24,20,0.05)', ...extra }
 }
 
-// 粗黑描边按钮（幽灵）
+// 幽灵按钮：1px 暖线 + 暖墨字
 export function btnGhost(extra: CSSProperties = {}): CSSProperties {
   return {
-    border: `2px solid ${INK}`,
-    borderRadius: 2,
+    border: `1px solid ${LINE}`,
+    borderRadius: 4,
     background: PAPER,
     color: INK,
     fontFamily: FONT,

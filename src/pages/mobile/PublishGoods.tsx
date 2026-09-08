@@ -78,7 +78,7 @@ export default function PublishGoods() {
             fontFamily: FONT,
             fontSize: 14,
             fontWeight: 600,
-            ...hard({ background: '#ffffff', color: toast.type === 'ok' ? ACCENT : INK }),
+            ...hard({ background: '#fffdf8', color: toast.type === 'ok' ? ACCENT : INK }),
           }}
         >
           {toast.type === 'ok' ? <CheckCircle size={16} color={ACCENT} /> : <XCircle size={16} color={INK} />}
@@ -95,14 +95,14 @@ export default function PublishGoods() {
         }
       />
 
-      <div style={{ ...hard(), background: '#ffffff', padding: 18 }}>
+      <div style={{ ...hard(), background: '#fffdf8', padding: 18 }}>
         {/* 商品名称 */}
         <SectionLabel label="商品名称" />
         <input
           value={title}
           onChange={e => setTitle(e.target.value)}
           placeholder="例如：九成新 iPad Air"
-          style={{ width: '100%', border: `2px solid ${INK}`, borderRadius: 2, padding: '10px 12px', fontFamily: FONT, fontSize: 15, outline: 'none', marginBottom: 18 }}
+          style={{ width: '100%', border: `1px solid #e3d9c6`, borderRadius: 2, padding: '10px 12px', fontFamily: FONT, fontSize: 15, outline: 'none', marginBottom: 18 }}
         />
 
         {/* 价格 + 分类 */}
@@ -114,7 +114,7 @@ export default function PublishGoods() {
               onChange={e => setPrice(e.target.value.replace(/[^\d.]/g, ''))}
               placeholder="0"
               inputMode="decimal"
-              style={{ width: '100%', border: `2px solid ${INK}`, borderRadius: 2, padding: '10px 12px', fontFamily: FONT, fontSize: 15, outline: 'none' }}
+              style={{ width: '100%', border: `1px solid #e3d9c6`, borderRadius: 2, padding: '10px 12px', fontFamily: FONT, fontSize: 15, outline: 'none' }}
             />
             <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: 2, color: MUTED, marginTop: 5, textTransform: 'uppercase' }}>元</div>
           </div>
@@ -122,7 +122,7 @@ export default function PublishGoods() {
             <select
               value={category}
               onChange={e => setCategory(e.target.value)}
-              style={{ width: '100%', border: `2px solid ${INK}`, borderRadius: 2, padding: '10px 12px', fontFamily: FONT, fontSize: 15, outline: 'none', background: '#ffffff', color: INK }}
+              style={{ width: '100%', border: `1px solid #e3d9c6`, borderRadius: 2, padding: '10px 12px', fontFamily: FONT, fontSize: 15, outline: 'none', background: '#fffdf8', color: INK }}
             >
               {cats.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
             </select>
@@ -136,14 +136,14 @@ export default function PublishGoods() {
           value={description}
           onChange={e => setDescription(e.target.value)}
           placeholder="成色、购买渠道、转手原因…"
-          style={{ width: '100%', height: 96, border: `2px solid ${INK}`, borderRadius: 2, padding: '10px 12px', fontFamily: FONT, fontSize: 15, outline: 'none', resize: 'none', marginBottom: 18 }}
+          style={{ width: '100%', height: 96, border: `1px solid #e3d9c6`, borderRadius: 2, padding: '10px 12px', fontFamily: FONT, fontSize: 15, outline: 'none', resize: 'none', marginBottom: 18 }}
         />
 
         {/* 商品图片 */}
         <SectionLabel label="商品图片 (最多 6 张)" />
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
           {images.map((src, i) => (
-            <div key={i} style={{ position: 'relative', width: 64, height: 64, border: `2px solid ${INK}`, borderRadius: 2, overflow: 'hidden', background: '#efefef' }}>
+            <div key={i} style={{ position: 'relative', width: 64, height: 64, border: `1px solid #e3d9c6`, borderRadius: 2, overflow: 'hidden', background: '#efefef' }}>
               <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               <button
                 onClick={() => setImages(images.filter((_, j) => j !== i))}

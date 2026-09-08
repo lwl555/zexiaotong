@@ -46,7 +46,7 @@ function Bubble({ m, meId, meta }: { m: FeatureChatMsg; meId: string; meta: Feat
     return (
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <div
-          style={{ maxWidth: '72%', padding: '10px 14px', borderRadius: 3, borderBottomRightRadius: 0, fontFamily: FONT, fontSize: 15, lineHeight: 1.6, color: '#ffffff', background: ACCENT, border: `2px solid ${INK}` }}
+          style={{ maxWidth: '72%', padding: '10px 14px', borderRadius: 3, borderBottomRightRadius: 0, fontFamily: FONT, fontSize: 15, lineHeight: 1.6, color: '#ffffff', background: ACCENT, border: `1px solid #e3d9c6` }}
         >
           {m.content}
           {time && <div style={{ fontFamily: FONT, fontSize: 10, color: 'rgba(255,255,255,0.75)', textAlign: 'right', marginTop: 4 }}>{time}</div>}
@@ -60,7 +60,7 @@ function Bubble({ m, meId, meta }: { m: FeatureChatMsg; meId: string; meta: Feat
       <WxIcon icon={meta.icon} size={36} />
       <div style={{ maxWidth: '72%' }}>
         <div style={{ fontFamily: FONT, fontSize: 11, color: MUTED, marginBottom: 4 }}>{m.author_role === 'admin' ? '管理员' : m.author_name}</div>
-        <div style={{ padding: '10px 14px', borderRadius: 3, borderBottomLeftRadius: 0, fontFamily: FONT, fontSize: 15, lineHeight: 1.6, color: INK, background: '#ffffff', border: `1.5px solid ${HAIR}` }}>
+        <div style={{ padding: '10px 14px', borderRadius: 3, borderBottomLeftRadius: 0, fontFamily: FONT, fontSize: 15, lineHeight: 1.6, color: INK, background: '#fffdf8', border: `1px solid #e3d9c6` }}>
           {m.content}
           {time && <div style={{ fontFamily: FONT, fontSize: 10, color: MUTED, marginTop: 4 }}>{time}</div>}
         </div>
@@ -161,7 +161,7 @@ export default function FeatureNotify() {
       />
 
       {/* 聊天主卡：粗黑边 + 硬阴影 */}
-      <div style={{ ...hard(), background: '#ffffff', display: 'flex', flexDirection: 'column', height: 'calc(100vh - 240px)', minHeight: 420, overflow: 'hidden' }}>
+      <div style={{ ...hard(), background: '#fffdf8', display: 'flex', flexDirection: 'column', height: 'calc(100vh - 240px)', minHeight: 420, overflow: 'hidden' }}>
         <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
           {/* 刷新 + 错误提示条 */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -191,25 +191,25 @@ export default function FeatureNotify() {
         {/* 打开完整功能（醒目入口） */}
         <button
           onClick={() => nav(meta.to)}
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '0 12px 12px', padding: '0 16px', height: 48, background: ACCENT, color: '#ffffff', border: `2px solid ${INK}`, borderRadius: 2, fontFamily: FONT, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '0 12px 12px', padding: '0 16px', height: 48, background: ACCENT, color: '#ffffff', border: `1px solid #e3d9c6`, borderRadius: 2, fontFamily: FONT, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
         >
           <span>打开完整功能</span>
           <ChevronRight size={20} />
         </button>
 
         {/* 输入栏 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 12, borderTop: `2px solid ${INK}`, background: '#ffffff' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 12, borderTop: `1px solid #e3d9c6`, background: '#fffdf8' }}>
           <input
             value={text}
             onChange={e => setText(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && send()}
             placeholder="回复 / 留言给该功能的负责团队…"
-            style={{ flex: 1, height: 40, padding: '0 12px', border: `2px solid ${INK}`, borderRadius: 2, background: '#ffffff', fontFamily: FONT, fontSize: 15, outline: 'none', color: INK }}
+            style={{ flex: 1, height: 40, padding: '0 12px', border: `1px solid #e3d9c6`, borderRadius: 2, background: '#fffdf8', fontFamily: FONT, fontSize: 15, outline: 'none', color: INK }}
           />
           <button
             onClick={send}
             disabled={!text.trim() || sending}
-            style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', background: ACCENT, color: '#ffffff', border: `2px solid ${INK}`, borderRadius: 2, cursor: 'pointer', opacity: (!text.trim() || sending) ? 0.4 : 1 }}
+            style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', background: ACCENT, color: '#ffffff', border: `1px solid #e3d9c6`, borderRadius: 2, cursor: 'pointer', opacity: (!text.trim() || sending) ? 0.4 : 1 }}
           >
             <Send size={18} />
           </button>

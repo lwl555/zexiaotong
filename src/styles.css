@@ -1,20 +1,20 @@
 :root {
   /* 黑白灰配色：默认所有板块 */
-  --bg: #ffffff;
-  --surface: #f8f8f8;
-  --fg: #1a1a1a;
-  --muted: #666666;
-  --faint: #999999;
-  --border: #e0e0e0;
-  --border-strong: #d0d0d0;
+  --bg: #f7f5f0;
+  --surface: #fffdf8;
+  --fg: #1c1814;
+  --muted: #6b6258;
+  --faint: #9a9085;
+  --border: #e3d9c6;
+  --border-strong: #d9cdb8;
   --accent: #1a1a1a;           /* 中性墨黑：内侧密集页用黑/深灰做强调，避免陶土红泛滥 */
   --accent-2: #333333;         /* 深灰 */
   --accent-3: #0a0a0a;         /* 更深黑 */
-  --brand: #D8451F;            /* 稳定品牌色：始终陶土红（首页/主按钮/用户气泡） */
-  --brand-2: #b5370f;          /* 陶土深 */
-  --brand-3: #8a3410;          /* 更深陶土 */
+  --brand: #c2410c;            /* 稳定品牌色：陶土（首页/主按钮/用户气泡） */
+  --brand-2: #a33708;          /* 陶土深 */
+  --brand-3: #7c2c0a;          /* 更深陶土 */
   --brand-soft: #fbeede;       /* 陶土浅 */
-  --accent-soft: #f0f0f0;      /* 极浅灰 */
+  --accent-soft: #f3ece2;      /* 暖浅底 */
   --accent-fg: #ffffff;
   --danger: #dc2626;
   --ok: #16a34a;
@@ -54,12 +54,12 @@
   --faint: #9a9085;
   --border: #e7ddcb;
   --border-strong: #d8cbb2;
-  --accent: #D8451F;          /* 首页：陶土红强调（与手机版白底结合版统一） */
-  --accent-2: #b5370f;
-  --accent-3: #8a3410;
+  --accent: #c2410c;          /* 首页：陶土强调（暖陶土编辑风） */
+  --accent-2: #a33708;
+  --accent-3: #7c2c0a;
   --accent-soft: #fbeede;
-  --brand: #D8451F;
-  --brand-2: #b5370f;
+  --brand: #c2410c;
+  --brand-2: #a33708;
   --brand-3: #8a3410;
   --brand-soft: #fbeede;
   --radius: 10px;
@@ -558,7 +558,7 @@ textarea { resize: vertical; min-height: 88px; }
 .msg { margin-bottom: 18px; }
 .msg.user { display: flex; justify-content: flex-end; }
 .msg.user .bubble {
-  background: var(--accent); color: #fff; border-radius: 12px 12px 4px 12px;
+  background: var(--brand); color: #fff; border-radius: 12px 12px 4px 12px;
   padding: 10px 14px; display: inline-block; max-width: 90%;
 }
 .msg.ai .bubble {

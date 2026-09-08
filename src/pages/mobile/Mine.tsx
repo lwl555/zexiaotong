@@ -61,7 +61,7 @@ export default function Mine() {
               width: 56,
               height: 56,
               borderRadius: '50%',
-              border: `2px solid ${INK}`,
+              border: `1px solid #e3d9c6`,
               background: '#f4f2ee',
               display: 'flex',
               alignItems: 'center',
@@ -88,7 +88,7 @@ export default function Mine() {
           <img
             src={me.avatar}
             alt=""
-            style={{ width: 56, height: 56, borderRadius: '50%', border: `2px solid ${INK}`, background: '#f4f2ee', flexShrink: 0 }}
+            style={{ width: 56, height: 56, borderRadius: '50%', border: `1px solid #e3d9c6`, background: '#f4f2ee', flexShrink: 0 }}
           />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: FONT, fontSize: 18, fontWeight: 800, color: INK }}>{me.nickname}</div>

@@ -26,17 +26,17 @@ const HOME_ICON: Record<string, string> = {
   about: 'info',
 }
 
-// ===== 配色（白底结合版：白底 + 陶土红唯一强调 + 粗黑边硬阴影）=====
-const INK = '#111111'
-const MUTED = '#6b7280'
-const ACCENT = '#D8451F' // 陶土红：登录链接 / 活跃态 / CTA / 编号
-const LINE = 'rgba(0,0,0,0.08)'
-const ACTIVE = 'rgba(216,69,31,0.06)' // 行按压极淡陶土红
+// ===== 配色（暖陶土编辑风：纸感底 + 暖白卡 + 陶土唯一强调 + 1px 暖线）=====
+const INK = '#1c1814'
+const MUTED = '#8a7f72'
+const ACCENT = '#c2410c' // 陶土：登录链接 / 活跃态 / CTA / 编号
+const LINE = '#e3d9c6'
+const ACTIVE = 'rgba(194,65,12,0.06)' // 行按压极淡陶土
 const UNREAD = '#fa5151' // 微信原生未读红，保留
 
-// 硬边卡片：粗黑边 + 无模糊实色硬阴影（neo-brutalism 版式语言）
+// 编辑风卡片：1px 暖线 + 微圆角 + 极轻投影
 function hard(extra: CSSProperties = {}): CSSProperties {
-  return { border: '3px solid #111111', borderRadius: 2, boxShadow: '5px 5px 0 #111111', ...extra }
+  return { border: `1px solid ${LINE}`, borderRadius: 4, boxShadow: '0 1px 3px rgba(28,24,20,0.05)', background: '#fffdf8', ...extra }
 }
 
 // ===== 功能分组：每行一个"聊天对象"= 一个平台功能 =====
@@ -97,7 +97,7 @@ export default function WeChatHome() {
   const isGuest = !me?.qq
 
   return (
-    <div style={{ background: '#ffffff', minHeight: '100%', color: INK, fontFamily: FONT }}>
+    <div style={{ background: '#f7f5f0', minHeight: '100%', color: INK, fontFamily: FONT }}>
       {/* 噪点 overlay：覆盖全屏、不可点击、极淡 */}
       <div
         aria-hidden
@@ -115,7 +115,7 @@ export default function WeChatHome() {
       {/* ===== 顶部导航 ===== */}
       <div
         className="sticky top-0 z-20 flex items-center justify-between px-2 h-12 border-b-2 bg-white"
-        style={{ borderColor: '#111111' }}
+        style={{ borderColor: '#e3d9c6' }}
       >
         {isGuest ? (
           <div className="w-9 h-9" />
@@ -168,9 +168,9 @@ export default function WeChatHome() {
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 22, fontWeight: 700, color: INK, lineHeight: 1.25 }}>选对学校<br />比努力<br />更关键</div>
             <div style={{ marginTop: 6, fontSize: 11, color: MUTED, lineHeight: 1.5 }}>用数据，不熬鸡汤。</div>
-            <div onClick={() => nav('/ai-search')} style={{ marginTop: 10, display: 'inline-block', background: ACCENT, color: '#ffffff', fontSize: 12, padding: '7px 14px', borderRadius: 2, fontWeight: 600 }}>开始测评 →</div>
+            <div onClick={() => nav('/ai-search')} style={{ marginTop: 10, display: 'inline-block', background: ACCENT, color: '#ffffff', fontSize: 12, padding: '7px 14px', borderRadius: 4, fontWeight: 600 }}>开始测评 →</div>
           </div>
-          <div style={{ position: 'relative', width: 96, height: 120, background: '#efefef', border: '3px solid #111111', borderRadius: 2, flexShrink: 0, overflow: 'hidden' }}>
+          <div style={{ position: 'relative', width: 96, height: 120, background: '#efe9dd', border: '1px solid #e3d9c6', borderRadius: 4, flexShrink: 0, overflow: 'hidden' }}>
             <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'flex-end', padding: 7, fontSize: 9, color: MUTED }}>校园实景照片</span>
             <img
               src="https://images.pexels.com/photos/159490/yale-university-landscape-universities-schools-159490.jpeg?auto=compress&cs=tinysrgb&w=400"
@@ -186,17 +186,17 @@ export default function WeChatHome() {
 
       {/* 一键查分 · 大白卡 */}
       <div style={{ margin: '14px 12px 0' }}>
-        <div style={{ ...hard(), padding: '14px 14px 12px', background: '#ffffff' }}>
+        <div style={{ ...hard(), padding: '14px 14px 12px' }}>
           <div style={{ fontSize: 17, fontWeight: 700, color: INK, letterSpacing: 1 }}>一键查分</div>
           <div style={{ marginTop: 4, fontSize: 11, color: MUTED }}>输入分数，智能匹配院校</div>
-          <div onClick={() => nav('/ai-search')} style={{ marginTop: 10, display: 'inline-block', background: ACCENT, color: '#ffffff', fontSize: 12, padding: '7px 16px', borderRadius: 2, fontWeight: 600 }}>开始匹配</div>
+          <div onClick={() => nav('/ai-search')} style={{ marginTop: 10, display: 'inline-block', background: ACCENT, color: '#ffffff', fontSize: 12, padding: '7px 16px', borderRadius: 4, fontWeight: 600 }}>开始匹配</div>
         </div>
       </div>
 
       {/* 三功能入口 */}
       <div style={{ margin: '10px 12px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {ENTRIES.map(e => (
-          <button key={e.n} onClick={() => nav(e.to)} style={{ ...hard(), display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: '#ffffff', width: '100%' }}>
+          <button key={e.n} onClick={() => nav(e.to)} style={{ ...hard(), display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', width: '100%' }}>
             <div style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
               <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 13, color: ACCENT, fontWeight: 700 }}>{e.n}</span>
               <span style={{ fontSize: 13, color: INK, fontWeight: 500 }}>{e.name}</span>
@@ -210,7 +210,7 @@ export default function WeChatHome() {
       </div>
 
       {/* ===== 功能列表（换皮：等宽 eyebrow + 陶土红强调 + 白底） ===== */}
-      <div style={{ background: '#ffffff', marginTop: 16 }}>
+      <div style={{ background: '#fffdf8', marginTop: 16, borderTop: '1px solid #e3d9c6' }}>
         {GROUPS.map((g, gi) => (
           <div key={g.title}>
             <div className="flex items-baseline gap-2 px-4 pt-3 pb-1">
@@ -267,7 +267,7 @@ export default function WeChatHome() {
       </div>
 
       {/* 列表底部留白，避免被底部导航遮住 */}
-      <div className="h-20" style={{ background: '#ffffff' }} />
+      <div className="h-20" style={{ background: '#f7f5f0' }} />
     </div>
   )
 }

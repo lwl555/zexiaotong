@@ -222,7 +222,7 @@ export default function Home() {
           <Link key={c.title} to={c.to} style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
             <HardCard style={{ display: 'flex', flexDirection: 'column', height: '100%', cursor: 'pointer' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                <span style={{ width: 40, height: 40, border: `2px solid ${INK}`, borderRadius: 2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: ACCENT }}>
+                <span style={{ width: 40, height: 40, border: `1px solid #e3d9c6`, borderRadius: 2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: ACCENT }}>
                   {c.ic ? <c.ic size={20} strokeWidth={1.9} /> : null}
                 </span>
                 <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: ACCENT }}>{String(i + 1).padStart(2, '0')}</span>
@@ -254,7 +254,7 @@ export default function Home() {
                       textTransform: 'uppercase',
                       color: idx === 1 ? ACCENT : INK,
                       padding: '12px 14px',
-                      borderBottom: `2px solid ${INK}`,
+                      borderBottom: `1px solid #e3d9c6`,
                       background: ACCENT_SOFT,
                     }}
                   >

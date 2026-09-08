@@ -131,12 +131,12 @@ export default function MobileLayout() {
   const notifyMeta = notifyMatch ? FEATURES[notifyMatch[1]] : undefined
 
   return (
-    <div className="app-shell flex flex-col" style={{ minHeight: '100vh', background: '#ffffff' }}>
+    <div className="app-shell flex flex-col" style={{ minHeight: '100vh', background: '#f7f5f0' }}>
       <div className="flex-1 overflow-y-auto no-scrollbar" style={{ paddingBottom: 48 }}>
         {showTopBar && (
           <div
-            className="sticky top-0 z-20 flex items-center gap-2 px-2 h-12 border-b-2 bg-white"
-            style={{ borderColor: '#111111' }}
+            className="sticky top-0 z-20 flex items-center gap-2 px-2 h-12 border-b bg-[#fffdf8]"
+            style={{ borderColor: '#e3d9c6' }}
           >
             <button
               aria-label="返回"
@@ -159,11 +159,11 @@ export default function MobileLayout() {
       </div>
       {/* 底部固定导航：微信风格 4 Tab（微信绿高亮） */}
       <nav
-        className="fixed bottom-0 inset-x-0 mx-auto w-full max-w-[480px] h-12 bg-white border-t-2 border-[#111111] flex items-center px-2 z-30"
+        className="fixed bottom-0 inset-x-0 mx-auto w-full max-w-[480px] h-12 bg-[#f7f5f0] border-t border-[#e3d9c6] flex items-center px-2 z-30"
         style={{ transform: 'translateY(0)' }}>
         {tabs.map(t => (
           <NavLink key={t.to} to={t.to} end={t.end}
-            className={({ isActive }) => 'flex-1 flex flex-col items-center gap-0 py-1 ' + (isActive ? 'text-[#111111] font-semibold' : 'text-[#9ca3af]')}>
+            className={({ isActive }) => 'flex-1 flex flex-col items-center gap-0 py-1 ' + (isActive ? 'text-[#c2410c] font-semibold' : 'text-[#9a9085]')}>
             <t.icon size={20} strokeWidth={1.6} />
             <span className="text-[10px] leading-none mt-0.5">{t.label}</span>
           </NavLink>
@@ -171,7 +171,7 @@ export default function MobileLayout() {
       </nav>
       {/* 浮动通知入口（贴着底部导航栏之上右侧，避免与 Tab 重叠） */}
       {unread > 0 && (
-        <button onClick={() => nav('/notifications')} className="fixed z-30 w-10 h-10 rounded-full bg-[#D8451F] text-white flex items-center justify-center shadow-[3px_3px_0_#111111]"
+        <button onClick={() => nav('/notifications')} className="fixed z-30 w-10 h-10 rounded-full bg-[#c2410c] text-white flex items-center justify-center shadow-[0_2px_8px_rgba(28,24,20,0.18)]"
           style={{ bottom: 56, right: 12 }}>
           <Bell size={18} strokeWidth={1.9} />
           <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">{unread}</span>

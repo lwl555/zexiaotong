@@ -111,7 +111,7 @@ export default function TaskDetail() {
       </HardCard>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14, border: `1px solid ${HAIR}`, borderRadius: 3, marginBottom: 16, background: PAPER }}>
-        <img src={task.poster_avatar} alt="" style={{ width: 40, height: 40, borderRadius: '50%', border: `2px solid ${INK}` }} />
+        <img src={task.poster_avatar} alt="" style={{ width: 40, height: 40, borderRadius: '50%', border: `1px solid #e3d9c6` }} />
         <div style={{ flex: 1 }}>
           <div style={{ fontFamily: FONT, fontSize: 14, fontWeight: 600, color: INK }}>{task.poster_name}</div>
           <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: 1, color: MUTED, marginTop: 2 }}>发布者</div>
@@ -153,7 +153,7 @@ export default function TaskDetail() {
               value={deliverText}
               onChange={e => setDeliverText(e.target.value)}
               placeholder="描述交付内容 / 上传链接…"
-              style={{ width: '100%', height: 96, resize: 'none', border: `2px solid ${INK}`, borderRadius: 2, padding: 10, boxSizing: 'border-box', fontFamily: FONT, fontSize: 14, color: INK, outline: 'none' }}
+              style={{ width: '100%', height: 96, resize: 'none', border: `1px solid #e3d9c6`, borderRadius: 2, padding: 10, boxSizing: 'border-box', fontFamily: FONT, fontSize: 14, color: INK, outline: 'none' }}
             />
             <BtnPrimary onClick={() => { deliverTask(task.id, deliverText); setShowDeliver(false); setDeliverText('') }} style={{ width: '100%', marginTop: 12 }}>确认交付</BtnPrimary>
           </div>

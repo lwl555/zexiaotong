@@ -74,7 +74,7 @@ export default function PublishPost() {
             fontFamily: FONT,
             fontSize: 14,
             fontWeight: 600,
-            ...hard({ background: '#ffffff', color: toast.type === 'ok' ? ACCENT : INK }),
+            ...hard({ background: '#fffdf8', color: toast.type === 'ok' ? ACCENT : INK }),
           }}
         >
           {toast.type === 'ok' ? <CheckCircle size={16} color={ACCENT} /> : <XCircle size={16} color={INK} />}
@@ -94,7 +94,7 @@ export default function PublishPost() {
         value={title}
         onChange={e => setTitle(e.target.value)}
         placeholder="一句话说清你想聊的"
-        style={{ width: '100%', border: `2px solid ${INK}`, borderRadius: 2, padding: '11px 12px', fontFamily: FONT, fontSize: 15, outline: 'none', marginBottom: 18, boxSizing: 'border-box' }}
+        style={{ width: '100%', border: `1px solid #e3d9c6`, borderRadius: 2, padding: '11px 12px', fontFamily: FONT, fontSize: 15, outline: 'none', marginBottom: 18, boxSizing: 'border-box' }}
       />
 
       <SectionLabel label="正文" />
@@ -102,13 +102,13 @@ export default function PublishPost() {
         value={content}
         onChange={e => setContent(e.target.value)}
         placeholder="分享你的想法、求助、吐槽…"
-        style={{ width: '100%', height: 160, resize: 'none', border: `2px solid ${INK}`, borderRadius: 2, padding: '11px 12px', fontFamily: FONT, fontSize: 15, outline: 'none', marginBottom: 18, boxSizing: 'border-box' }}
+        style={{ width: '100%', height: 160, resize: 'none', border: `1px solid #e3d9c6`, borderRadius: 2, padding: '11px 12px', fontFamily: FONT, fontSize: 15, outline: 'none', marginBottom: 18, boxSizing: 'border-box' }}
       />
 
       <SectionLabel label="配图（最多 9 张）" />
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 24 }}>
         {images.map((src, i) => (
-          <div key={i} style={{ position: 'relative', width: 84, height: 84, border: `2px solid ${INK}`, borderRadius: 2, overflow: 'hidden', background: '#efefef' }}>
+          <div key={i} style={{ position: 'relative', width: 84, height: 84, border: `1px solid #e3d9c6`, borderRadius: 2, overflow: 'hidden', background: '#efefef' }}>
             <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             <button
               onClick={() => setImages(images.filter((_, j) => j !== i))}
