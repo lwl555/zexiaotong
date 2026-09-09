@@ -206,9 +206,11 @@ export async function agnesChat(
       messages,
       max_tokens: Math.min(opts.maxTokens ?? 8192, 8192),
       stream: false,
-      web_search: opts.webSearch ?? false,
-      auto_search: opts.autoSearch ?? false,
-      search_only: opts.searchOnly ?? false
+      // 临时：Agnes 免费档联网搜索额度已耗尽(429)，强制关闭检索以恢复纯生成链路
+      // （对话/图片/视频）。待更换有效 Agnes key 后恢复 web_search/auto_search。
+      web_search: false,
+      auto_search: false,
+      search_only: false
     },
     signal: opts.signal
   })
@@ -249,9 +251,11 @@ export async function agnesChatStream(
     max_tokens: Math.min(opts.maxTokens ?? 8192, 8192),
     stream: true,
     structured_reasoning: opts.structuredReasoning ?? false,
-    web_search: opts.webSearch ?? false,
-    auto_search: opts.autoSearch ?? false,
-    search_only: opts.searchOnly ?? false
+    // 临时：Agnes 免费档联网搜索额度已耗尽(429)，强制关闭检索以恢复纯生成链路。
+    // 待更换有效 Agnes key 后恢复 web_search/auto_search。
+    web_search: false,
+    auto_search: false,
+    search_only: false
   })
 
   // 初始连接偶发被网关路由到卡死实例（503/无 CORS）→ 重试绕开
