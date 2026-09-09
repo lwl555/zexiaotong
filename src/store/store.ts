@@ -5,9 +5,25 @@ import type {
   TaskStatus, GoodsStatus, PostStatus
 } from '../lib/types'
 import * as db from '../lib/db'
+import { notifyNative } from '../lib/nativeNotify'
 
 const now = () => new Date().toISOString()
 const round = (n: number) => Math.round(n * 100) / 100
+
+// ─── 通知栏轮询（仅原生壳内生效，普通浏览器静默 no-op）───
+let notifyTimer: ReturnType<typeof setInterval> | null = null
+let notifySeen = new Set<string>()
+let notifyMeId = ''
+// 通知类型 → 点击后跳转路由（HashRouter 的 hash 路径）
+const NOTIFY_ROUTE: Record<string, string> = {
+  message: '/messages',
+  task_status: '/my-tasks',
+  task_taken: '/my-tasks',
+  task_review: '/my-tasks',
+  arbitration: '/my-tasks',
+  comment: '/community',
+  announce: '/notifications',
+}
 
 interface State {
   // 加载状态
@@ -33,6 +49,9 @@ interface State {
 
   // 初始化
   init: () => Promise<void>
+
+  // 通知栏轮询：后台到达的站内消息弹手机通知栏（覆盖全部通知类型）
+  startNotifyPoller: () => void
 
   // 用户
   login: (qq?: string, role?: Role) => Promise<void>
@@ -153,11 +172,51 @@ export const useStore = create<State>((set, get) => ({
       const [tasks, goods, posts, txns, withdrawals, arbitrations, notifications, categories, banners, config] =
         bundle || Array(10).fill([])
       set({ tasks, goods, posts, txns, withdrawals, arbitrations, notifications, categories, banners, config, loading: false })
+      // 启动通知栏轮询（App 后台时把新到达的站内消息弹到手机通知栏）
+      get().startNotifyPoller()
     } catch (e: any) {
       set({ error: e?.message || '加载失败', loading: false })
     } finally {
       clearTimeout(hardStop)
     }
+  },
+
+  // ─── 通知栏轮询：每 15s 拉一次站内通知，新到达且未读的弹手机通知栏 ───
+  startNotifyPoller: () => {
+    const me = get().me
+    if (me && notifyMeId !== me.id) {
+      // 以当前账号已有通知为基准，避免把历史通知当新消息弹
+      notifyMeId = me.id
+      notifySeen = new Set(get().notifications.map(n => n.id))
+    }
+    if (notifyTimer) return
+    notifyTimer = setInterval(async () => {
+      const m = get().me
+      if (!m) return
+      if (notifyMeId !== m.id) {
+        // 切换账号：重新以当前通知为基准
+        notifyMeId = m.id
+        notifySeen = new Set(get().notifications.map(n => n.id))
+        return
+      }
+      let list: any[] = []
+      try {
+        list = await db.fetchNotifications(m.id)
+      } catch {
+        return
+      }
+      set({ notifications: list })
+      const fresh = list.filter((n: any) => !notifySeen.has(n.id))
+      // 仅在 App 切到后台时弹系统通知，避免前台刷屏；站内通知中心在前台已可见
+      if (typeof document !== 'undefined' && document.hidden) {
+        for (const n of fresh) {
+          if (n.read) continue
+          const route = NOTIFY_ROUTE[n.type] || '/notifications'
+          notifyNative(n.title || '择校通', n.content || '', route)
+        }
+      }
+      fresh.forEach((n: any) => notifySeen.add(n.id))
+    }, 15000)
   },
 
   // ─── 用户 ───
