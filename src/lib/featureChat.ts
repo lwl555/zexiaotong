@@ -14,6 +14,7 @@
 
 import { supabase } from './db'
 import { avatarOf } from './avatarMeta'
+import { notifyNative } from './nativeNotify'
 
 export type FeatureRole = 'system' | 'user' | 'admin'
 
@@ -222,4 +223,7 @@ export async function ensureSeed(feature: string, notifications: string[], autho
       content,
     })
   }
+  // 把功能「推送文案」同步弹到手机通知栏（仅在真正播种时触发一次，不会每次打开都弹）
+  const featureName = FEATURES[feature]?.name ?? '择校通'
+  notifyNative(`择校通·${featureName}`, notifications[0] ?? '', `/m/notify/${feature}`)
 }

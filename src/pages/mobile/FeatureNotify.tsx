@@ -6,6 +6,7 @@ import WxIcon from '../../components/mobile/WxIcon'
 import {
   FEATURES, fetchFeatureChat, postFeatureChat, ensureSeed, FeatureChatMsg, FeatureRole, FeatureMeta,
 } from '../../lib/featureChat'
+import { notifyNative } from '../../lib/nativeNotify'
 import {
   PageHeader,
   btnGhost,
@@ -82,6 +83,9 @@ export default function FeatureNotify() {
   const [error, setError] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const sendingRef = useRef(false)
+  // 已见过的消息 id（用于给新到达的非本人消息弹系统通知，避免重复弹）
+  const seenRef = useRef<Set<string>>(new Set())
+  const firstLoadRef = useRef(true)
 
   // 拉取服务端消息，并保留本地临时消息（正在发送中、尚未被服务端确认）
   const pull = async () => {
@@ -90,6 +94,17 @@ export default function FeatureNotify() {
       const tmp = prev.filter(m => m.id.startsWith('tmp-'))
       return tmp.length ? [...tmp, ...list] : list
     })
+    // 仅在非首屏拉取时，对新到达的非本人消息弹系统通知（app 处于后台时）
+    if (!firstLoadRef.current) {
+      const myId = me?.id
+      const fresh = list.filter(m => !seenRef.current.has(m.id))
+      const incoming = fresh.filter(m => !(m.author_role === 'user' && myId != null && m.author_id === myId))
+      if (typeof document !== 'undefined' && document.hidden) {
+        for (const m of incoming) notifyNative(meta.name, m.content, `/m/notify/${id}`)
+      }
+    }
+    seenRef.current = new Set(list.map(m => m.id))
+    firstLoadRef.current = false
   }
 
   // 带 loading / refreshing UI 态的拉取（首屏 & 手动刷新用）
@@ -101,13 +116,18 @@ export default function FeatureNotify() {
   }
 
   useEffect(() => {
-    if (!meta) { nav('/', { replace: true }); return }
+    if (!meta || !me) { if (!meta) nav('/', { replace: true }); return }
     let alive = true
     ;(async () => {
       setLoading(true)
       await ensureSeed(id, meta.notifications, `择校通·${meta.name}`)
       const list = await fetchFeatureChat(id)
-      if (alive) { setMsgs(list); setLoading(false) }
+      if (alive) {
+        // 首屏直接认领已有消息，避免后续轮询把它们当成「新消息」重复弹通知
+        seenRef.current = new Set(list.map(m => m.id))
+        firstLoadRef.current = false
+        setMsgs(list); setLoading(false)
+      }
     })()
     // 轻量轮询：管理员后台下发后用户端能即时看到（每 12s，发送中不覆盖）
     const timer = setInterval(() => { if (alive && !sendingRef.current) pull() }, 12000)

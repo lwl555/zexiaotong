@@ -1,0 +1,16 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- 简洁学士帽：通知栏小图标（系统会按需要着色，用纯白填充） -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12 4 L2 9 L12 14 L22 9 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M5 10.5 L5 16.5 L12 19.5 L19 16.5 L19 10.5 L17 11.5 L17 15 L12 17 L7 15 L7 11.5 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M5 10.5 L5 12 L2 10.8 L2 9.4 Z" />
+</vector>
