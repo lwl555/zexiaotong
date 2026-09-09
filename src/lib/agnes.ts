@@ -206,11 +206,11 @@ export async function agnesChat(
       messages,
       max_tokens: Math.min(opts.maxTokens ?? 8192, 8192),
       stream: false,
-      // 临时：Agnes 免费档联网搜索额度已耗尽(429)，强制关闭检索以恢复纯生成链路
-      // （对话/图片/视频）。待更换有效 Agnes key 后恢复 web_search/auto_search。
-      web_search: false,
-      auto_search: false,
-      search_only: false
+      // 检索层全为免 key 自爬源（Bing/百度/DDG/GNews/HN/维基），零 Agnes 额度消耗；
+      // 只有生成那一跳消耗 Agnes 额度。恢复透传，由 agnes-search 编排检索+生成。
+      web_search: opts.webSearch ?? false,
+      auto_search: opts.autoSearch ?? false,
+      search_only: opts.searchOnly ?? false
     },
     signal: opts.signal
   })
@@ -251,11 +251,10 @@ export async function agnesChatStream(
     max_tokens: Math.min(opts.maxTokens ?? 8192, 8192),
     stream: true,
     structured_reasoning: opts.structuredReasoning ?? false,
-    // 临时：Agnes 免费档联网搜索额度已耗尽(429)，强制关闭检索以恢复纯生成链路。
-    // 待更换有效 Agnes key 后恢复 web_search/auto_search。
-    web_search: false,
-    auto_search: false,
-    search_only: false
+    // 检索层全为免 key 自爬源，零 Agnes 额度消耗。恢复透传，由 agnes-search 编排检索+生成。
+    web_search: opts.webSearch ?? false,
+    auto_search: opts.autoSearch ?? false,
+    search_only: opts.searchOnly ?? false
   })
 
   // 初始连接偶发被网关路由到卡死实例（503/无 CORS）→ 重试绕开
@@ -431,13 +430,13 @@ export async function agnesVideoPoll(
   }
 }
 
-// —— 预热：页面加载 / 窗口聚焦时后台暖热 agnes-search 与 v9(agnes-proxy) 两个 Edge Function ——
-// 两者各自冷启动约 1.5s+，叠加后「用户首个真实提问」会撞双冷启动（耗时 10s+，偶发被网关掐断 → "Failed to fetch"）。
-// 这里在页面加载即无声发起一次极轻的请求（trivial query 仍会调 v9 以暖热它），结果被忽略，失败也无所谓；
-// 数秒后用户发起的真实提问将命中已热实例，约 3s 返回，彻底规避冷启动超时。
+// —— 预热：页面加载时后台暖热 agnes-search Edge Function，避免用户首个真实提问撞冷启动 ——
+// 🔴 额度纪律（2026-09-09）：Agnes 免费档生成额度窗口极紧（实测一分钟一两次就 429），
+// 此前预热「每次加载/聚焦连发 3 次 + auto_search:true」等于自己人把窗口烧光、真实提问必撞 429。
+// 改为：仅页面加载预热 1 次、max_tokens 压到 16、纯生成不带检索；聚焦/切回不再预热。
 let __agnesWarmed = false
 export function warmupAgnes(force = false): void {
-  if (__agnesWarmed && !force) return
+  if (__agnesWarmed) return
   __agnesWarmed = true
   const base = resolveBase()
   if (base.startsWith('/')) return // 开发态走本地代理，无需预热
@@ -448,27 +447,14 @@ export function warmupAgnes(force = false): void {
   const body = JSON.stringify({
     model: DEFAULT_MODEL,
     messages: [{ role: 'user', content: '你好' }],
-    max_tokens: 200,
+    max_tokens: 16,
     stream: false,
-    auto_search: true
+    auto_search: false
   })
-  // 连续多次：Supabase 网关偶发把首请求路由到「冷启动超时」的卡死实例（直接 503），
-  // 多发几次可保证至少有一个健康实例被暖热，用户首个真实提问命中热实例（~1.5s）而非撞冷启。
-  const fire = () => {
-    fetch(`${base}/v1/chat/completions`, { method: 'POST', headers, body }).catch(() => {})
-  }
-  fire()
-  setTimeout(fire, 1500)
-  setTimeout(fire, 3500)
+  fetch(`${base}/v1/chat/completions`, { method: 'POST', headers, body }).catch(() => {})
 }
 
-// 页面加载即预热；窗口重新聚焦（用户离开又回来）时也补一次，覆盖「长时间闲置后回来」的场景
+// 页面加载即预热一次（仅一次；聚焦/切回不再预热，省额度窗口）
 if (typeof window !== 'undefined') {
   warmupAgnes()
-  window.addEventListener('focus', () => warmupAgnes(true))
-  if (typeof document !== 'undefined') {
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') warmupAgnes(true)
-    })
-  }
 }
