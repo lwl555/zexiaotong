@@ -330,6 +330,17 @@ export async function agnesChatStream(
           reasoning = o.reasoning || reasoning
           search = o.search
           degraded = !!o.degraded
+        } else if (o.choices?.[0]?.delta) {
+          // OpenAI 标准流式格式（agnes-proxy 返回的是这种）：choices[0].delta.content / reasoning_content
+          const d = o.choices[0].delta
+          if (d.reasoning_content) {
+            reasoning += d.reasoning_content
+            opts.onContent?.(d.reasoning_content)
+          }
+          if (d.content) {
+            content += d.content
+            opts.onContent?.(d.content)
+          }
         }
       } catch {}
     }
