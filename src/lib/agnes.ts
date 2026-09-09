@@ -60,19 +60,25 @@ async function call<T = any>(
           signal: controller.signal
         })
         if (!res.ok) {
-          // 5xx 与 429 视为可重试：5xx=网关/实例抖动，429=Supabase 免费档瞬时限流（退避后可恢复）；
-          // 其余 4xx（400/401/403 等）属用户/配置问题，直接抛出不重试。
-          if ((res.status >= 500 || res.status === 429) && attempt < MAX_ATTEMPTS - 1) {
+          const t = await res.text().catch(() => '')
+          // 429（上游免费额度限流）单独处理：最多重试 2 次（限流窗口是分钟级，多等无益），
+          // 且把响应体挂到错误上供上层降级——agnes-search 的 429 body 里通常带已检索到的 search 资料
+          if (res.status === 429) {
+            const e: any = new Error(`HTTP 429 ${t.slice(0, 200)}`)
+            try { e.payload = JSON.parse(t) } catch {}
+            lastErr = e
+            if (attempt < 2) {
+              await new Promise((r) => setTimeout(r, 2500))
+              continue
+            }
+            throw e
+          }
+          if (res.status >= 500 && attempt < MAX_ATTEMPTS - 1) {
             lastErr = new Error(`HTTP ${res.status}`)
             await new Promise((r) => setTimeout(r, 500 * Math.pow(2, attempt) + Math.random() * 300))
             continue
           }
-          let msg = `HTTP ${res.status}`
-          try {
-            const t = await res.text()
-            if (t) msg += ` ${t.slice(0, 300)}`
-          } catch {}
-          throw new Error(msg)
+          throw new Error(`HTTP ${res.status} ${t.slice(0, 300)}`)
         }
         const ct = res.headers.get('content-type') || ''
         if (ct.includes('application/json')) return (await res.json()) as T
@@ -200,20 +206,42 @@ export async function agnesChat(
   messages: ChatMsg[],
   opts: ChatOptions = {}
 ): Promise<ChatResult> {
-  const data = await call('/v1/chat/completions', {
-    body: {
-      model: opts.model || DEFAULT_MODEL,
-      messages,
-      max_tokens: Math.min(opts.maxTokens ?? 8192, 8192),
-      stream: false,
-      // 检索层全为免 key 自爬源（Bing/百度/DDG/GNews/HN/维基），零 Agnes 额度消耗；
-      // 只有生成那一跳消耗 Agnes 额度。恢复透传，由 agnes-search 编排检索+生成。
-      web_search: opts.webSearch ?? false,
-      auto_search: opts.autoSearch ?? false,
-      search_only: opts.searchOnly ?? false
-    },
-    signal: opts.signal
-  })
+  let data: any
+  try {
+    data = await call('/v1/chat/completions', {
+      body: {
+        model: opts.model || DEFAULT_MODEL,
+        messages,
+        max_tokens: Math.min(opts.maxTokens ?? 8192, 8192),
+        stream: false,
+        // 检索层全为免 key 自爬源（Bing/百度/DDG/GNews/HN/维基），零 Agnes 额度消耗；
+        // 只有生成那一跳消耗 Agnes 额度。恢复透传，由 agnes-search 编排检索+生成。
+        web_search: opts.webSearch ?? false,
+        auto_search: opts.autoSearch ?? false,
+        search_only: opts.searchOnly ?? false
+      },
+      signal: opts.signal
+    })
+  } catch (e: any) {
+    // 生成撞上游额度限流(429)时的降级：429 响应体里通常带已检索到的资料（search.count/links），
+    // 转成 degraded 结果让页面展示「已检索资料 + 重新生成」，而非裸报错。
+    const payload = e?.payload
+    const s = payload?.search
+    if (s && ((s.count || 0) > 0 || (s.links || []).length)) {
+      const links: LinkInfo[] = s.links || []
+      const list = links.length
+        ? links.slice(0, 5).map((l, i) => `${i + 1}. ${l.title} — ${l.url}`).join('\n')
+        : (s.sources || []).slice(0, 5).map((x: string, i: number) => `${i + 1}. ${x}`).join('\n')
+      return {
+        content:
+          `⏱️ **AI 生成暂时被上游限流**，但已为你检索到 ${s.count || 0} 条公开资料，先参考下方内容；点「重新生成」可再试一次。\n\n` +
+          `> 关于「${String(s.query || '').slice(0, 80)}」的参考资料：\n${list}`,
+        search: s,
+        degraded: true
+      }
+    }
+    throw e
+  }
   const content = (data as any)?.choices?.[0]?.message?.content ?? ''
   const search = (data as any)?.search as SearchMeta | undefined
   const results = (data as any)?.results as string[] | undefined

@@ -1607,9 +1607,14 @@ Deno.serve(async (req: Request) => {
   // 40s 是经验值：暖路径实测 1–12s（curl 杭电 19.78s 拿到 1183 token），冷启动 25–35s 也覆盖；
   // 比之前 30s 更宽容，彻底避开偶发 30-40s 卡死的冷启动——本轮用户截图"杭州电子科技大学超时"根因就是阈值太紧。
   let v9Resp: { data: any; status: number } | null = null
-  for (let i = 0; i < 2 && !v9Resp; i++) {
+  // 生成预算硬截止（从检索结束后起算 40s，给网关 50s 预算留余量）：
+  //  - 429（上游免费额度限流，秒回）/5xx：视为可重试失败，退避 3s 再试（窗口分钟级，重试是抽奖但远好于裸透传）；
+  //  - 超时（40s 级冷启动卡死）：受预算控制最多容得下一次重试；
+  //  - 预算耗尽仍失败 → 走下方 degraded 降级（返回已检索资料），绝不把 429 裸透传给前端。
+  const genDeadline = Date.now() + 40000
+  for (let i = 0; i < 3 && !v9Resp && Date.now() < genDeadline; i++) {
     try {
-      v9Resp = await callV9(
+      const r = await callV9(
         {
           model: V9_MODEL,
           messages: [...sysMessages, ...otherMessages],
@@ -1617,11 +1622,16 @@ Deno.serve(async (req: Request) => {
           stream: false,
           temperature: body.temperature ?? 0.7
         },
-        40000
+        Math.max(8000, Math.min(40000, genDeadline - Date.now()))
       )
+      if (r.status === 429 || r.status >= 500) {
+        await new Promise((res) => setTimeout(res, 3000))
+        continue
+      }
+      v9Resp = r
     } catch {
-      // 重试前短暂等待，给 agnes-proxy 冷实例一点启动时间（仅首次重试前等，避免叠加超时）
-      if (i === 0) await new Promise((r) => setTimeout(r, 800))
+      // 重试前短暂等待，给 agnes-proxy 冷实例一点启动时间
+      await new Promise((r) => setTimeout(r, 800))
     }
   }
 
