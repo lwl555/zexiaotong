@@ -30,6 +30,11 @@ jobs:
           VITE_AGNES_BASE: https://wcnssyiqitugqfmcbdhe.functions.supabase.co/agnes-search
           VITE_SUPABASE_URL: https://wcnssyiqitugqfmcbdhe.supabase.co
           VITE_SUPABASE_ANON: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndjbnNzeWlxaXR1Z3FmbWNiZGhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0MDEyNzUsImV4cCI6MjA5ODk3NzI3NX0.9EfbEr7BQhZtbOwHJ3IrkOy16kcaxlmzuJuV0A2Z8Eg
+          # 备用 AI 通道（Agnes 限流时自动接管）：智谱 GLM-4-Flash（免费额度宽松）。
+          # 注意：与上面的 anon key 一样，该值会进入前端 bundle（公开可读），仅供本平台使用。
+          VITE_AI_BACKUP_BASE: https://open.bigmodel.cn/api/paas/v4
+          VITE_AI_BACKUP_KEY: 8c369855bb97469093e33438f5b3059b.PGzrjYohtHM1C4cG
+          VITE_AI_BACKUP_MODEL: glm-4-flash
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
