@@ -28,13 +28,11 @@ jobs:
         env:
           # 这些值本就要进入前端 bundle（公开，非机密），故直接内联，避免依赖仓库 Variables/Secrets 配置。
           VITE_AGNES_BASE: https://wcnssyiqitugqfmcbdhe.functions.supabase.co/agnes-search
+          # 备用 AI 通道已改为「服务端代理」：由 Edge Function `agnes-proxy` 在主上游(Agnes)限流时
+          # 自动切换到备用上游。备用平台 key 只存服务端 secret（BACKUP_KEY），
+          # 前端 bundle 不含任何备用 key（避免公开暴露）。
           VITE_SUPABASE_URL: https://wcnssyiqitugqfmcbdhe.supabase.co
           VITE_SUPABASE_ANON: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndjbnNzeWlxaXR1Z3FmbWNiZGhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0MDEyNzUsImV4cCI6MjA5ODk3NzI3NX0.9EfbEr7BQhZtbOwHJ3IrkOy16kcaxlmzuJuV0A2Z8Eg
-          # 备用 AI 通道（Agnes 限流时自动接管）：智谱 GLM-4-Flash（免费额度宽松）。
-          # 注意：与上面的 anon key 一样，该值会进入前端 bundle（公开可读），仅供本平台使用。
-          VITE_AI_BACKUP_BASE: https://open.bigmodel.cn/api/paas/v4
-          VITE_AI_BACKUP_KEY: 8c369855bb97469093e33438f5b3059b.PGzrjYohtHM1C4cG
-          VITE_AI_BACKUP_MODEL: glm-4-flash
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

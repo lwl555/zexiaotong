@@ -20,6 +20,17 @@ const UPSTREAM_BASE = Deno.env.get('UPSTREAM_BASE') || 'https://api.agnes-ai.cn/
 const UPSTREAM_KEY = Deno.env.get('AGNES_KEY') || Deno.env.get('AGNES_API_KEY') || ''
 const SERPER_KEY = Deno.env.get('SERPER_API_KEY') || ''
 
+// ─── 备用上游（主上游 Agnes 限流/故障时自动接管）───
+// 默认智谱 GLM-4-Flash：免费额度宽松、OpenAI 兼容、CORS 友好。
+// key 只存服务端 secret（BACKUP_KEY），前端永不接触。
+// 配置（Supabase 后台 Functions → agnes-proxy → Secrets）：
+//   BACKUP_KEY    必填，备用平台 API key（配置后才启用备用逻辑；未配置则整条备用链跳过）
+//   BACKUP_BASE   可选，默认 https://open.bigmodel.cn/api/paas/v4
+//   BACKUP_MODEL  可选，默认 glm-4-flash
+const BACKUP_BASE = (Deno.env.get('BACKUP_BASE') || 'https://open.bigmodel.cn/api/paas/v4').replace(/\/+$/, '')
+const BACKUP_KEY = Deno.env.get('BACKUP_KEY') || ''
+const BACKUP_MODEL = Deno.env.get('BACKUP_MODEL') || 'glm-4-flash'
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -192,17 +203,50 @@ Deno.serve(async (req: Request) => {
   if (!UPSTREAM_KEY) return json({ error: 'UPSTREAM_KEY (DEEPSEEK_KEY) 未配置' }, 500)
 
   const useStream = !!body.stream
+  const chatMessages = [...sysMessages, ...otherMessages]
 
-  const upstream = await fetch(`${UPSTREAM_BASE}/chat/completions`, {
+  let upstream = await fetch(`${UPSTREAM_BASE}/chat/completions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${UPSTREAM_KEY}` },
     body: JSON.stringify({
       model,
-      messages: [...sysMessages, ...otherMessages],
+      messages: chatMessages,
       max_tokens: maxTokens,
       stream: useStream
     })
   })
+
+  // ─── 备用上游自动接管 ───
+  // 主上游（Agnes 免费档）速率配额极小，实测 30s 窗口仅放 1~2 次，对外表现为 429。
+  // 命中限流/5xx 时自动切到备用上游（默认智谱 GLM-4-Flash，免费额度宽松）。
+  // 关键：备用 key 只存服务端 secret（Deno.env BACKUP_KEY），前端永不接触、不暴露。
+  if (!upstream.ok && BACKUP_KEY && (upstream.status === 429 || upstream.status >= 500)) {
+    const failStatus = upstream.status
+    const failText = await upstream.text().catch(() => '')
+    const restoreFail = () =>
+      new Response(failText || '{"error":"upstream failed"}', {
+        status: failStatus,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    try {
+      const backupRes = await fetch(`${BACKUP_BASE}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${BACKUP_KEY}` },
+        body: JSON.stringify({
+          model: BACKUP_MODEL,
+          messages: chatMessages,
+          max_tokens: Math.min(maxTokens, 4096),
+          stream: useStream,
+          temperature: body.temperature ?? 0.7
+        })
+      })
+      // 备用返回 OpenAI 兼容结构（含流式 SSE），与主上游同形，下游 agnes-search / 前端无需改动
+      upstream = backupRes.ok ? backupRes : restoreFail()
+    } catch {
+      // 备用也失败 → 还原主上游的失败响应（下游仍能读到原始错误信息）
+      upstream = restoreFail()
+    }
+  }
 
   // 流式：直接把上游 SSE 透传给调用方（agnes-search 再转发给前端），实现「思考过程实时流出」
   if (useStream) {
