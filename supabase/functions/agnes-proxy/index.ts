@@ -62,6 +62,18 @@ function stripHtml(s: string): string {
   return s.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
 }
 
+// 带超时的 fetch：Agnes 免费档偶发「请求被路由到卡死实例」——连接不断但长时间无响应，
+// 若不设超时，请求会一直挂到上层超时（用户干等 40s+ 才看到降级）。超时后即视为失败，交给备用上游接管。
+async function fetchWithTimeout(url: string, opts: RequestInit, ms: number): Promise<Response> {
+  const ctrl = new AbortController()
+  const t = setTimeout(() => ctrl.abort(), ms)
+  try {
+    return await fetch(url, { ...opts, signal: ctrl.signal })
+  } finally {
+    clearTimeout(t)
+  }
+}
+
 // 服务端联网搜索：有 Serper key 走 Serper（可靠），否则 DuckDuckGo HTML 兜底（零成本，可能不稳）。
 async function search(query: string): Promise<string> {
   try {
@@ -205,16 +217,32 @@ Deno.serve(async (req: Request) => {
   const useStream = !!body.stream
   const chatMessages = [...sysMessages, ...otherMessages]
 
-  let upstream = await fetch(`${UPSTREAM_BASE}/chat/completions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${UPSTREAM_KEY}` },
-    body: JSON.stringify({
-      model,
-      messages: chatMessages,
-      max_tokens: maxTokens,
-      stream: useStream
+  let upstream: Response
+  // 主上游超时 8s：**必须足够短**。下游 agnes-search 的整条生成预算只有 40s
+  // （检索约 8s 后剩 ~32s），预算要同时容纳「等主上游 + 备用生成含 20+ 条检索资料的长 prompt」。
+  // 实测 15s 会挤压备用生成 → 频繁 degraded（只有资料没答案）。压到 8s 后备用有 ~24s 完成生成。
+  // 代价：Agnes 偶发 >8s 的慢响应会切到备用模型（答案依然完整，仅模型不同）。
+  try {
+    upstream = await fetchWithTimeout(
+      `${UPSTREAM_BASE}/chat/completions`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${UPSTREAM_KEY}` },
+        body: JSON.stringify({
+          model,
+          messages: chatMessages,
+          max_tokens: maxTokens,
+          stream: useStream
+        })
+      },
+      8000
+    )
+  } catch {
+    upstream = new Response('{"error":"upstream timeout"}', {
+      status: 504,
+      headers: { 'Content-Type': 'application/json' }
     })
-  })
+  }
 
   // ─── 备用上游自动接管 ───
   // 主上游（Agnes 免费档）速率配额极小，实测 30s 窗口仅放 1~2 次，对外表现为 429。
@@ -229,13 +257,26 @@ Deno.serve(async (req: Request) => {
         headers: { 'Content-Type': 'application/json' }
       })
     try {
+      // 备用上游的 prompt 精简：agnes-search 注入的检索资料可长达 1.5 万字符（20~30 条），
+      // 免费模型处理长 prompt 明显更慢，会把下游 agnes-search 的生成预算耗尽 → 用户只能看到降级资料。
+      // 这里把注入的 <search> system 段截断，换取更快的备用生成（预算内完成率显著提升）。
+      const backupMessages = chatMessages.map((m: any) => {
+        if (m?.role === 'system' && typeof m.content === 'string' && m.content.includes('<search>')) {
+          const c = m.content
+          return {
+            ...m,
+            content: c.length > 9000 ? c.slice(0, 9000) + '\n（资料过长已截断，请基于以上内容作答）' : c
+          }
+        }
+        return m
+      })
       const backupRes = await fetch(`${BACKUP_BASE}/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${BACKUP_KEY}` },
         body: JSON.stringify({
           model: BACKUP_MODEL,
-          messages: chatMessages,
-          max_tokens: Math.min(maxTokens, 4096),
+          messages: backupMessages,
+          max_tokens: Math.min(maxTokens, 3000),
           stream: useStream,
           temperature: body.temperature ?? 0.7
         })
