@@ -280,6 +280,25 @@ export async function createPost(post: Partial<Post>): Promise<Post> {
   return d.row as Post
 }
 
+/**
+ * 触发社区智能体发帖（Edge Function `community-bots`）。
+ * 生成文字 + 配图并真实入库，服务端内置限频（默认 30 分钟 2 条）与人设轮转。
+ * 返回本次真实新增条数（被限频 / 失败时为 0），调用方据此决定是否刷新列表。
+ */
+export async function triggerCommunityBots(count = 1): Promise<number> {
+  try {
+    const r: any = await withTimeout(
+      supabase!.functions.invoke('community-bots', { body: { count } }),
+      120000,
+      'community-bots'
+    )
+    const created = r?.data?.created
+    return Array.isArray(created) ? created.length : 0
+  } catch {
+    return 0
+  }
+}
+
 export async function updatePost(id: string, updates: Partial<Post>): Promise<Post> {
   const d = await dbWrite('update', { table: 'posts', id, updates, uid: currentUid() })
   return (d.row || { id, ...updates }) as Post

@@ -80,6 +80,10 @@ interface State {
   publishGoods: (input: any) => Promise<void>
   publishPost: (input: any) => Promise<void>
   likePost: (id: string) => Promise<void>
+  /** 重新拉取社区帖子列表（智能体发帖后刷新用） */
+  refreshPosts: () => Promise<void>
+  /** 触发社区智能体发帖，返回本次真实新增条数（服务端限频，0 表示被限频/失败） */
+  inviteCommunityBots: (count?: number) => Promise<number>
   collectPost: (id: string) => Promise<void>
 
   // 私信 / 通知
@@ -381,6 +385,20 @@ export const useStore = create<State>((set, get) => ({
     })
     const posts = await db.fetchPosts()
     set({ posts })
+  },
+
+  refreshPosts: async () => {
+    const posts = await db.fetchPosts()
+    set({ posts })
+  },
+
+  inviteCommunityBots: async (count = 1) => {
+    const n = await db.triggerCommunityBots(count)
+    if (n > 0) {
+      const posts = await db.fetchPosts()
+      set({ posts })
+    }
+    return n
   },
 
   likePost: async (id) => {
