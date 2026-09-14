@@ -40,7 +40,7 @@ function markRateLimited(): void {
 
 async function call<T = any>(
   path: string,
-  opts: { method?: string; body?: any; signal?: AbortSignal }
+  opts: { method?: string; body?: any; signal?: AbortSignal; skipCooldown?: boolean }
 ): Promise<T> {
   const base = resolveBase()
   const url = `${base}${path}`
@@ -67,8 +67,9 @@ async function call<T = any>(
     const MAX_ATTEMPTS = 6
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       try {
-        // 若刚撞过限流、仍在冷却窗口内（典型：用户立刻点「重新生成」），先等满窗口再发，避免必撞 429
-        await waitRateLimitWindow()
+        // 若刚撞过限流、仍在冷却窗口内（典型：用户立刻点「重新生成」），先等满窗口再发，避免必撞 429。
+        // skipCooldown：备用通道取检索资料（search_only，不消耗生成配额）时跳过等待，避免白等 26s。
+        if (!opts.skipCooldown) await waitRateLimitWindow()
         const res = await fetch(url, {
           method: opts.method || 'POST',
           headers,
@@ -84,7 +85,8 @@ async function call<T = any>(
             try { e.payload = JSON.parse(t) } catch {}
             lastErr = e
             markRateLimited()
-            if (attempt < 1) {
+            // 已配置备用通道时：不原地等窗口（上层会立即切备用出答案，远好于干等 26s）
+            if (!hasBackupChannel() && attempt < 1) {
               await waitRateLimitWindow()
               continue
             }
@@ -218,6 +220,110 @@ export interface VideoPollResult {
   error?: string
 }
 
+// ===== 备用 AI 通道（Agnes 限流时自动兜底）=====
+// 背景：Agnes 免费档速率配额极小（实测 30s 窗口仅放 1~2 次生成），主通道撞限流时用户只能干等或看降级提示。
+// 备用通道 = 任意 OpenAI 兼容平台（推荐免费额度宽松的国产模型，如智谱 GLM-4-Flash，注册免费、不绑卡）。
+// 配置来源（二选一；两者都未配置时整条备用链完全跳过，行为与之前完全一致）：
+//   ① 运行时（免重新部署）：localStorage['zex:ai_backup'] = {"base":"https://open.bigmodel.cn/api/paas/v4","key":"xxx","model":"glm-4-flash"}
+//   ② 构建注入：VITE_AI_BACKUP_BASE / VITE_AI_BACKUP_KEY / VITE_AI_BACKUP_MODEL
+interface BackupCfg { base: string; key: string; model: string }
+function resolveBackup(): BackupCfg | null {
+  const norm = (b: string) => b.trim().replace(/\/+$/, '')
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('zex:ai_backup') : null
+    if (raw) {
+      const o = JSON.parse(raw)
+      if (o?.base && o?.key) {
+        return { base: norm(String(o.base)), key: String(o.key), model: String(o.model || 'glm-4-flash') }
+      }
+    }
+  } catch {}
+  const env = (import.meta as any).env || {}
+  if (env.VITE_AI_BACKUP_BASE && env.VITE_AI_BACKUP_KEY) {
+    return {
+      base: norm(String(env.VITE_AI_BACKUP_BASE)),
+      key: String(env.VITE_AI_BACKUP_KEY),
+      model: String(env.VITE_AI_BACKUP_MODEL || 'glm-4-flash')
+    }
+  }
+  return null
+}
+export function hasBackupChannel(): boolean { return !!resolveBackup() }
+
+/** 备用通道纯生成（OpenAI 兼容，非流式） */
+async function backupChat(messages: ChatMsg[], maxTokens: number): Promise<string> {
+  const cfg = resolveBackup()
+  if (!cfg) throw new Error('no backup channel')
+  const res = await fetch(`${cfg.base}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.key}` },
+    body: JSON.stringify({
+      model: cfg.model,
+      messages,
+      max_tokens: Math.min(maxTokens, 8192),
+      stream: false,
+      temperature: 0.7
+    })
+  })
+  if (!res.ok) {
+    const t = await res.text().catch(() => '')
+    throw new Error(`backup HTTP ${res.status} ${t.slice(0, 150)}`)
+  }
+  const data = await res.json().catch(() => ({}))
+  return (data as any)?.choices?.[0]?.message?.content ?? ''
+}
+
+/**
+ * 主通道不可用时走备用通道出答案。
+ * 关键：联网检索是 agnes-search 的「免 key 自爬」层、**不消耗生成配额**——
+ * 所以这里先用 search_only 模式把资料取回来（零配额），再把「资料 + 问题」交给备用模型生成，
+ * 备用通道同样保持「联网作答」体验，而不是退化成纯记忆回答。
+ */
+async function tryBackupGeneration(
+  messages: ChatMsg[],
+  opts: ChatOptions,
+  needSearch: boolean
+): Promise<ChatResult | null> {
+  if (!hasBackupChannel()) return null
+  let results: string[] = []
+  if (needSearch) {
+    try {
+      const sr: any = await call('/v1/chat/completions', {
+        body: {
+          model: opts.model || DEFAULT_MODEL,
+          messages,
+          max_tokens: 16,
+          stream: false,
+          web_search: false,
+          auto_search: opts.autoSearch ?? false,
+          search_only: true
+        },
+        skipCooldown: true
+      })
+      results = (sr?.results || []) as string[]
+    } catch { /* 检索失败也继续：备用模型按自身知识作答 */ }
+  }
+  const msgs: ChatMsg[] = results.length
+    ? [
+        {
+          role: 'system',
+          content:
+            `以下是针对用户问题联网检索到的公开资料（可能非最新，请批判性采用，优先采信可交叉验证的事实）：\n` +
+            `<search>\n${results.slice(0, 30).join('\n')}\n</search>\n` +
+            `要求：优先依据上述资料作答；资料未覆盖处严禁编造具体事实（尤其学校类型 / 分数线 / 就业率 / 学费等），不确定就直说暂无法确认。`
+        },
+        ...messages
+      ]
+    : messages
+  try {
+    const content = await backupChat(msgs, opts.maxTokens ?? 3000)
+    if (!content?.trim()) return null
+    return { content, degraded: false }
+  } catch {
+    return null
+  }
+}
+
 /** OpenAI 兼容 chat/completions，返回正文与检索元数据。 */
 export async function agnesChat(
   messages: ChatMsg[],
@@ -240,10 +346,12 @@ export async function agnesChat(
       signal: opts.signal
     })
   } catch (e: any) {
-    // 生成撞上游额度限流(429)时的降级：429 响应体里通常带已检索到的资料（search.count/links），
-    // 转成 degraded 结果让页面展示「已检索资料 + 重新生成」，而非裸报错。
     const payload = e?.payload
     const s = payload?.search
+    // ① 主通道限流/失败 → 先试备用通道（若已配置）：以 search_only 零配额取回资料，交给备用模型生成完整回答
+    const backupRes = await tryBackupGeneration(messages, opts, !!(opts.autoSearch || opts.webSearch))
+    if (backupRes) return backupRes
+    // ② 无备用通道：降级为「展示已检索资料 + 提示重新生成」，而非裸报错
     if (s && ((s.count || 0) > 0 || (s.links || []).length)) {
       const links: LinkInfo[] = s.links || []
       const list = links.length
@@ -264,6 +372,11 @@ export async function agnesChat(
   const results = (data as any)?.results as string[] | undefined
   const reasoning = (data as any)?.reasoning as string | undefined
   const degraded = !!(data as any)?.degraded
+  // 服务端降级（生成被上游限流）→ 有备用通道时用它把完整答案补出来
+  if (degraded && hasBackupChannel()) {
+    const backupRes = await tryBackupGeneration(messages, opts, !!(opts.autoSearch || opts.webSearch))
+    if (backupRes) return { ...backupRes, search }
+  }
   return { content, search, results, reasoning, degraded }
 }
 
@@ -308,14 +421,16 @@ export async function agnesChatStream(
   let lastErr: any
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     try {
-      await waitRateLimitWindow()
+      // 有备用通道时不等待冷却：直接发；若仍 429 就立刻切备用出答案
+      if (!hasBackupChannel()) await waitRateLimitWindow()
       const r = await fetch(url, { method: 'POST', headers, body, signal: opts.signal })
       if (r.ok) { res = r; break }
-      // 429 限流：等满一个窗口重试一次（实测撞限流后 ~30s 恢复）
+      // 429 限流：等满一个窗口重试一次（实测撞限流后 ~30s 恢复）；
+      // 已配置备用通道时不再干等，直接抛出交给备用通道出答案
       if (r.status === 429) {
         markRateLimited()
         lastErr = new Error('HTTP 429')
-        if (attempt < 1) { await waitRateLimitWindow(); continue }
+        if (!hasBackupChannel() && attempt < 1) { await waitRateLimitWindow(); continue }
         throw lastErr
       }
       if (r.status >= 500 && attempt < MAX_ATTEMPTS - 1) {
@@ -337,7 +452,12 @@ export async function agnesChatStream(
       throw e
     }
   }
-  if (!res) throw lastErr || new Error('retry exhausted')
+  if (!res) {
+    // 主通道不可用（限流/网关异常）→ 试备用通道出答案（非流式，一次性回调给页面）
+    const backupRes = await tryBackupGeneration(messages, opts, !!(opts.autoSearch || opts.webSearch))
+    if (backupRes) { opts.onDone?.(backupRes); return }
+    throw lastErr || new Error('retry exhausted')
+  }
 
   // 后端未升级：返回的是 JSON 而非 SSE，降级处理
   const ct = res.headers.get('content-type') || ''
@@ -396,6 +516,11 @@ export async function agnesChatStream(
         }
       } catch {}
     }
+  }
+  // 服务端已降级（生成被上游限流，内容里只有检索资料提示）→ 有备用通道时用它把完整答案补出来，用户几乎无感
+  if (degraded && hasBackupChannel()) {
+    const backupRes = await tryBackupGeneration(messages, opts, !!(opts.autoSearch || opts.webSearch))
+    if (backupRes) { opts.onDone?.({ ...backupRes, search }); return }
   }
   opts.onDone?.({ content, reasoning, search, degraded })
 }
