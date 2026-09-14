@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Heart, Star, MessageCircle, Flag, ChevronLeft } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { useMe } from '../../store/useMe'
+import { useIsMobile } from '../../lib/useIsMobile'
 import { fetchComments, createComment } from '../../lib/db'
 import type { Comment } from '../../lib/types'
 import {
@@ -24,6 +25,11 @@ export default function PostDetail() {
   const { id } = useParams()
   const nav = useNavigate()
   const me = useMe()
+  // 本页在 ResponsiveShell 下手机/PC 共用。手机壳底部有 48px 固定 Tab 栏，
+  // 评论输入栏必须让开它，否则同层 z-index 下会被 Tab 栏盖住（此前就是这个 bug）。
+  const isMobile = useIsMobile()
+  const TAB_BAR_H = 48
+  const BAR_H = 64
   const post = useStore(s => s.posts.find(p => p.id === id))
   const likePost = useStore(s => s.likePost)
   const collectPost = useStore(s => s.collectPost)
@@ -81,7 +87,7 @@ export default function PostDetail() {
   }
 
   return (
-    <div style={{ padding: '8px 2px 96px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
+    <div style={{ padding: `8px 2px ${isMobile ? TAB_BAR_H + BAR_H + 24 : BAR_H + 24}px`, maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
       <button onClick={() => nav(-1)} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT, fontSize: 13, color: MUTED, marginBottom: 12, padding: 0 }}>
         <ChevronLeft size={16} /> 返回
       </button>
@@ -101,6 +107,7 @@ export default function PostDetail() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, paddingBottom: 12, borderBottom: `1px solid ${HAIR}` }}>
           <img src={post.author_avatar} alt="" style={{ width: 30, height: 30, borderRadius: '50%', border: `1.5px solid ${INK}` }} />
           <span style={{ fontFamily: FONT, fontSize: 14, fontWeight: 700, color: INK }}>{post.author_name}</span>
+          {post.is_bot && <Tag tone="line">AI 生成</Tag>}
           <span style={{ fontFamily: MONO, fontSize: 11, color: MUTED, letterSpacing: 1, marginLeft: 'auto' }}>
             {String(post.likes + post.collects).padStart(3, '0')} 互动
           </span>
@@ -146,8 +153,9 @@ export default function PostDetail() {
         ))}
       </div>
 
-      {/* 固定评论输入栏：白底 + 粗黑边 */}
-      <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 1200, height: 64, background: '#ffffff', borderTop: `1px solid #e8e8e8`, display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', zIndex: 30 }}>
+      {/* 固定评论输入栏：白底 + 1px 灰线。手机端抬到底部 Tab 栏（48px）之上，
+          否则 z-index 相同、DOM 在后的 Tab 栏会把它整个盖住。 */}
+      <div style={{ position: 'fixed', bottom: isMobile ? TAB_BAR_H : 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: isMobile ? 480 : 1200, height: BAR_H, background: '#ffffff', borderTop: `1px solid #e8e8e8`, display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', zIndex: 30 }}>
         <input
           value={comment}
           onChange={e => setComment(e.target.value)}

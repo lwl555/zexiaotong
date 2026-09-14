@@ -94,6 +94,8 @@ export interface Post {
   collected: boolean
   status: PostStatus
   created_at: string
+  /** 社区智能体自动生成的帖子（前端据此打「AI 生成」标注，不伪装成真人） */
+  is_bot?: boolean
 }
 
 export interface Comment {

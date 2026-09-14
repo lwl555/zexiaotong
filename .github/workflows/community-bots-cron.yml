@@ -1,11 +1,12 @@
 name: Community Bots (定时发文)
 
 # 让社区在无人访问时也有新内容——像真人在活跃。
-# 定时调用 Edge Function `community-bots` 生成「文字 + 配图」帖子（服务端内含限频与人设轮转）。
-# 北京时间的 08:00 / 12:00 / 18:00 / 22:00（GitHub Actions 的 cron 用 UTC）。
+# 定时调用 Edge Function `community-bots` 生成「文字 +（按需）配图」帖子（服务端内含限频与人设轮转）。
+# 每天 8 批 × 每批 3 条 ≈ 24 条/天，覆盖白天到晚上的人活跃时段。
+# 下面的 cron 用 UTC，对应北京时间 07/09/11/13/15/18/20/22 点。
 on:
   schedule:
-    - cron: '0 0,4,10,14 * * *'
+    - cron: '0 23,1,3,5,7,10,12,14 * * *'
   workflow_dispatch:
 
 jobs:
@@ -13,13 +14,13 @@ jobs:
     name: Trigger community-bots
     runs-on: ubuntu-latest
     steps:
-      - name: 调用 community-bots 生成 2 条社区内容
+      - name: 调用 community-bots 生成 3 条社区内容
         # 这里的 anon key 与前端的公开 key 同款（本身即公开），仅用于通过函数网关鉴权
         run: |
           curl -sS -X POST "https://wcnssyiqitugqfmcbdhe.functions.supabase.co/community-bots" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndjbnNzeWlxaXR1Z3FmbWNiZGhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0MDEyNzUsImV4cCI6MjA5ODk3NzI3NX0.9EfbEr7BQhZtbOwHJ3IrkOy16kcaxlmzuJuV0A2Z8Eg' }}" \
             -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndjbnNzeWlxaXR1Z3FmbWNiZGhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0MDEyNzUsImV4cCI6MjA5ODk3NzI3NX0.9EfbEr7BQhZtbOwHJ3IrkOy16kcaxlmzuJuV0A2Z8Eg" \
-            -d '{"count":2}' \
+            -d '{"count":3}' \
             --max-time 150 \
             -w "\nHTTP %{http_code}\n"

@@ -3,7 +3,7 @@
 //
 // 调用：POST /functions/v1/community-bots      body: { count?: number }
 //   需带 Supabase anon key（Authorization: Bearer <anon>）。
-// 安全：内置限频——默认 30 分钟内最多产出 2 条，防止被刷爆上游配额。
+// 安全：内置限频——默认 30 分钟内最多产出 4 条，防止被刷爆上游配额。
 //
 // Secrets：
 //   BACKUP_KEY / IMAGE_API_KEY   图片生成平台 key（默认智谱 cogview-3-flash，免费）
@@ -21,8 +21,9 @@ const IMG_MODEL = Deno.env.get('IMAGE_MODEL') || 'cogview-3-flash'
 const BUCKET = 'community'
 
 // 限频：窗口内最多产出条数（防被恶意刷爆上游配额）
+// 单条要跑一次文字生成（可能再跑一次配图），4 条约 1~2 分钟，仍在函数时限内。
 const COOLDOWN_MIN = 30
-const MAX_PER_COOLDOWN = 2
+const MAX_PER_COOLDOWN = 4
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -98,18 +99,20 @@ const BOTS: Bot[] = [
 const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)]
 
 // 调 agnes-proxy 生成帖子草稿（agnes-proxy 内部自带主/备上游切换）
-async function draftPost(botName: string, bot: Bot, profile: any): Promise<{ title: string; content: string; imagePrompt: string } | null> {
+async function draftPost(botName: string, bot: Bot, profile: any): Promise<{ title: string; content: string; needImage: boolean; imagePrompt: string } | null> {
   const topic = pick(bot.topics)
   const sys =
-    `你是「${botName}」，身份标签：${bot.tag}。文风与性格：${bot.style}。擅长话题：${bot.topics.join('、')}。\n` +
-    `现在你要在一个「择校/求职」主题的校园社区里发一条帖子（就是真人发帖，不是写文章）：\n` +
-    `- 语气自然口语化，可以带一点个人经历、具体数字、吐槽或提醒，别端着、别说教、别用「首先其次最后」这种模板；\n` +
-    `- 不要出现"作为AI""我是模型"之类的话；不要写标题党；不要输出 markdown 代码块；\n` +
-    `- 正文 150~380 字，可分 2~4 个自然段，段落之间用 \\n 分隔；\n` +
-    `- 配图：给一句中文画面描述，用于生成真实摄影风格的配图（校园/教室/图书馆/宿舍/城市街景/办公场景等，不要文字、不要logo）。\n` +
+    `你是「${botName}」，${bot.tag}（这只是你发帖的视角，正文里**不要自报身份**、不要写"我是XX"）。\n` +
+    `文风与性格：${bot.style}。擅长话题：${bot.topics.join('、')}。\n` +
+    `现在你要在一个「择校 / 求职 / 搞钱」主题的社区里发一条帖子（就是真人发帖，不是写文章）：\n` +
+    `- 语气自然口语化，可以带个人经历、具体数字、吐槽或提醒；别端着、别说教、别用「首先其次最后」这种模板；\n` +
+    `- **内容要实在、有信息量**：正文 300~600 字，分 3~5 段（段落之间用 \\n 分隔）；能给具体做法 / 数字 / 时间线 / 踩坑细节就给，不要只讲大道理；\n` +
+    `- 不要出现"作为AI""我是模型"之类的话；不要标题党；不要输出 markdown 代码块；\n` +
+    `- 最后判断这条帖子**是否需要配图**：讲经验 / 观点 / 清单 / 建议这类纯文字内容就不需要（needImage=false）；\n` +
+    `  讲具体场景（校园、教室、图书馆、宿舍、食堂、城市街景、办公室、实验室等）才需要（needImage=true 并给一句中文画面描述，真实摄影风格、不要文字、不要 logo）。\n` +
     `主题方向：${topic}\n\n` +
     `只输出一个严格 JSON（不要任何多余文字、不要代码块围栏）：\n` +
-    `{"title":"不超过 20 字的标题","content":"正文","imagePrompt":"配图画面描述"}`
+    `{"title":"不超过 22 字的标题","content":"正文","needImage":true,"imagePrompt":"配图画面描述，不需要配图时留空字符串"}`
   try {
     const r = await fetch(CHAT_URL, {
       method: 'POST',
@@ -117,7 +120,7 @@ async function draftPost(botName: string, bot: Bot, profile: any): Promise<{ tit
       body: JSON.stringify({
         model: 'agnes-2.0-flash',
         messages: [{ role: 'system', content: sys }, { role: 'user', content: `请以「${botName}」的身份发一条关于「${topic}」的帖子。` }],
-        max_tokens: 1200,
+        max_tokens: 1800,
         stream: false
       })
     })
@@ -131,11 +134,13 @@ async function draftPost(botName: string, bot: Bot, profile: any): Promise<{ tit
     const e = text.lastIndexOf('}')
     if (s >= 0 && e > s) text = text.slice(s, e + 1)
     const obj = JSON.parse(text)
-    const title = String(obj.title || '').trim().slice(0, 40)
+    const title = String(obj.title || '').trim().slice(0, 44)
     const content = String(obj.content || '').trim()
     const imagePrompt = String(obj.imagePrompt || '').trim()
+    // 由模型判断是否需要配图（纯文字经验帖不配图，更真实也更省额度）
+    const needImage = !!obj.needImage && imagePrompt.length > 4
     if (!title || content.length < 40) return null
-    return { title, content, imagePrompt: imagePrompt || '校园场景，真实摄影风格' }
+    return { title, content, needImage, imagePrompt }
   } catch {
     return null
   }
@@ -189,7 +194,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = await req.json().catch(() => ({}))
-    const want = Math.max(1, Math.min(Number(body?.count) || 1, 2))
+    const want = Math.max(1, Math.min(Number(body?.count) || 1, MAX_PER_COOLDOWN))
 
     // 取最近帖子，用于：① 限频统计 ② 避开刚发过的人设（让 20 个角色轮着来）
     const recent = await pgGet(`posts?select=id,author_id,created_at&order=created_at.desc&limit=60`)
@@ -225,7 +230,8 @@ Deno.serve(async (req: Request) => {
       if (!draft) continue
 
       const postId = crypto.randomUUID()
-      const img = await makeImage(draft.imagePrompt, postId)
+      // 由模型判断是否需要配图：纯文字经验帖不配图（更像真人，也省上游额度）
+      const img = draft.needImage ? await makeImage(draft.imagePrompt, postId) : { url: null as string | null }
 
       const row: Record<string, any> = {
         id: postId,
@@ -238,11 +244,12 @@ Deno.serve(async (req: Request) => {
         likes: Math.floor(Math.random() * 26) + 3,
         collects: Math.floor(Math.random() * 10) + 1,
         comments: 0,
-        status: 'on'
+        status: 'on',
+        is_bot: true
       }
       const ins = await pgInsert('posts', row)
       if (ins.ok) {
-        created.push({ id: postId, author: botName, title: draft.title, image: !!img.url, imgErr: img.err })
+        created.push({ id: postId, author: botName, title: draft.title, image: !!img.url, needImage: draft.needImage, imgErr: img.err })
       }
       // 同一批次不重复用同一人设
       pool = pool.filter((b) => b.id !== bot.id)

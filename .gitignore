@@ -12,3 +12,10 @@ supabase/.temp/
 supabase/.temp/
 shot-mobile.mjs
 shot-*.png
+
+# 临时文件（含凭证/探针脚本，绝不入库）
+_*.py
+_*.json
+_*.txt
+posts.json
+live2.js

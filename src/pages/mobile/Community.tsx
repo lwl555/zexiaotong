@@ -7,6 +7,7 @@ import {
   IndexGrid,
   HardCard,
   BtnPrimary,
+  Tag,
   INK,
   MUTED,
   FAINT,
@@ -169,7 +170,7 @@ export default function Community() {
                   letterSpacing: 2,
                 }}
               >
-                NO COVER
+                文字帖
               </div>
             )}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -205,7 +206,8 @@ export default function Community() {
                 ) : (
                   <span style={{ width: 22, height: 22, borderRadius: '50%', border: `1.5px solid ${INK}`, display: 'inline-block', background: '#efefef' }} />
                 )}
-                {p.author_name}
+                <span style={{ maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.author_name}</span>
+                {p.is_bot && <Tag tone="line">AI 生成</Tag>}
               </div>
               <div style={{ display: 'flex', gap: 12, fontFamily: FONT, fontSize: 12, color: MUTED }}>
                 <button
