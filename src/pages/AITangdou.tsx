@@ -1764,7 +1764,7 @@ export default function AITangdou() {
                   {genDialog === 'generating' ? '正在生成，请稍候…' : ''}
                 </div>
                 <div style={{ fontSize: 11, color: '#bbb', marginTop: 4 }}>
-                  {genDialog === 'generating' ? (genMode === 'image' || genVideoMode === 'image' ? '图生图/视频约 30-60 秒' : '图片约 10-30 秒 · 视频约 2-3 分钟') : ''}
+                  {genDialog === 'generating' ? (genMode === 'image' || genVideoMode === 'image' ? '图生图/视频约 30-60 秒' : '图片约 20~60 秒 · 视频约 2-3 分钟') : ''}
                 </div>
               </div>
             )}

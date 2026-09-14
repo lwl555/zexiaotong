@@ -515,7 +515,7 @@ function AIChatView({ chat, nav, me }: { chat: ChatDef; nav: ReturnType<typeof u
     let cur: ChatMsg[] = [...base, {
       side: 'them',
       text: kind === 'image'
-        ? '收到,正在为你生成图像…(约 10 秒)'
+        ? '收到,正在为你生成图像…(约 20~60 秒)'
         : '收到,开始生成视频…(通常 1-3 分钟,请稍候)',
       genPending: kind,
     }]
@@ -530,7 +530,9 @@ function AIChatView({ chat, nav, me }: { chat: ChatDef; nav: ReturnType<typeof u
     }
     try {
       if (kind === 'image') {
-        const t = setTimeout(() => ac.abort(), 90_000)
+        // 图片走方舟 Seedream 2K：热态 ~20s、冷启动可达 60s+，外层 abort 给到 120s
+        // （与 agnes.ts 内 call() 的超时一致，避免把已经出图/已计费的请求掐掉）
+        const t = setTimeout(() => ac.abort(), 120_000)
         const r = await agnesImageGen({ prompt: userText, signal: ac.signal })
         clearTimeout(t)
         if (r.ok && r.url) patch({ text: '图生成好了,不满意就再说一句,我重画 👇', image: r.url })
