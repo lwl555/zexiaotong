@@ -19,3 +19,4 @@ _*.json
 _*.txt
 posts.json
 live2.js
+_*.mjs
