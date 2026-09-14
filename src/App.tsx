@@ -1,10 +1,11 @@
-import { useEffect, Component, ReactNode, Suspense, lazy } from 'react'
+import { useEffect, Component, ReactNode, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import Layout from './components/Layout'
 import MobileLayout from './components/layout/MobileLayout'
 import AdminLayout from './components/layout/AdminLayout'
 import { useIsMobile } from './lib/useIsMobile'
 import { ROUTE_TITLES } from './lib/nav'
+import { safeLazy, reloadForNewVersion } from './lib/safeLazy'
 
 // 性能优化：路由级 code splitting（v1）。
 // 改造前 App.tsx 静态 import 了 ~37 个页面（含管理后台 10 个、桌面 AI 站 8 个），
@@ -14,52 +15,52 @@ import { ROUTE_TITLES } from './lib/nav'
 //   - 管理后台（Dashboard/Users/TaskAudit 等）只在管理员进入时才下载，省去一大块。
 //   - 桌面 AI 站（Home/AISearch/AITangdou 等）只在桌面或 AI 功能时下载。
 // 首页（WeChatHome）的视觉布局/样式完全不变——仅在 chunk 下载期间显示几十~几百毫秒的占位。
-const Home          = lazy(() => import('./pages/Home').then(m => ({ default: m.default })))
-const AISearch      = lazy(() => import('./pages/AISearch').then(m => ({ default: m.default })))
-const AITangdou     = lazy(() => import('./pages/AITangdou').then(m => ({ default: m.default })))
-const AITutor       = lazy(() => import('./pages/AITutor').then(m => ({ default: m.default })))
-const DocWorkshop   = lazy(() => import('./pages/DocWorkshop').then(m => ({ default: m.default })))
-const Warnings      = lazy(() => import('./pages/Warnings').then(m => ({ default: m.default })))
-const Money         = lazy(() => import('./pages/Money').then(m => ({ default: m.default })))
-const About         = lazy(() => import('./pages/About').then(m => ({ default: m.default })))
+const Home          = safeLazy(() => import('./pages/Home'))
+const AISearch      = safeLazy(() => import('./pages/AISearch'))
+const AITangdou     = safeLazy(() => import('./pages/AITangdou'))
+const AITutor       = safeLazy(() => import('./pages/AITutor'))
+const DocWorkshop   = safeLazy(() => import('./pages/DocWorkshop'))
+const Warnings      = safeLazy(() => import('./pages/Warnings'))
+const Money         = safeLazy(() => import('./pages/Money'))
+const About         = safeLazy(() => import('./pages/About'))
 
 // 手机 H5 模块（同一套 URL，由 ResponsiveShell 按设备决定套哪个壳）
-const WeChatHome    = lazy(() => import('./pages/mobile/WeChatHome').then(m => ({ default: m.default })))
-const Splash        = lazy(() => import('./pages/mobile/Splash').then(m => ({ default: m.default })))
-const Login         = lazy(() => import('./pages/mobile/Login').then(m => ({ default: m.default })))
-const PublishTask   = lazy(() => import('./pages/mobile/PublishTask').then(m => ({ default: m.default })))
-const TaskDetail    = lazy(() => import('./pages/mobile/TaskDetail').then(m => ({ default: m.default })))
-const GoodsList     = lazy(() => import('./pages/mobile/GoodsList').then(m => ({ default: m.default })))
-const GoodsDetail   = lazy(() => import('./pages/mobile/GoodsDetail').then(m => ({ default: m.default })))
-const PublishGoods  = lazy(() => import('./pages/mobile/PublishGoods').then(m => ({ default: m.default })))
-const Community     = lazy(() => import('./pages/mobile/Community').then(m => ({ default: m.default })))
-const PostDetail    = lazy(() => import('./pages/mobile/PostDetail').then(m => ({ default: m.default })))
-const PublishPost   = lazy(() => import('./pages/mobile/PublishPost').then(m => ({ default: m.default })))
-const Messages      = lazy(() => import('./pages/mobile/Messages').then(m => ({ default: m.default })))
-const Notifications = lazy(() => import('./pages/mobile/Notifications').then(m => ({ default: m.default })))
-const MyTasks       = lazy(() => import('./pages/mobile/MyTasks').then(m => ({ default: m.default })))
-const AIHistory     = lazy(() => import('./pages/mobile/AIHistory').then(m => ({ default: m.default })))
-const Wallet        = lazy(() => import('./pages/mobile/Wallet').then(m => ({ default: m.default })))
-const Mine          = lazy(() => import('./pages/mobile/Mine').then(m => ({ default: m.default })))
-const FeatureNotify = lazy(() => import('./pages/mobile/FeatureNotify').then(m => ({ default: m.default })))
-const News          = lazy(() => import('./pages/mobile/News').then(m => ({ default: m.default })))
-const MobileMoney   = lazy(() => import('./pages/mobile/Money').then(m => ({ default: m.default })))
-const ThemePreview  = lazy(() => import('./pages/mobile/ThemePreview').then(m => ({ default: m.default })))
-const Settings      = lazy(() => import('./pages/mobile/Settings').then(m => ({ default: m.default })))
-const Discover      = lazy(() => import('./pages/mobile/Discover').then(m => ({ default: m.default })))
-const Chat          = lazy(() => import('./pages/mobile/Chat').then(m => ({ default: m.default })))
+const WeChatHome    = safeLazy(() => import('./pages/mobile/WeChatHome'))
+const Splash        = safeLazy(() => import('./pages/mobile/Splash'))
+const Login         = safeLazy(() => import('./pages/mobile/Login'))
+const PublishTask   = safeLazy(() => import('./pages/mobile/PublishTask'))
+const TaskDetail    = safeLazy(() => import('./pages/mobile/TaskDetail'))
+const GoodsList     = safeLazy(() => import('./pages/mobile/GoodsList'))
+const GoodsDetail   = safeLazy(() => import('./pages/mobile/GoodsDetail'))
+const PublishGoods  = safeLazy(() => import('./pages/mobile/PublishGoods'))
+const Community     = safeLazy(() => import('./pages/mobile/Community'))
+const PostDetail    = safeLazy(() => import('./pages/mobile/PostDetail'))
+const PublishPost   = safeLazy(() => import('./pages/mobile/PublishPost'))
+const Messages      = safeLazy(() => import('./pages/mobile/Messages'))
+const Notifications = safeLazy(() => import('./pages/mobile/Notifications'))
+const MyTasks       = safeLazy(() => import('./pages/mobile/MyTasks'))
+const AIHistory     = safeLazy(() => import('./pages/mobile/AIHistory'))
+const Wallet        = safeLazy(() => import('./pages/mobile/Wallet'))
+const Mine          = safeLazy(() => import('./pages/mobile/Mine'))
+const FeatureNotify = safeLazy(() => import('./pages/mobile/FeatureNotify'))
+const News          = safeLazy(() => import('./pages/mobile/News'))
+const MobileMoney   = safeLazy(() => import('./pages/mobile/Money'))
+const ThemePreview  = safeLazy(() => import('./pages/mobile/ThemePreview'))
+const Settings      = safeLazy(() => import('./pages/mobile/Settings'))
+const Discover      = safeLazy(() => import('./pages/mobile/Discover'))
+const Chat          = safeLazy(() => import('./pages/mobile/Chat'))
 
 // PC 管理后台（同一平台内的模块，自身响应式）
-const Dashboard     = lazy(() => import('./pages/admin/Dashboard').then(m => ({ default: m.default })))
-const Users         = lazy(() => import('./pages/admin/Users').then(m => ({ default: m.default })))
-const TaskAudit     = lazy(() => import('./pages/admin/TaskAudit').then(m => ({ default: m.default })))
-const GoodsAudit    = lazy(() => import('./pages/admin/GoodsAudit').then(m => ({ default: m.default })))
-const PostAudit     = lazy(() => import('./pages/admin/PostAudit').then(m => ({ default: m.default })))
-const Arbitration   = lazy(() => import('./pages/admin/Arbitration').then(m => ({ default: m.default })))
-const Withdraw      = lazy(() => import('./pages/admin/Withdraw').then(m => ({ default: m.default })))
-const Config        = lazy(() => import('./pages/admin/Config').then(m => ({ default: m.default })))
-const System        = lazy(() => import('./pages/admin/System').then(m => ({ default: m.default })))
-const FeatureChats  = lazy(() => import('./pages/admin/FeatureChats').then(m => ({ default: m.default })))
+const Dashboard     = safeLazy(() => import('./pages/admin/Dashboard'))
+const Users         = safeLazy(() => import('./pages/admin/Users'))
+const TaskAudit     = safeLazy(() => import('./pages/admin/TaskAudit'))
+const GoodsAudit    = safeLazy(() => import('./pages/admin/GoodsAudit'))
+const PostAudit     = safeLazy(() => import('./pages/admin/PostAudit'))
+const Arbitration   = safeLazy(() => import('./pages/admin/Arbitration'))
+const Withdraw      = safeLazy(() => import('./pages/admin/Withdraw'))
+const Config        = safeLazy(() => import('./pages/admin/Config'))
+const System        = safeLazy(() => import('./pages/admin/System'))
+const FeatureChats  = safeLazy(() => import('./pages/admin/FeatureChats'))
 
 // 路由切换时的加载占位（陶土红品牌色；只在 chunk 下载期间出现一帧）
 function RouteFallback() {
@@ -70,13 +71,37 @@ function RouteFallback() {
   )
 }
 
-// 生产级兜底：任一路由子树渲染抛错时，显示错误而不是整页白屏（也方便定位问题）
+// 生产级兜底：任一路由子树渲染抛错时，显示错误而不是整页白屏（也方便定位问题）。
+// 特例：部署新版本后旧 chunk 404（Failed to fetch dynamically imported module）——
+// 这类错误用户自己刷新一下就能好，所以给一个明确的「刷新」按钮而不是一屏报错堆栈。
+const CHUNK_ERR_RE = /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|Loading chunk \d+ failed/i
 class ErrorBoundary extends Component<{ children: ReactNode }, { err: any }> {
   state = { err: null as any }
   static getDerivedStateFromError(err: any) { return { err } }
-  componentDidCatch(err: any) { console.error('[AppError]', err) }
+  componentDidCatch(err: any) {
+    console.error('[AppError]', err)
+    // 旧 chunk 失效：自动刷新一次拿新版本（防循环逻辑在 safeLazy 内）
+    if (CHUNK_ERR_RE.test(String(err?.message || err))) reloadForNewVersion()
+  }
   render() {
     if (this.state.err) {
+      const isChunkErr = CHUNK_ERR_RE.test(String(this.state.err?.message || this.state.err))
+      if (isChunkErr) {
+        return (
+          <div style={{ padding: 24, fontFamily: 'system-ui, sans-serif', color: '#1c1814', textAlign: 'center' }}>
+            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>页面已更新</div>
+            <div style={{ fontSize: 13, color: '#6b6258', marginBottom: 16 }}>
+              检测到新版本，点一下即可继续使用
+            </div>
+            <button
+              onClick={() => window.location.reload()}
+              style={{ padding: '10px 20px', borderRadius: 4, border: 0, background: '#c2410c', color: '#fff', fontSize: 14 }}
+            >
+              刷新页面
+            </button>
+          </div>
+        )
+      }
       return (
         <div style={{ padding: 20, fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#b00' }}>
           渲染错误：{String(this.state.err?.stack || this.state.err)}
