@@ -24,6 +24,20 @@ function resolveAuthHeaders(): Record<string, string> {
   return anon ? { Authorization: `Bearer ${anon}` } : {}
 }
 
+// —— 上游限流(429)冷却机制 ——
+// Agnes 免费档速率配额极小：实测同一窗口内 6s 间隔的第二发必 429，而静默等 ~30s 后探测即恢复 200。
+// 所以撞限流后不立刻失败，而是「等满一个窗口再自动重试」——比让用户看到「限流，请重新生成」体验好得多。
+// 冷却时间戳全模块共享：用户手动点「重新生成」时若仍在冷却期内，也会先等满窗口再发（否则必再撞 429）。
+const RATE_LIMIT_COOLDOWN_MS = 26000
+let __rateLimitedUntil = 0
+async function waitRateLimitWindow(): Promise<void> {
+  const wait = __rateLimitedUntil - Date.now()
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait))
+}
+function markRateLimited(): void {
+  __rateLimitedUntil = Date.now() + RATE_LIMIT_COOLDOWN_MS
+}
+
 async function call<T = any>(
   path: string,
   opts: { method?: string; body?: any; signal?: AbortSignal }
@@ -53,6 +67,8 @@ async function call<T = any>(
     const MAX_ATTEMPTS = 6
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       try {
+        // 若刚撞过限流、仍在冷却窗口内（典型：用户立刻点「重新生成」），先等满窗口再发，避免必撞 429
+        await waitRateLimitWindow()
         const res = await fetch(url, {
           method: opts.method || 'POST',
           headers,
@@ -61,14 +77,15 @@ async function call<T = any>(
         })
         if (!res.ok) {
           const t = await res.text().catch(() => '')
-          // 429（上游免费额度限流）单独处理：最多重试 2 次（限流窗口是分钟级，多等无益），
-          // 且把响应体挂到错误上供上层降级——agnes-search 的 429 body 里通常带已检索到的 search 资料
+          // 429（上游免费额度限流）单独处理：把响应体挂到错误上供上层降级（429 body 里带已检索到的 search 资料），
+          // 并进入冷却重试——等满一个窗口再发一次（实测 30s 后恢复），只给一次机会，仍失败则交上层展示资料。
           if (res.status === 429) {
             const e: any = new Error(`HTTP 429 ${t.slice(0, 200)}`)
             try { e.payload = JSON.parse(t) } catch {}
             lastErr = e
-            if (attempt < 2) {
-              await new Promise((r) => setTimeout(r, 2500))
+            markRateLimited()
+            if (attempt < 1) {
+              await waitRateLimitWindow()
               continue
             }
             throw e
@@ -291,9 +308,17 @@ export async function agnesChatStream(
   let lastErr: any
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     try {
+      await waitRateLimitWindow()
       const r = await fetch(url, { method: 'POST', headers, body, signal: opts.signal })
       if (r.ok) { res = r; break }
-      if ((r.status >= 500 || r.status === 429) && attempt < MAX_ATTEMPTS - 1) {
+      // 429 限流：等满一个窗口重试一次（实测撞限流后 ~30s 恢复）
+      if (r.status === 429) {
+        markRateLimited()
+        lastErr = new Error('HTTP 429')
+        if (attempt < 1) { await waitRateLimitWindow(); continue }
+        throw lastErr
+      }
+      if (r.status >= 500 && attempt < MAX_ATTEMPTS - 1) {
         lastErr = new Error(`HTTP ${r.status}`)
         await new Promise((rr) => setTimeout(rr, 500 * Math.pow(2, attempt) + Math.random() * 300))
         continue
@@ -458,10 +483,12 @@ export async function agnesVideoPoll(
   }
 }
 
-// —— 预热：页面加载时后台暖热 agnes-search Edge Function，避免用户首个真实提问撞冷启动 ——
-// 🔴 额度纪律（2026-09-09）：Agnes 免费档生成额度窗口极紧（实测一分钟一两次就 429），
-// 此前预热「每次加载/聚焦连发 3 次 + auto_search:true」等于自己人把窗口烧光、真实提问必撞 429。
-// 改为：仅页面加载预热 1 次、max_tokens 压到 16、纯生成不带检索；聚焦/切回不再预热。
+// —— 预热（已停用自动调用）——
+// 🔴 额度纪律（2026-09-14 实测定论）：Agnes 免费档生成配额极小——30s 窗口仅放 1~2 次请求
+// （6s 内连发第二发必 429；静默等 ~30s 探测即恢复 200）。预热本身就会吃掉一次配额，
+// 导致用户紧接着的首个真实提问必撞 429（然后要等 26s 冷却 + 重试）。
+// 省下这次配额远比省 ~1.5s 冷启动重要；冷启动慢 / 网关 503 由 call() 的 6 次重试兜底。
+// 函数保留（以备将来上游配额放宽时手动启用），但不再自动触发。
 let __agnesWarmed = false
 export function warmupAgnes(force = false): void {
   if (__agnesWarmed) return
@@ -482,7 +509,5 @@ export function warmupAgnes(force = false): void {
   fetch(`${base}/v1/chat/completions`, { method: 'POST', headers, body }).catch(() => {})
 }
 
-// 页面加载即预热一次（仅一次；聚焦/切回不再预热，省额度窗口）
-if (typeof window !== 'undefined') {
-  warmupAgnes()
-}
+// 自动预热已停用（见上方说明）：不要再打开，否则会与用户提问抢配额。
+// if (typeof window !== 'undefined') warmupAgnes()
