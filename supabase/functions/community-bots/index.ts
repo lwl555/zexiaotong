@@ -6,8 +6,10 @@
 // 安全：内置限频——默认 30 分钟内最多产出 4 条，防止被刷爆上游配额。
 //
 // Secrets：
-//   BACKUP_KEY / IMAGE_API_KEY   图片生成平台 key（默认智谱 cogview-3-flash，免费）
-//   IMAGE_API_BASE / IMAGE_MODEL 可选覆盖图片平台
+//   图片生成两家，主用火山方舟、失败自动回落智谱：
+//     ARK_API_KEY / ARK_IMAGE_MODEL   火山方舟 key + 接入点 ID（ep-xxxx，按张计费）
+//     ARK_IMAGE_BASE                  可选，默认 https://ark.cn-beijing.volces.com/api/v3
+//     BACKUP_KEY（或 IMAGE_API_KEY）  智谱 key，免费兜底（cogview-3-flash）
 //   文字生成复用 agnes-proxy（其内部已含 Agnes → 智谱 的自动切换，本函数无需再管）
 //
 // 部署： supabase functions deploy community-bots --project-ref wcnssyiqitugqfmcbdhe
@@ -15,15 +17,28 @@
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const CHAT_URL = `${SUPABASE_URL}/functions/v1/agnes-proxy/v1/chat/completions`
+
+// 主：火山方舟（豆包 Seedream）
+const ARK_BASE = (Deno.env.get('ARK_IMAGE_BASE') || 'https://ark.cn-beijing.volces.com/api/v3').replace(/\/+$/, '')
+const ARK_KEY = Deno.env.get('ARK_API_KEY') || ''
+const ARK_MODEL = Deno.env.get('ARK_IMAGE_MODEL') || ''
+// 方舟 Seedream 有「最小像素」硬门槛（实测 3686400），低于门槛会被 400 拒绝
+const ARK_MIN_PIXELS = 3686400
+const ARK_SIZE = '2048x2048'
+
+// 备：智谱 cogview-3-flash（免费，画质弱一档，仅在方舟失败时兜底）
 const IMG_KEY = Deno.env.get('IMAGE_API_KEY') || Deno.env.get('BACKUP_KEY') || ''
 const IMG_BASE = (Deno.env.get('IMAGE_API_BASE') || 'https://open.bigmodel.cn/api/paas/v4').replace(/\/+$/, '')
 const IMG_MODEL = Deno.env.get('IMAGE_MODEL') || 'cogview-3-flash'
+
 const BUCKET = 'community'
 
 // 限频：窗口内最多产出条数（防被恶意刷爆上游配额）
-// 单条要跑一次文字生成（可能再跑一次配图），4 条约 1~2 分钟，仍在函数时限内。
 const COOLDOWN_MIN = 30
 const MAX_PER_COOLDOWN = 4
+// 单次调用上限。免费档墙钟约 150s，预算 = 并发文案(~30s) + 方舟配图(超时 75s)
+// + 智谱兜底(超时 25s)，故一批最多 3 条；更大的量靠调度频率解决（cron 每天 8 批）。
+const MAX_PER_CALL = 3
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -146,46 +161,89 @@ async function draftPost(botName: string, bot: Bot, profile: any): Promise<{ tit
   }
 }
 
-// 生成配图并转存到本平台 Storage（图片平台返回的是临时 URL，会过期）
-// 返回诊断信息，便于定位「配图失败」卡在哪一步
-async function makeImage(prompt: string, fileKey: string): Promise<{ url: string | null; err?: string }> {
-  if (!IMG_KEY) return { url: null, err: 'IMG_KEY 未配置' }
+// 带超时的 fetch：方舟/智谱任一方卡住时，必须在函数墙钟（免费档约 150s）内主动失败，
+// 否则整个批次会被平台 546 掐断（实测：文案串行 + 配图超时未设 → 151s 被 kill）。
+async function fetchWithTimeout(url: string, opts: RequestInit, ms: number): Promise<Response> {
+  const ctrl = new AbortController()
+  const t = setTimeout(() => ctrl.abort(), ms)
+  try {
+    return await fetch(url, { ...opts, signal: ctrl.signal })
+  } finally {
+    clearTimeout(t)
+  }
+}
+
+// 单次「出图 + 下载」；不做转存。返回图片字节与真实格式，便于定位卡在哪一步。
+async function genImageBytes(
+  engine: 'ark' | 'zhipu',
+  prompt: string
+): Promise<{ buf?: Uint8Array; ct?: string; err?: string }> {
+  const cfg =
+    engine === 'ark'
+      ? { base: ARK_BASE, key: ARK_KEY, model: ARK_MODEL, size: ARK_SIZE, extra: { response_format: 'url', watermark: false } }
+      : { base: IMG_BASE, key: IMG_KEY, model: IMG_MODEL, size: '1024x1024', extra: {} as Record<string, unknown> }
+  if (!cfg.key || !cfg.model) return { err: `${engine} 未配置 key/model` }
   let step = 'generate'
   try {
-    const r = await fetch(`${IMG_BASE}/images/generations`, {
+    const r = await fetchWithTimeout(`${cfg.base}/images/generations`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${IMG_KEY}` },
-      body: JSON.stringify({ model: IMG_MODEL, prompt, size: '1024x1024' })
-    })
-    if (!r.ok) return { url: null, err: `gen HTTP ${r.status} ${(await r.text().catch(() => '')).slice(0, 160)}` }
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.key}` },
+      body: JSON.stringify({ model: cfg.model, prompt, size: cfg.size, ...cfg.extra })
+    }, engine === 'ark' ? 75000 : 25000)
+    if (!r.ok) return { err: `${engine} gen HTTP ${r.status} ${(await r.text().catch(() => '')).slice(0, 160)}` }
     const d = await r.json().catch(() => null)
     const url = d?.data?.[0]?.url
-    if (!url) return { url: null, err: 'gen 无 url: ' + JSON.stringify(d).slice(0, 160) }
+    if (!url) return { err: `${engine} gen 无 url: ${JSON.stringify(d).slice(0, 160)}` }
 
     step = 'download'
-    const img = await fetch(url)
-    if (!img.ok) return { url: null, err: `download HTTP ${img.status}` }
+    const img = await fetchWithTimeout(url, {}, 30000)
+    if (!img.ok) return { err: `${engine} download HTTP ${img.status}` }
     const buf = new Uint8Array(await img.arrayBuffer())
-    if (buf.length < 1000) return { url: null, err: `图片过小 ${buf.length}B` }
+    if (buf.length < 1000) return { err: `${engine} 图片过小 ${buf.length}B` }
 
-    step = 'upload'
-    const up = await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/posts/${fileKey}.png`, {
-      method: 'POST',
-      headers: {
-        // 注意：Storage 网关必须同时带 apikey 与 Authorization，只带 Authorization 会被判
-        // "Invalid Compact JWS"（新版 secret key 不是 JWT，网关靠 apikey 头识别）
-        apikey: SERVICE_ROLE,
-        Authorization: `Bearer ${SERVICE_ROLE}`,
-        'Content-Type': 'image/png',
-        'x-upsert': 'true'
-      },
-      body: buf
-    })
-    if (!up.ok) return { url: null, err: `upload HTTP ${up.status} ${(await up.text().catch(() => '')).slice(0, 160)}` }
-    return { url: `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/posts/${fileKey}.png` }
+    // 格式按魔数判定：方舟 Seedream 返回 JPEG，智谱 cogview 返回 PNG。
+    // 转存时 Content-Type 与扩展名必须跟真实格式一致，否则部分 WebView 不渲染。
+    const isJpeg = buf[0] === 0xff && buf[1] === 0xd8
+    return { buf, ct: isJpeg ? 'image/jpeg' : 'image/png' }
   } catch (e: any) {
-    return { url: null, err: `${step}: ${String(e?.message || e).slice(0, 160)}` }
+    return { err: `${engine} ${step}: ${String(e?.message || e).slice(0, 160)}` }
   }
+}
+
+// 生成配图并转存到本平台 Storage（图片平台返回的是临时 URL，会过期）。
+// 主用方舟（画质好），失败自动回落智谱（免费）——任一家出图即返回。
+async function makeImage(prompt: string, fileKey: string): Promise<{ url: string | null; err?: string; engine?: string }> {
+  const failures: string[] = []
+  for (const engine of ['ark', 'zhipu'] as const) {
+    const g = await genImageBytes(engine, prompt)
+    if (!g.buf) {
+      failures.push(String(g.err))
+      continue
+    }
+    const ext = g.ct === 'image/jpeg' ? 'jpg' : 'png'
+    try {
+      const up = await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/posts/${fileKey}.${ext}`, {
+        method: 'POST',
+        headers: {
+          // 注意：Storage 网关必须同时带 apikey 与 Authorization，只带 Authorization 会被判
+          // "Invalid Compact JWS"（新版 secret key 不是 JWT，网关靠 apikey 头识别）
+          apikey: SERVICE_ROLE,
+          Authorization: `Bearer ${SERVICE_ROLE}`,
+          'Content-Type': g.ct!,
+          'x-upsert': 'true'
+        },
+        body: g.buf
+      })
+      if (!up.ok) {
+        failures.push(`upload HTTP ${up.status} ${(await up.text().catch(() => '')).slice(0, 120)}`)
+        continue
+      }
+      return { url: `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/posts/${fileKey}.${ext}`, engine }
+    } catch (e: any) {
+      failures.push(`upload: ${String(e?.message || e).slice(0, 120)}`)
+    }
+  }
+  return { url: null, err: failures.join(' | ') }
 }
 
 Deno.serve(async (req: Request) => {
@@ -194,7 +252,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = await req.json().catch(() => ({}))
-    const want = Math.max(1, Math.min(Number(body?.count) || 1, MAX_PER_COOLDOWN))
+    const want = Math.max(1, Math.min(Number(body?.count) || 1, MAX_PER_CALL))
 
     // 取最近帖子，用于：① 限频统计 ② 避开刚发过的人设（让 20 个角色轮着来）
     const recent = await pgGet(`posts?select=id,author_id,created_at&order=created_at.desc&limit=60`)
@@ -220,19 +278,41 @@ Deno.serve(async (req: Request) => {
     const remaining = MAX_PER_COOLDOWN - inWindow.length
     const n = Math.min(want, remaining)
 
-    for (let i = 0; i < n; i++) {
-      const bot = pool[Math.floor(Math.random() * pool.length)]
-      const prof = pMap[bot.id]
-      if (!prof) continue
-      const botName: string = prof.nickname || '社区网友'
+    // ─── 阶段一：并发出文案 ───
+    // 文本生成是本函数最耗时的一环（每次经 agnes-proxy，主上游 8s 超时 + 备用模型生成 600 字，
+    // 单条约 15~30s）。串行 3 条就要 75s，再叠加配图必然顶穿免费档约 150s 的墙钟（实测 546）。
+    // 先随机选出不重复的人设，再并发跑——批次内不重复用同一人设的语义保持不变。
+    const bag = [...pool]
+    const picked: Bot[] = []
+    for (let i = 0; i < n && bag.length; i++) {
+      picked.push(bag.splice(Math.floor(Math.random() * bag.length), 1)[0])
+    }
 
-      const draft = await draftPost(botName, bot, prof)
-      if (!draft) continue
+    const drafted = await Promise.all(
+      picked.map(async (bot) => {
+        const prof = pMap[bot.id]
+        if (!prof) return null
+        const botName: string = prof.nickname || '社区网友'
+        const draft = await draftPost(botName, bot, prof)
+        return draft ? { bot, prof, botName, draft, postId: crypto.randomUUID() } : null
+      })
+    )
+    const plans = drafted.filter((x): x is NonNullable<typeof x> => !!x)
 
-      const postId = crypto.randomUUID()
-      // 由模型判断是否需要配图：纯文字经验帖不配图（更像真人，也省上游额度）
-      const img = draft.needImage ? await makeImage(draft.imagePrompt, postId) : { url: null as string | null }
+    // ─── 阶段二：并发配图 ───
+    // 方舟 2K 图热态约 20s、冷启动实测可达 60s：一张张串行同样会顶穿函数时限，故并发。
+    const ready = await Promise.all(
+      plans.map(async (p) => ({
+        ...p,
+        // 由模型判断是否需要配图：纯文字经验帖不配图（更像真人，也省额度）
+        img: p.draft.needImage
+          ? await makeImage(p.draft.imagePrompt, p.postId)
+          : ({ url: null } as { url: string | null; err?: string; engine?: string })
+      }))
+    )
 
+    for (const p of ready) {
+      const { bot, prof, botName, draft, postId, img } = p
       const row: Record<string, any> = {
         id: postId,
         title: draft.title,
@@ -249,11 +329,16 @@ Deno.serve(async (req: Request) => {
       }
       const ins = await pgInsert('posts', row)
       if (ins.ok) {
-        created.push({ id: postId, author: botName, title: draft.title, image: !!img.url, needImage: draft.needImage, imgErr: img.err })
+        created.push({
+          id: postId,
+          author: botName,
+          title: draft.title,
+          image: !!img.url,
+          needImage: draft.needImage,
+          engine: img.engine, // ark=方舟 / zhipu=智谱兜底，便于核验走了哪条链路
+          imgErr: img.err
+        })
       }
-      // 同一批次不重复用同一人设
-      pool = pool.filter((b) => b.id !== bot.id)
-      if (!pool.length) pool = BOTS
     }
 
     return json({ ok: true, created })

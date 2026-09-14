@@ -40,7 +40,7 @@ function markRateLimited(): void {
 
 async function call<T = any>(
   path: string,
-  opts: { method?: string; body?: any; signal?: AbortSignal; skipCooldown?: boolean }
+  opts: { method?: string; body?: any; signal?: AbortSignal; skipCooldown?: boolean; timeoutMs?: number }
 ): Promise<T> {
   const base = resolveBase()
   const url = `${base}${path}`
@@ -49,10 +49,11 @@ async function call<T = any>(
     ...resolveAuthHeaders()
   }
   const controller = new AbortController()
-  // 前端被动超时：75s（双重保险）。后端 v9 调用已自带 22s×2 超时 + 降级返回，
+  // 前端被动超时：默认 75s（双重保险）。后端 v9 调用已自带 22s×2 超时 + 降级返回，
   // 正常情况下 44s 内就会拿到结果（含 degraded 降级），不会走到这里；
   // 仅当整条链路异常时才触发，避免用户无限转圈。
-  const timer = setTimeout(() => controller.abort(), 75_000)
+  // 图片生成单独放宽（timeoutMs）：方舟 Seedream 2K 图热态 ~20s、冷启动实测可达 60s。
+  const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? 75_000)
   // 外部中断（如「停止生成」）：与超时共用一个 controller，任一触发即取消请求
   if (opts.signal) {
     if (opts.signal.aborted) controller.abort()
@@ -525,7 +526,8 @@ export async function agnesChatStream(
   opts.onDone?.({ content, reasoning, search, degraded })
 }
 
-/** 文生图：调用 Agnes agnes-image-2.1-flash（同步，~10s） */
+/** 文生图：走 agnes-proxy 的图片路由（服务端优先火山方舟豆包 Seedream，失败回落 Agnes）。
+ *  2K 同步出图，热态 ~20s、冷启动可达 60s，故单独放宽超时。 */
 export async function agnesImageGen(
   opts: ImageGenOptions
 ): Promise<ImageGenResult> {
@@ -543,7 +545,9 @@ export async function agnesImageGen(
     }
     const data = await call('/v1/images/generations', {
       body,
-      signal: opts.signal
+      signal: opts.signal,
+      // 图片走方舟 Seedream（2K），冷启动可达 60s+，超时给到 120s，避免把已经付过费的生成掐掉
+      timeoutMs: 120000
     })
     const url = (data as any)?.data?.[0]?.url
     if (!url) return { ok: false, error: (data as any)?.error?.message || '生成失败，请重试' }

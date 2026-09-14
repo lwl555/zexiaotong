@@ -1,6 +1,7 @@
 // agnes-proxy — Supabase Edge Function (Deno)
 // 转发 chat/completions 到上游 Agnes 平台（agnes-2.0-flash），并支持「流式透传」（用于深度思考实时流出）。
-// 同时转发图片生成（/v1/images/generations）和视频生成（/v1/videos + /agnesapi 轮询）到上游 Agnes 平台。
+// 图片生成（/v1/images/generations）优先走火山方舟豆包 Seedream，失败回落 Agnes；
+// 视频生成（/v1/videos + /agnesapi 轮询）转发到上游 Agnes 平台。
 //
 // 部署：
 //   supabase functions deploy agnes-proxy --project-ref wcnssyiqitugqfmcbdhe
@@ -8,6 +9,9 @@
 //   AGNES_KEY / AGNES_API_KEY   必填，上游 Agnes 平台 key（真实值已配置在 Secret 中，本仓库示例值无效）
 //   UPSTREAM_BASE               可选，默认 https://api.agnes-ai.cn/v1
 //   SERPER_API_KEY              可选，配置了就用 Serper 做真·搜索；没配则 DuckDuckGo HTML 兜底
+//   ARK_API_KEY / ARK_IMAGE_MODEL  可选（推荐），火山方舟图片生成 key + 接入点 ID（ep-xxxx）
+//   ARK_IMAGE_BASE              可选，默认 https://ark.cn-beijing.volces.com/api/v3
+//   BACKUP_KEY / BACKUP_BASE / BACKUP_MODEL  可选，文本主上游失败时的备用模型（默认智谱 glm-4-flash）
 //
 // 前端调用：
 //   POST {VITE_AGNES_BASE}/v1/chat/completions   → 文本/流式对话
@@ -30,6 +34,30 @@ const SERPER_KEY = Deno.env.get('SERPER_API_KEY') || ''
 const BACKUP_BASE = (Deno.env.get('BACKUP_BASE') || 'https://open.bigmodel.cn/api/paas/v4').replace(/\/+$/, '')
 const BACKUP_KEY = Deno.env.get('BACKUP_KEY') || ''
 const BACKUP_MODEL = Deno.env.get('BACKUP_MODEL') || 'glm-4-flash'
+
+// ─── 图片生成上游：火山方舟（豆包 Seedream）───
+// 用户自带方舟账号，按张计费（约 0.22 元/张），质量明显优于免费档。
+// key 只存服务端 secret，前端永不接触；未配置或调用失败时自动回落到 Agnes 图片上游。
+// 配置（Supabase 后台 Functions → agnes-proxy → Secrets）：
+//   ARK_API_KEY     必填，方舟 API key（ark-xxxx）
+//   ARK_IMAGE_MODEL 必填，方舟「接入点」ID（ep-xxxx，非模型名）
+//   ARK_IMAGE_BASE  可选，默认 https://ark.cn-beijing.volces.com/api/v3
+const ARK_BASE = (Deno.env.get('ARK_IMAGE_BASE') || 'https://ark.cn-beijing.volces.com/api/v3').replace(/\/+$/, '')
+const ARK_KEY = Deno.env.get('ARK_API_KEY') || ''
+const ARK_MODEL = Deno.env.get('ARK_IMAGE_MODEL') || ''
+
+// 方舟 Seedream 有「最小像素」硬门槛（实测 3686400，1024² 会被 400 拒绝）。
+// 前端传的是 1024x1024（沿用 Agnes 尺寸），这里统一抬到 2048²；已达标的一律原样透传。
+const ARK_MIN_PIXELS = 3686400
+const ARK_FALLBACK_SIZE = '2048x2048'
+function arkSize(size: unknown): string {
+  const m = /^(\d+)\s*x\s*(\d+)$/i.exec(String(size ?? '').trim())
+  if (!m) return ARK_FALLBACK_SIZE
+  const w = Number(m[1])
+  const h = Number(m[2])
+  if (!w || !h || w * h < ARK_MIN_PIXELS) return ARK_FALLBACK_SIZE
+  return `${w}x${h}`
+}
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -117,7 +145,38 @@ Deno.serve(async (req: Request) => {
   if (path.endsWith('/v1/images/generations') && req.method === 'POST') {
     let body: any
     try { body = await req.json() } catch { return json({ error: 'invalid json' }, 400) }
-    if (!UPSTREAM_KEY) return json({ error: 'UPSTREAM_KEY 未配置' }, 500)
+
+    // 主：火山方舟（豆包 Seedream）。失败/未配置 → 继续走下面的 Agnes 图片上游。
+    if (ARK_KEY && ARK_MODEL) {
+      const arkBody: Record<string, any> = {
+        model: ARK_MODEL,
+        prompt: body.prompt || '',
+        size: arkSize(body.size),
+        response_format: 'url',
+        watermark: false // 配图不要平台水印
+      }
+      // 图生图：方舟同样用 image 字段（支持公网 URL / base64 data URI）
+      if (body.image) arkBody.image = body.image
+      try {
+        // 冷启动实测可达 60s（热态约 20s），超时必须留够，否则会白花一次生成费
+        const r = await fetchWithTimeout(
+          `${ARK_BASE}/images/generations`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ARK_KEY}` },
+            body: JSON.stringify(arkBody)
+          },
+          120000
+        )
+        if (r.ok) {
+          const d = await r.json().catch(() => null)
+          if (d?.data?.[0]?.url) return json(d, 200)
+        }
+        // 未成功：静默回落（不把方舟的原始错误抛给前端，用户无感）
+      } catch { /* 超时 / 网络异常 → 回落 */ }
+    }
+
+    if (!UPSTREAM_KEY) return json({ error: 'UPSTREAM_KEY 未配置且方舟未启用' }, 500)
 
     const reqBody: Record<string, any> = {
       model: body.model || 'agnes-image-2.1-flash',
