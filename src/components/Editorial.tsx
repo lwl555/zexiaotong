@@ -248,16 +248,20 @@ export function BtnPrimary({
   children,
   onClick,
   style,
+  disabled,
 }: {
   children: ReactNode
   onClick?: () => void
   style?: CSSProperties
+  disabled?: boolean
 }) {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
       style={{
         ...hard({ padding: '9px 16px', fontSize: 14, fontWeight: 700, color: PAPER, background: ACCENT, fontFamily: FONT }),
+        ...(disabled ? { opacity: 0.55, cursor: 'not-allowed' } : null),
         ...style,
       }}
     >
@@ -270,13 +274,23 @@ export function BtnGhost({
   children,
   onClick,
   style,
+  disabled,
 }: {
   children: ReactNode
   onClick?: () => void
   style?: CSSProperties
+  disabled?: boolean
 }) {
   return (
-    <button onClick={onClick} style={{ ...btnGhost({ padding: '8px 15px', fontSize: 14 }), ...style }}>
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        ...btnGhost({ padding: '8px 15px', fontSize: 14 }),
+        ...(disabled ? { opacity: 0.55, cursor: 'not-allowed' } : null),
+        ...style,
+      }}
+    >
       {children}
     </button>
   )

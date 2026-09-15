@@ -118,6 +118,9 @@ interface State {
   adminSendAnnounce: (title: string, content: string) => Promise<void>
   fetchLogs: (opts?: { actor_type?: string; action?: string }) => Promise<void>
 
+  // 个人资料（昵称 / 头像）
+  updateProfile: (updates: { nickname?: string; avatar?: string }) => Promise<{ ok: boolean; msg: string }>
+
   // 签到
   checkin: { checkedToday: boolean; streak: number; nextStreak: number; nextPoints: number; recent: CheckIn[] }
   checkIn: () => Promise<{ points: number; streak: number; weekBonus: number } | null>
@@ -631,6 +634,21 @@ export const useStore = create<State>((set, get) => ({
       const logs = await db.fetchActivityLogs({ ...opts, operatorId: me.id })
       set({ logs })
     } catch { /* 失败保留旧数据 */ }
+  },
+
+  // ─── 个人资料（昵称 / 头像）───
+  // 走 db-write 通用 update 动作（profiles 已在白名单，后端校验只能改自己）。
+  // 成功后同步刷新本地 me，避免各页面仍显示旧昵称/头像。
+  updateProfile: async (updates) => {
+    const me = get().me
+    if (!me) return { ok: false, msg: '未登录' }
+    try {
+      const row = await db.updateProfile(me.id, updates)
+      set({ me: { ...me, ...(row || {}), ...updates } as any })
+      return { ok: true, msg: '已保存' }
+    } catch (e: any) {
+      return { ok: false, msg: e?.message || '保存失败' }
+    }
   },
 
   // ─── 签到 ───

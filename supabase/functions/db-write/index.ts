@@ -130,6 +130,18 @@ const UPDATE_ALLOWED: Record<string, string[]> = {
   profiles: ['id']
 }
 
+// 列级白名单：update 动作只允许改这些列，其余字段静默丢弃。
+// 关键安全闸：阻止登录用户通过通用 update 把 profiles.role 改成 admin、或改 balance 刷积分。
+// （行级校验只保证"只能改自己的"，但以前不限制改哪些列，存在越权/提权漏洞。）
+const UPDATE_COLUMNS: Record<string, string[]> = {
+  tasks: ['status', 'top_until', 'accepted_id', 'accepted_name'],
+  posts: ['title', 'content', 'images', 'status', 'liked', 'likes', 'collected', 'collects', 'comments'],
+  profiles: ['nickname', 'avatar', 'status'], // 严禁 role / balance / frozen / password_hash
+  notifications: ['read'],
+  withdrawals: ['status', 'reason', 'handled_at'],
+  arbitrations: ['status', 'winner', 'result']
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
@@ -403,27 +415,27 @@ Deno.serve(async (req) => {
       return json({ row: res.data?.[0] })
     }
 
-    // ── 通用 update（白名单表 + 所有权/管理员校验）──
+    // ── 通用 update（白名单表 + 列级白名单 + 所有权/管理员校验）──
     if (action === 'update') {
       const { table, id, updates } = body
       if (!UPDATE_ALLOWED.hasOwnProperty(table)) return json({ error: '不允许更新该表：' + table }, 400)
       if (!id) return json({ error: '缺少 id' }, 400)
+      // 列级过滤：只允许白名单内的列，role/balance 等敏感列一律丢弃（防越权/提权）
+      const allow = UPDATE_COLUMNS[table] || []
+      const safe: Record<string, any> = {}
+      for (const k of Object.keys(updates || {})) if (allow.includes(k)) safe[k] = updates[k]
+      if (!Object.keys(safe).length) return json({ error: '无可更新字段（列不在白名单）' }, 400)
+
       const r = await pg('GET', `${table}?select=*&id=eq.${enc(id)}`)
       if (!r.ok || !Array.isArray(r.data) || !r.data.length) return json({ error: '记录不存在' }, 404)
       const target = r.data[0]
       const owners = UPDATE_ALLOWED[table]
-      // 帖子点赞/收藏/评论数等计数器：允许任意登录用户修改（非作者也可点赞）
-      if (table === 'posts' && Object.keys(updates).every((k) => ['liked', 'likes', 'collected', 'collects', 'comments'].includes(k))) {
-        const u = await pg('PATCH', `${table}?id=eq.${enc(id)}`, updates)
-        if (!u.ok) return json({ error: '更新失败：' + JSON.stringify(u.data) }, 500)
-        return json({ ok: true, row: u.data?.[0] })
-      }
       const isOwner = owners.some((c) => target[c] === uid)
       if (!isOwner) {
         const p = await getProfile(uid)
         if (!p || p.role !== 'admin') return json({ error: '无权限修改该记录' }, 403)
       }
-      const u = await pg('PATCH', `${table}?id=eq.${enc(id)}`, updates)
+      const u = await pg('PATCH', `${table}?id=eq.${enc(id)}`, safe)
       if (!u.ok) return json({ error: '更新失败：' + JSON.stringify(u.data) }, 500)
       return json({ ok: true, row: u.data?.[0] })
     }

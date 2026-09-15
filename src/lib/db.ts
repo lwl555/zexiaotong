@@ -693,9 +693,21 @@ function currentUid(): string {
   return ensureUserId()
 }
 
+// 更新本人资料（昵称 / 头像）。可改字段在 db-write 里由 UPDATE_ALLOWED 控制，
+// 且后端会校验 profiles.id === uid（只能改自己的），无需新增 Edge Function 动作。
+export async function updateProfile(
+  uid: string,
+  updates: { nickname?: string; avatar?: string }
+): Promise<Partial<Profile> | null> {
+  const data = await dbWrite('update', { table: 'profiles', id: uid, updates, uid })
+  return (data?.row || null) as Partial<Profile> | null
+}
+
 // 列出用户（分页，page 从 0 开始）
-export async function adminListUsers(page = 0): Promise<Profile[]> {
-  const data = await adminInvoke('list', { page })
+// 注意：admin-users 函数强制要求 operator_id 并校验其 role='admin'，
+// 此前漏传该参数 → 后端直接 400「缺少操作者身份」，导致用户管理页永远拉不到数据。
+export async function adminListUsers(operatorId: string, page = 0): Promise<Profile[]> {
+  const data = await adminInvoke('list', { operator_id: operatorId, page })
   const rows = (data?.users || []) as any[]
   // function 直接返回 PG 行（phone 即 QQ 号），这里映射到应用层 qq 字段
   return rows.map((r) => ({ ...r, qq: r.phone || '', password_hash: undefined })) as Profile[]

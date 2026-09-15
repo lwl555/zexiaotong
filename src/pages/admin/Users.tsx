@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Ban, CheckCircle2, Download, Search, Trash2, Loader2, RefreshCw, PlusCircle } from 'lucide-react'
+import { Ban, CheckCircle2, XCircle, Download, Search, Trash2, Loader2, RefreshCw, PlusCircle } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { useMe } from '../../store/useMe'
 import { PageHeader, StatusBadge, confirmDanger } from './ui'
@@ -9,10 +9,19 @@ import {
 import type { Profile } from '../../lib/types'
 
 export default function Users() {
-  const showToast = useStore((s) => s.showToast)
   const adminAddPoints = useStore((s) => s.adminAddPoints)
   const me = useMe()
   const operatorId = me?.id
+
+  // 本地 toast（与 System / TaskAudit 后台页一致）——
+  // 此前误写成 useStore(s => s.showToast)，但 store 中并无该 action，
+  // 拿到 undefined → 一调用即 TypeError，导致本页加载失败时永久卡在 loading。
+  const [toast, setToast] = useState<{ type: 'ok' | 'err'; msg: string } | null>(null)
+  // 必须 useCallback 固定引用：load 的依赖里有 showToast，否则每次渲染都会重建 load → 触发无限拉取
+  const showToast = useCallback((type: 'ok' | 'err', msg: string) => {
+    setToast({ type, msg })
+    setTimeout(() => setToast(null), 2500)
+  }, [])
 
   const [users, setUsers] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
@@ -24,16 +33,18 @@ export default function Users() {
   const [ptsBusy, setPtsBusy] = useState(false)
 
   const load = useCallback(async () => {
+    // operatorId 尚未就绪时不要发请求（后端会 400），也不要把 loading 卡住
+    if (!operatorId) { setLoading(false); return }
     setLoading(true)
     try {
-      const list = await adminListUsers(0)
+      const list = await adminListUsers(operatorId, 0)
       setUsers(list)
     } catch (e: any) {
       showToast('err', e?.message || '加载用户列表失败')
     } finally {
       setLoading(false)
     }
-  }, [showToast])
+  }, [showToast, operatorId])
 
   useEffect(() => { load() }, [load])
 
@@ -108,6 +119,13 @@ export default function Users() {
 
   return (
     <div>
+      {toast && (
+        <div className={`fixed top-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium shadow-lg ${toast.type === 'ok' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+          {toast.type === 'ok' ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
+          {toast.msg}
+        </div>
+      )}
+
       <PageHeader title="用户管理" desc="查看、冻结 / 解封 / 删除账号（删除为真实删除，不可恢复）">
         <button className="btn-ghost" onClick={exportCsv}><Download size={16} /> 导出 CSV</button>
         <button className="btn-ghost" onClick={load} disabled={loading}>

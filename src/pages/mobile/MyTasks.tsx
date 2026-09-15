@@ -10,6 +10,7 @@ import {
   INK,
   MUTED,
   ACCENT,
+  PAPER,
   HAIR,
   FONT,
   MONO,
