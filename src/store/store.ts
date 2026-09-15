@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type {
   Profile, Role, Task, Goods, Post, Message, WalletTxn, Withdrawal,
   Arbitration, Notification, Category, Banner, PlatformConfig,
-  TaskStatus, GoodsStatus, PostStatus, School, Bulletin, ActivityLog
+  TaskStatus, GoodsStatus, PostStatus, School, Bulletin, ActivityLog, CheckIn
 } from '../lib/types'
 import * as db from '../lib/db'
 import { notifyNative } from '../lib/nativeNotify'
@@ -117,6 +117,10 @@ interface State {
   adminAddPoints: (targetUserId: string, points: number, reason: string) => Promise<void>
   adminSendAnnounce: (title: string, content: string) => Promise<void>
   fetchLogs: (opts?: { actor_type?: string; action?: string }) => Promise<void>
+
+  // 签到
+  checkin: { checkedToday: boolean; streak: number; nextStreak: number; nextPoints: number; recent: CheckIn[] }
+  checkIn: () => Promise<{ points: number; streak: number; weekBonus: number } | null>
 }
 
 export const useStore = create<State>((set, get) => ({
@@ -138,6 +142,7 @@ export const useStore = create<State>((set, get) => ({
   schools: [],
   bulletins: [],
   logs: [],
+  checkin: { checkedToday: false, streak: 0, nextStreak: 1, nextPoints: 10, recent: [] },
 
   // ─── 初始化：从 Supabase 拉取所有数据 ───
   init: async () => {
@@ -626,5 +631,24 @@ export const useStore = create<State>((set, get) => ({
       const logs = await db.fetchActivityLogs({ ...opts, operatorId: me.id })
       set({ logs })
     } catch { /* 失败保留旧数据 */ }
+  },
+
+  // ─── 签到 ───
+  checkIn: async () => {
+    const me = get().me
+    if (!me) return null
+    const r = await db.checkIn(me.id)
+    if (r?.error) throw new Error(r.error)
+    if (r?.already) {
+      // 已签过：只刷新状态，不重复发积分
+      const status = await db.fetchCheckinStatus(me.id)
+      set({ checkin: status })
+      return { points: Number(r.points) || 0, streak: Number(r.streak) || 0, weekBonus: 0 }
+    }
+    const status = await db.fetchCheckinStatus(me.id)
+    const txns = await db.fetchTxns(me.id)
+    const newBal = typeof r?.balance === 'number' ? r.balance : me.balance
+    set(s => ({ me: { ...(s.me as any), balance: newBal }, txns, checkin: status }))
+    return { points: Number(r?.points) || 0, streak: Number(r?.streak) || 0, weekBonus: Number(r?.weekBonus) || 0 }
   }
 }))

@@ -25,6 +25,23 @@ const CORS = {
 
 const enc = (s: string) => encodeURIComponent(String(s))
 
+// 签到奖励规则（可在本文件顶部集中调整）
+const CHECKIN_BASE = 10          // 每日基础积分
+const CHECKIN_BONUS_PER_DAY = 2 // 连续每多 1 天额外 +2
+const CHECKIN_BONUS_CAP = 20    // 连签奖励封顶 +20（连续 11 天起每天 30）
+const CHECKIN_WEEK_BONUS = 50   // 连续满 7 天额外周奖励
+
+// 中国日期（东八区）。按服务器本地时区换算，避免 UTC 错位导致「差一天」。
+function chinaDate(d: Date = new Date()): string {
+  const sh = new Date(d.getTime() + 8 * 3600 * 1000 - d.getTimezoneOffset() * 60000)
+  return sh.toISOString().slice(0, 10)
+}
+function yesterdayOf(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00Z')
+  d.setUTCDate(d.getUTCDate() - 1)
+  return d.toISOString().slice(0, 10)
+}
+
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -495,6 +512,37 @@ Deno.serve(async (req) => {
       const r = await pg('GET', path)
       if (!r.ok) return json({ error: '查询失败' }, 500)
       return json({ logs: r.data || [] })
+    }
+
+    // ── 每日签到（按中国日期，一人一天一次，连签奖励 + 满 7 天周奖励）──
+    if (action === 'check_in') {
+      const me = await requireUser(uid)
+      const today = chinaDate()
+      // 今日是否已签（防重复，唯一索引同时兜底并发）
+      const tRes = await pg('GET', `checkins?select=id,points,streak&user_id=eq.${enc(uid)}&checkin_date=eq.${enc(today)}`)
+      if (Array.isArray(tRes.data) && tRes.data.length) {
+        const t = tRes.data[0]
+        return json({ ok: true, already: true, points: Number(t.points), streak: Number(t.streak) })
+      }
+      // 连续天数：看昨天是否签
+      const yRes = await pg('GET', `checkins?select=streak&user_id=eq.${enc(uid)}&checkin_date=eq.${enc(yesterdayOf(today))}`)
+      let streak = 1
+      if (Array.isArray(yRes.data) && yRes.data.length) streak = Number(yRes.data[0].streak) + 1
+      let points = CHECKIN_BASE + Math.min((streak - 1) * CHECKIN_BONUS_PER_DAY, CHECKIN_BONUS_CAP)
+      let weekBonus = 0
+      if (streak % 7 === 0) { weekBonus = CHECKIN_WEEK_BONUS; points += weekBonus }
+      const newBal = Number(me.balance) + points
+      await pg('PATCH', `profiles?id=eq.${enc(uid)}`, { balance: newBal })
+      await pg('POST', 'txns', {
+        user_id: uid,
+        type: 'checkin',
+        amount: points,
+        balance_after: newBal,
+        remark: `签到（连续 ${streak} 天）+${points} 积分${weekBonus ? `，含周奖励 ${weekBonus}` : ''}`
+      })
+      const ins = await pg('POST', 'checkins', { user_id: uid, checkin_date: today, points, streak })
+      await logActivity('user', uid, me.nickname || '', 'check_in', 'wallet', '', `签到 连续 ${streak} 天 +${points} 积分`)
+      return json({ ok: true, already: false, points, streak, weekBonus, balance: newBal, checkin: ins.data?.[0] || null })
     }
 
     return json({ error: '未知操作：' + action }, 400)

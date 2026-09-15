@@ -29,6 +29,7 @@ const TXN_LABEL: any = {
   freeze: '冻结',
   unfreeze: '解冻',
   adjust: '积分调整',
+  checkin: '签到',
 }
 const TXN_COLOR: any = {
   recharge: POS,
@@ -40,6 +41,7 @@ const TXN_COLOR: any = {
   commission: NEG,
   refund: POS,
   adjust: ACCENT,
+  checkin: ACCENT,
 }
 
 export default function Wallet() {

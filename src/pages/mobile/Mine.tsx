@@ -1,8 +1,10 @@
 import { useNavigate } from 'react-router-dom'
-import { ChevronRight } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ChevronRight, CalendarCheck, Flame, Gift } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { useMe } from '../../store/useMe'
 import { getQueries } from '../../lib/history'
+import { fetchCheckinStatus } from '../../lib/db'
 import {
   PageHeader,
   SectionLabel,
@@ -41,6 +43,32 @@ export default function Mine() {
   const unread = useStore(s => s.notifications.filter(n => n.user_id === me.id && !n.read).length)
   const logout = useStore(s => s.logout)
   const isGuest = !me.qq
+  const checkin = useStore(s => s.checkin)
+  const doCheckIn = useStore(s => s.checkIn)
+  const [ciBusy, setCiBusy] = useState(false)
+  const [ciDone, setCiDone] = useState<{ points: number; streak: number; weekBonus: number } | null>(null)
+
+  // 进入页面拉取签到状态（登录后）
+  useEffect(() => {
+    if (isGuest || !me?.id) return
+    fetchCheckinStatus(me.id)
+      .then(status => useStore.setState({ checkin: status }))
+      .catch(() => {})
+  }, [isGuest, me?.id])
+
+  const onCheckIn = async () => {
+    if (ciBusy) return
+    setCiBusy(true)
+    try {
+      const r = await doCheckIn()
+      if (r) setCiDone(r)
+    } catch {
+      /* 失败静默，UI 不报错 */
+    } finally {
+      setCiBusy(false)
+      setTimeout(() => setCiDone(null), 3500)
+    }
+  }
 
   const myRows = [
     { label: '我的发布', val: myPosted, onClick: () => nav('/my-tasks?role=poster') },
@@ -126,6 +154,85 @@ export default function Mine() {
                 <div style={{ fontFamily: MONO, fontSize: 10, color: MUTED, letterSpacing: 2, marginTop: 2 }}>{s.l}</div>
               </div>
             ))}
+          </div>
+        </HardCard>
+      )}
+
+      {/* 签到卡片 */}
+      {!isGuest && (
+        <HardCard style={{ marginBottom: 24, borderColor: ciDone ? ACCENT : '#e8e8e8' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <CalendarCheck size={22} color={ACCENT} />
+              <div>
+                <div style={{ fontFamily: FONT, fontSize: 15, fontWeight: 800, color: INK }}>每日签到</div>
+                <div style={{ fontFamily: MONO, fontSize: 11, color: MUTED, letterSpacing: 1, marginTop: 2 }}>
+                  连续 {checkin.streak} 天 · 满 7 天额外 +50
+                </div>
+              </div>
+            </div>
+            {checkin.checkedToday ? (
+              <div style={{ fontFamily: MONO, fontSize: 12, color: MUTED }}>今日已签 ✓</div>
+            ) : (
+              <BtnGhost
+                onClick={onCheckIn}
+                disabled={ciBusy}
+                style={{
+                  padding: '9px 16px',
+                  color: '#fff',
+                  background: ACCENT,
+                  borderColor: ACCENT,
+                  opacity: ciBusy ? 0.6 : 1,
+                }}
+              >
+                {ciBusy ? '签到中…' : `签到 +${checkin.nextPoints}`}
+              </BtnGhost>
+            )}
+          </div>
+
+          {ciDone && (
+            <div
+              style={{
+                marginTop: 12,
+                paddingTop: 12,
+                borderTop: '1px solid rgba(28,24,20,0.08)',
+                fontFamily: FONT,
+                fontSize: 13,
+                color: ACCENT,
+                fontWeight: 700,
+              }}
+            >
+              签到成功 +{ciDone.points} 积分（连续 {ciDone.streak} 天）
+              {ciDone.weekBonus ? ` · 周奖励 +${ciDone.weekBonus}` : ''}
+            </div>
+          )}
+
+          {/* 近 7 天连签小条 */}
+          <div style={{ display: 'flex', gap: 6, marginTop: 14 }}>
+            {[6, 5, 4, 3, 2, 1, 0].map((off) => {
+              const d = new Date()
+              d.setDate(d.getDate() - off)
+              const key = d.toISOString().slice(0, 10)
+              const hit = checkin.recent.some((r) => r.checkin_date === key)
+              return (
+                <div
+                  key={key}
+                  style={{
+                    flex: 1,
+                    textAlign: 'center',
+                    padding: '6px 0',
+                    borderRadius: 4,
+                    border: '1px solid #e8e8e8',
+                    background: hit ? 'rgba(194,65,12,0.08)' : '#fff',
+                    color: hit ? ACCENT : FAINT,
+                    fontFamily: MONO,
+                    fontSize: 10,
+                  }}
+                >
+                  {['日', '一', '二', '三', '四', '五', '六'][d.getDay()]}
+                </div>
+              )
+            })}
           </div>
         </HardCard>
       )}

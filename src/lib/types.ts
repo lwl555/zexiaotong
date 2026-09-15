@@ -155,7 +155,17 @@ export interface Message {
   created_at: string
 }
 
-export type TxnType = 'recharge' | 'income' | 'pay' | 'withdraw' | 'commission' | 'refund' | 'freeze' | 'unfreeze' | 'adjust'
+export type TxnType = 'recharge' | 'income' | 'pay' | 'withdraw' | 'commission' | 'refund' | 'freeze' | 'unfreeze' | 'adjust' | 'checkin'
+
+// 签到记录
+export interface CheckIn {
+  id: string
+  user_id: string
+  checkin_date: string  // YYYY-MM-DD（中国日期）
+  points: number
+  streak: number
+  created_at: string
+}
 export interface WalletTxn {
   id: string
   user_id: string

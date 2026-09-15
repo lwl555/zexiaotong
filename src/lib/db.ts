@@ -12,7 +12,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   Profile, Task, Goods, Post, Comment, Message, WalletTxn, Withdrawal,
   Arbitration, Notification, Category, Banner, PlatformConfig, Role,
-  TaskStatus, GoodsStatus, PostStatus, School, Bulletin, ActivityLog
+  TaskStatus, GoodsStatus, PostStatus, School, Bulletin, ActivityLog, CheckIn
 } from './types'
 
 export { supabase }
@@ -528,6 +528,59 @@ export async function fetchActivityLogs(opts?: { actor_type?: string; action?: s
     uid: opts?.operatorId || ''
   })
   return (data?.logs || []) as ActivityLog[]
+}
+
+// 签到：走 db-write 的 check_in action（服务端算中国日期、连签、发积分、写流水）
+export async function checkIn(uid: string): Promise<any> {
+  return dbWrite('check_in', { uid })
+}
+
+// 读取当前用户签到状态（今日是否已签 + 当前连续天数 + 下次签到的连签/积分预览 + 最近记录）
+// checkins 表 RLS 设为 select using (true)，anon 也可读，用于展示活跃度。
+export async function fetchCheckinStatus(uid: string): Promise<{
+  checkedToday: boolean
+  streak: number
+  nextStreak: number
+  nextPoints: number
+  recent: CheckIn[]
+}> {
+  const empty = { checkedToday: false, streak: 0, nextStreak: 1, nextPoints: 10, recent: [] as CheckIn[] }
+  if (!uid) return empty
+  try {
+    const { data, error } = await withTimeout(
+      supabase!
+        .from('checkins')
+        .select('id,user_id,checkin_date,points,streak')
+        .eq('user_id', uid)
+        .order('checkin_date', { ascending: false })
+        .limit(31),
+      8000,
+      'checkin-status'
+    )
+    if (error) return empty
+    const rows = (data as any[]) || []
+    const now = new Date()
+    const sh = new Date(now.getTime() + 8 * 3600 * 1000 - now.getTimezoneOffset() * 60000)
+    const today = sh.toISOString().slice(0, 10)
+    const dates = rows.map(r => r.checkin_date).sort()
+    const lastDate = dates.length ? dates[dates.length - 1] : null
+    const checkedToday = lastDate === today
+    const set = new Set(dates)
+    // 以最近一次签到日为终点往前数连续天数
+    let streak = 0
+    if (lastDate) {
+      let cur = new Date(lastDate + 'T00:00:00Z')
+      while (set.has(cur.toISOString().slice(0, 10))) {
+        streak++
+        cur.setUTCDate(cur.getUTCDate() - 1)
+      }
+    }
+    const nextStreak = checkedToday ? streak : streak + 1
+    const nextPoints = 10 + Math.min((nextStreak - 1) * 2, 20) + (nextStreak % 7 === 0 ? 50 : 0)
+    return { checkedToday, streak, nextStreak, nextPoints, recent: rows as CheckIn[] }
+  } catch {
+    return empty
+  }
 }
 
 // ─── 管理员操作 ─────────────────────────────────────────────────
