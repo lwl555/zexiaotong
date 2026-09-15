@@ -102,7 +102,7 @@ export default function TaskDetail() {
           </span>
         </div>
         <div style={{ fontFamily: FONT, fontSize: 28, fontWeight: 800, color: ACCENT, letterSpacing: '-0.02em', margin: '16px 0' }}>
-          ¥{task.amount}
+          {task.amount} 积分
           <span style={{ fontFamily: FONT, fontSize: 12, color: MUTED, fontWeight: 400, marginLeft: 8 }}>
             {(() => { const c = useStore.getState().config; return c ? `平台抽佣 ${Math.round(c.commission_rate * 100)}%` : '' })()}
           </span>

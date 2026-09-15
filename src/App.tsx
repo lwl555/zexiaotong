@@ -49,6 +49,9 @@ const ThemePreview  = safeLazy(() => import('./pages/mobile/ThemePreview'))
 const Settings      = safeLazy(() => import('./pages/mobile/Settings'))
 const Discover      = safeLazy(() => import('./pages/mobile/Discover'))
 const Chat          = safeLazy(() => import('./pages/mobile/Chat'))
+const BulletinBoard = safeLazy(() => import('./pages/mobile/BulletinBoard'))
+const PublishBulletin = safeLazy(() => import('./pages/mobile/PublishBulletin'))
+const BulletinDetail = safeLazy(() => import('./pages/mobile/BulletinDetail'))
 
 // PC 管理后台（同一平台内的模块，自身响应式）
 const Dashboard     = safeLazy(() => import('./pages/admin/Dashboard'))
@@ -61,6 +64,7 @@ const Withdraw      = safeLazy(() => import('./pages/admin/Withdraw'))
 const Config        = safeLazy(() => import('./pages/admin/Config'))
 const System        = safeLazy(() => import('./pages/admin/System'))
 const FeatureChats  = safeLazy(() => import('./pages/admin/FeatureChats'))
+const Logs          = safeLazy(() => import('./pages/admin/Logs'))
 
 // 路由切换时的加载占位（陶土红品牌色；只在 chunk 下载期间出现一帧）
 function RouteFallback() {
@@ -185,6 +189,7 @@ export default function App() {
             <Route path="withdraw" element={<Withdraw />} />
             <Route path="config" element={<Config />} />
             <Route path="feature-chats" element={<FeatureChats />} />
+            <Route path="logs" element={<Logs />} />
             <Route path="system" element={<System />} />
           </Route>
 
@@ -203,6 +208,9 @@ export default function App() {
             <Route path="publish-post" element={<PublishPost />} />
             <Route path="messages" element={<Messages />} />
             <Route path="notifications" element={<Notifications />} />
+            <Route path="bulletins" element={<BulletinBoard />} />
+            <Route path="publish-bulletin" element={<PublishBulletin />} />
+            <Route path="bulletin/:id" element={<BulletinDetail />} />
             <Route path="my-tasks" element={<MyTasks />} />
             <Route path="ai-history" element={<AIHistory />} />
             <Route path="wallet" element={<Wallet />} />

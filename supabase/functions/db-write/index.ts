@@ -78,6 +78,21 @@ async function requireAdmin(uid: string): Promise<any> {
   return p
 }
 
+// 运行日志：记录智能体 / 管理员 / 用户 / 系统的关键动作
+async function logActivity(
+  actor_type: string, actor_id: string, actor_name: string,
+  action: string, target_type = '', target_id = '', detail = ''
+) {
+  await pg('POST', 'activity_logs', { actor_type, actor_id, actor_name, action, target_type, target_id, detail })
+}
+
+// 计数器 +1（评论数 / 点赞数等）
+async function incCounter(table: string, id: string, col: string) {
+  const r = await pg('GET', `${table}?select=${col}&id=eq.${enc(id)}`)
+  const cur = Array.isArray(r.data) && r.data[0] ? Number(r.data[0][col]) : 0
+  await pg('PATCH', `${table}?id=eq.${enc(id)}`, { [col]: cur + 1 })
+}
+
 // 通用 insert：白名单表 + owner 校验
 const INSERT_ALLOWED: Record<string, string[]> = {
   comments: [],                       // 评论无 owner 字段，按目标关联写入
@@ -179,22 +194,26 @@ Deno.serve(async (req) => {
       return json({ profile: strip(ins.data?.[0]) })
     }
 
-    // ── 充值 ──
+    // ── 充值（前端传「元」，后端按 points_per_yuan 换算成「积分」入账）──
     if (action === 'recharge') {
       const { amount } = body
       if (typeof amount !== 'number' || amount <= 0) return json({ error: '金额无效' }, 400)
       const me = await requireUser(uid)
-      const newBal = Number(me.balance) + Number(amount)
+      const cfgRes = await pg('GET', 'platform_config?select=points_per_yuan&limit=1')
+      const ppu = Array.isArray(cfgRes.data) && cfgRes.data[0]?.points_per_yuan ? Number(cfgRes.data[0].points_per_yuan) : 100
+      const points = Math.round(Number(amount) * ppu)
+      const newBal = Number(me.balance) + points
       const u = await pg('PATCH', `profiles?id=eq.${enc(uid)}`, { balance: newBal })
       if (!u.ok) return json({ error: '充值失败' }, 500)
       await pg('POST', 'txns', {
         user_id: uid,
         type: 'recharge',
-        amount,
+        amount: points,
         balance_after: newBal,
-        remark: '账户充值'
+        remark: `充值 ¥${Number(amount).toFixed(2)}，得 ${points} 积分`
       })
-      return json({ balance: newBal })
+      await logActivity('user', uid, me.nickname || '', 'recharge', 'wallet', '', `充值 ¥${Number(amount).toFixed(2)}，得 ${points} 积分`)
+      return json({ balance: newBal, points })
     }
 
     // ── 发布任务（冻结余额 + 建任务 + 记流水）──
@@ -220,7 +239,7 @@ Deno.serve(async (req) => {
         type: 'freeze',
         amount: -amount,
         balance_after: Number(me.balance),
-        remark: `发布任务冻结（${task.title}）`
+        remark: `发布任务冻结 ${amount} 积分（${task.title}）`
       })
       await pg('PATCH', `profiles?id=eq.${enc(uid)}`, { frozen: Number(me.frozen) + amount })
       return json({ task: taskRow })
@@ -275,8 +294,10 @@ Deno.serve(async (req) => {
       const cfg = Array.isArray(cfgRes.data) && cfgRes.data[0] ? cfgRes.data[0] : { commission_rate: 0.1 }
       const commission = Number(task.amount) * Number(cfg.commission_rate)
       const net = Number(task.amount) - commission
-      // 解冻雇主
-      await pg('PATCH', `profiles?id=eq.${enc(task.poster_id)}`, { frozen: Number(task.frozen ?? 0) - Number(task.amount) })
+      // 解冻雇主：必须用雇主当前冻结额减去本任务金额（tasks 表无 frozen 列，原代码引用了不存在的列导致算成负数）
+      const posterRes = await pg('GET', `profiles?select=frozen&id=eq.${enc(task.poster_id)}`)
+      const posterFrozen = Array.isArray(posterRes.data) && posterRes.data[0] ? Number(posterRes.data[0].frozen) : 0
+      await pg('PATCH', `profiles?id=eq.${enc(task.poster_id)}`, { frozen: Math.max(0, posterFrozen - Number(task.amount)) })
       // 给接单者加款
       const acc = await pg('GET', `profiles?select=balance&id=eq.${enc(task.accepted_id)}`)
       const accBal = Array.isArray(acc.data) && acc.data[0] ? Number(acc.data[0].balance) : 0
@@ -286,14 +307,14 @@ Deno.serve(async (req) => {
         type: 'income',
         amount: net,
         balance_after: accBal + net,
-        remark: `任务完成收入（${task.title}，平台抽佣 ¥${commission}）`
+        remark: `任务完成收入（${task.title}，平台抽佣 ${commission} 积分）`
       })
       await pg('PATCH', `tasks?id=eq.${enc(taskId)}`, { status: 'done' })
       await pg('POST', 'notifications', {
         user_id: task.accepted_id,
         type: 'task_status',
         title: '任务已完成',
-        content: `「${task.title}」已结算，收入 ¥${net}`
+        content: `「${task.title}」已结算，收入 ${net} 积分`
       })
       return json({ ok: true, net })
     }
@@ -307,7 +328,8 @@ Deno.serve(async (req) => {
         top_price_d1: config.top_price.d1,
         top_price_d3: config.top_price.d3,
         top_price_d7: config.top_price.d7,
-        announce: config.announce
+        announce: config.announce,
+        points_per_yuan: config.points_per_yuan
       })
       if (!u.ok) return json({ error: '更新失败' }, 500)
       return json({ ok: true })
@@ -319,12 +341,22 @@ Deno.serve(async (req) => {
       await requireAdmin(uid)
       const u = await pg('GET', `profiles?select=balance&id=eq.${enc(userId)}`)
       const bal = Array.isArray(u.data) && u.data[0] ? Number(u.data[0].balance) : 0
-      await pg('PATCH', `profiles?id=eq.${enc(userId)}`, { balance: bal - Number(amount) })
+      const newBal = bal - Number(amount)
+      await pg('PATCH', `profiles?id=eq.${enc(userId)}`, { balance: newBal })
+      // 补写提现流水（原代码漏写，导致「余额少了但流水里看不到提现」）
+      await pg('POST', 'txns', {
+        user_id: userId,
+        type: 'withdraw',
+        amount: -Number(amount),
+        balance_after: newBal,
+        remark: '提现审核通过'
+      })
       const w = await pg('PATCH', `withdrawals?id=eq.${enc(wdId)}`, {
         status: 'approved',
         handled_at: new Date().toISOString()
       })
       if (!w.ok) return json({ error: '更新失败' }, 500)
+      await logActivity('admin', uid, '', 'approve_withdrawal', 'user', userId, `通过提现 ${amount} 积分`)
       return json({ ok: true })
     }
 
@@ -377,6 +409,92 @@ Deno.serve(async (req) => {
       const u = await pg('PATCH', `${table}?id=eq.${enc(id)}`, updates)
       if (!u.ok) return json({ error: '更新失败：' + JSON.stringify(u.data) }, 500)
       return json({ ok: true, row: u.data?.[0] })
+    }
+
+    // ── 管理员手动增加/扣减积分 ──
+    if (action === 'add_points') {
+      const { targetUserId, points, reason } = body
+      await requireAdmin(uid)
+      if (typeof points !== 'number' || points === 0) return json({ error: '积分无效' }, 400)
+      const t = await getProfile(targetUserId)
+      if (!t) return json({ error: '目标用户不存在' }, 404)
+      const newBal = Number(t.balance) + points
+      await pg('PATCH', `profiles?id=eq.${enc(targetUserId)}`, { balance: newBal })
+      await pg('POST', 'txns', {
+        user_id: targetUserId,
+        type: 'adjust',
+        amount: points,
+        balance_after: newBal,
+        remark: reason || '管理员调整积分'
+      })
+      await logActivity('admin', uid, '', 'add_points', 'user', targetUserId, `${points > 0 ? '+' : ''}${points} 积分：${reason || ''}`)
+      return json({ balance: newBal, points })
+    }
+
+    // ── 发布小黑板（校园墙）──
+    if (action === 'publish_bulletin') {
+      const { bulletin } = body
+      if (!bulletin || bulletin.author_id !== uid) return json({ error: '身份不匹配' }, 403)
+      const ins = await pg('POST', 'bulletins', bulletin)
+      if (!ins.ok) return json({ error: '发布失败：' + JSON.stringify(ins.data) }, 500)
+      await logActivity('user', uid, bulletin.author_name || '', 'publish_bulletin', 'bulletin', ins.data?.[0]?.id, (bulletin.content || '').slice(0, 60))
+      return json({ bulletin: ins.data?.[0] })
+    }
+
+    // ── 写入评论（智能体 / 用户通用；自动维护评论计数 + 运行日志）──
+    if (action === 'add_comment') {
+      const { target_type, target_id, author_id, author_name, author_avatar, content, is_bot } = body
+      if (!target_type || !target_id || !author_id || !content) return json({ error: '评论参数缺失' }, 400)
+      const ins = await pg('POST', 'comments', {
+        target_type,
+        target_id,
+        author_id,
+        author_name: author_name || '匿名',
+        author_avatar: author_avatar || '',
+        content
+      })
+      if (!ins.ok) return json({ error: '评论失败：' + JSON.stringify(ins.data) }, 500)
+      const tbl = target_type === 'bulletin' ? 'bulletins' : target_type === 'post' ? 'posts' : target_type
+      await incCounter(tbl, target_id, 'comments')
+      await logActivity(is_bot ? 'bot' : 'user', author_id, author_name || '', 'comment', target_type, target_id, (content || '').slice(0, 60))
+      return json({ comment: ins.data?.[0] })
+    }
+
+    // ── 点赞目标（智能体自动点赞用）──
+    if (action === 'like_target') {
+      const { target_type, target_id } = body
+      if (!target_type || !target_id) return json({ error: '参数缺失' }, 400)
+      const tbl = target_type === 'bulletin' ? 'bulletins' : 'posts'
+      await incCounter(tbl, target_id, 'likes')
+      return json({ ok: true })
+    }
+
+    // ── 管理员代发全站公告（写入每个用户的通知）──
+    if (action === 'send_announce') {
+      const { title, content } = body
+      await requireAdmin(uid)
+      if (!title || !content) return json({ error: '缺少标题或内容' }, 400)
+      const usersRes = await pg('GET', `profiles?select=id&limit=2000`)
+      const users = Array.isArray(usersRes.data) ? usersRes.data : []
+      let sent = 0
+      for (const u of users) {
+        const r = await pg('POST', 'notifications', { user_id: u.id, type: 'announce', title, content })
+        if (r.ok) sent++
+      }
+      await logActivity('admin', uid, '', 'send_announce', '', '', `${title}（${sent} 人）`)
+      return json({ ok: true, sent })
+    }
+
+    // ── 后台查看运行日志 ──
+    if (action === 'admin_logs') {
+      await requireAdmin(uid)
+      const { actor_type, action: act, limit } = body
+      let path = 'activity_logs?select=*&order=created_at.desc&limit=' + (Number(limit) || 100)
+      if (actor_type) path += `&actor_type=eq.${enc(actor_type)}`
+      if (act) path += `&action=eq.${enc(act)}`
+      const r = await pg('GET', path)
+      if (!r.ok) return json({ error: '查询失败' }, 500)
+      return json({ logs: r.data || [] })
     }
 
     return json({ error: '未知操作：' + action }, 400)

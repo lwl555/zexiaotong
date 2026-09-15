@@ -12,7 +12,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   Profile, Task, Goods, Post, Comment, Message, WalletTxn, Withdrawal,
   Arbitration, Notification, Category, Banner, PlatformConfig, Role,
-  TaskStatus, GoodsStatus, PostStatus
+  TaskStatus, GoodsStatus, PostStatus, School, Bulletin, ActivityLog
 } from './types'
 
 export { supabase }
@@ -299,6 +299,40 @@ export async function triggerCommunityBots(count = 1): Promise<number> {
   }
 }
 
+/**
+ * 触发社区智能体自动互动（Edge Function `community-bots` 的 interact 模式）。
+ * 让 bot 给最近帖子/小黑板留言 + 顺手点赞，制造「随处都有活人」的氛围。
+ * 服务端内置限频（30 分钟窗口内达上限则跳过），前端也可放心反复调用。
+ * 纯后台行为：不抛错、不阻塞 UI，返回是否真有互动发生。
+ */
+export async function botInteract(count = 1): Promise<boolean> {
+  try {
+    const r: any = await withTimeout(
+      supabase!.functions.invoke('community-bots', { body: { mode: 'interact', count } }),
+      60000,
+      'community-bots-interact'
+    )
+    const data = r?.data || {}
+    return !!data?.ok && !data?.skipped
+  } catch {
+    return false
+  }
+}
+
+// 客户端节流：10 分钟内最多触发一次，配合服务端 30 分钟限频，避免来回切页面频繁打函数。
+const BOT_INTERACT_KEY = 'zex:bot_interact_at'
+export async function maybeBotInteract(count = 1): Promise<void> {
+  try {
+    const last = Number(localStorage.getItem(BOT_INTERACT_KEY) || 0)
+    const now = Date.now()
+    if (now - last < 10 * 60 * 1000) return
+    localStorage.setItem(BOT_INTERACT_KEY, String(now))
+    await botInteract(count)
+  } catch {
+    /* 静默失败，绝不阻塞页面 */
+  }
+}
+
 export async function updatePost(id: string, updates: Partial<Post>): Promise<Post> {
   const d = await dbWrite('update', { table: 'posts', id, updates, uid: currentUid() })
   return (d.row || { id, ...updates }) as Post
@@ -435,6 +469,65 @@ export async function fetchBanners(): Promise<Banner[]> {
   const { data, error } = await supabase!.from('banners').select('*')
   if (error) throw error
   return (data || []) as Banner[]
+}
+
+// ─── 院校 / 小黑板 / 运行日志 ───────────────────────────────────
+
+export async function fetchSchools(): Promise<School[]> {
+  const { data, error } = await supabase!
+    .from('schools')
+    .select('*')
+    .order('name')
+  if (error) throw error
+  return (data || []) as School[]
+}
+
+// 小黑板列表：
+//   - 全部模式：所有 status=on 的帖子
+//   - 指定学校模式：该校专属帖子 + 标记为「全部院校」的全局帖子
+export async function fetchBulletins(opts?: { schoolId?: string | null }): Promise<Bulletin[]> {
+  let q = supabase!.from('bulletins').select('*').eq('status', 'on')
+  if (opts?.schoolId && opts.schoolId !== 'all') {
+    q = q.or(`school_id.eq.${opts.schoolId},is_all_schools.eq.true`)
+  }
+  const { data, error } = await q.order('created_at', { ascending: false })
+  if (error) throw error
+  return (data || []) as Bulletin[]
+}
+
+export async function createBulletin(b: Partial<Bulletin>): Promise<Bulletin> {
+  const d = await dbWrite('publish_bulletin', { bulletin: b })
+  return d.bulletin as Bulletin
+}
+
+export async function fetchBulletinComments(bulletinId: string): Promise<Comment[]> {
+  return fetchComments('bulletin', bulletinId)
+}
+
+export async function addBulletinComment(c: Partial<Comment>): Promise<Comment> {
+  const d = await dbWrite('add_comment', { ...c, target_type: 'bulletin' })
+  return d.comment as Comment
+}
+
+// 管理员手动增减积分
+export async function adminAddPoints(targetUserId: string, points: number, reason: string, operatorId: string) {
+  await dbWrite('add_points', { targetUserId, points, reason, uid: operatorId })
+}
+
+// 管理员代发全站公告
+export async function adminSendAnnounce(title: string, content: string, operatorId: string) {
+  await dbWrite('send_announce', { title, content, uid: operatorId })
+}
+
+// 后台运行日志（需管理员身份，后端校验）
+export async function fetchActivityLogs(opts?: { actor_type?: string; action?: string; limit?: number; operatorId?: string }): Promise<ActivityLog[]> {
+  const data = await dbWrite('admin_logs', {
+    actor_type: opts?.actor_type,
+    action: opts?.action,
+    limit: opts?.limit || 200,
+    uid: opts?.operatorId || ''
+  })
+  return (data?.logs || []) as ActivityLog[]
 }
 
 // ─── 管理员操作 ─────────────────────────────────────────────────

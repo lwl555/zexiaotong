@@ -9,8 +9,8 @@ export interface Profile {
   nickname: string
   avatar: string
   role: Role
-  balance: number          // 钱包余额（元）
-  frozen: number           // 冻结金额（发布任务冻结）
+  balance: number          // 积分余额（100 积分 = 1 元）
+  frozen: number           // 冻结积分（发布任务冻结）
   status: UserStatus
   created_at: string
   password_hash?: string  // 密码哈希（前端 SHA-256(qq:password)），可空表示未设置密码
@@ -100,12 +100,47 @@ export interface Post {
 
 export interface Comment {
   id: string
-  target_type: 'task' | 'post' | 'goods'
+  target_type: 'task' | 'post' | 'goods' | 'bulletin'
   target_id: string
   author_id: string
   author_name: string
   author_avatar?: string
   content: string
+  created_at: string
+}
+
+export interface School {
+  id: string
+  name: string
+  created_at: string
+}
+
+export interface Bulletin {
+  id: string
+  school_id: string | null
+  school_name: string
+  author_id: string
+  author_name: string
+  author_avatar: string
+  content: string
+  images: string[]
+  is_all_schools: boolean
+  likes: number
+  comments: number
+  status: 'on' | 'off' | 'removed'
+  created_at: string
+}
+
+export type ActorType = 'user' | 'admin' | 'bot' | 'system'
+export interface ActivityLog {
+  id: string
+  actor_type: ActorType
+  actor_id: string
+  actor_name: string
+  action: string
+  target_type: string
+  target_id: string
+  detail: string
   created_at: string
 }
 
@@ -120,7 +155,7 @@ export interface Message {
   created_at: string
 }
 
-export type TxnType = 'recharge' | 'income' | 'pay' | 'withdraw' | 'commission' | 'refund' | 'freeze' | 'unfreeze'
+export type TxnType = 'recharge' | 'income' | 'pay' | 'withdraw' | 'commission' | 'refund' | 'freeze' | 'unfreeze' | 'adjust'
 export interface WalletTxn {
   id: string
   user_id: string
@@ -161,7 +196,7 @@ export interface Arbitration {
   created_at: string
 }
 
-export type NotiType = 'task_status' | 'task_taken' | 'task_review' | 'arbitration' | 'comment' | 'message' | 'announce'
+export type NotiType = 'task_status' | 'task_taken' | 'task_review' | 'arbitration' | 'comment' | 'message' | 'announce' | 'bulletin'
 export interface Notification {
   id: string
   user_id: string
@@ -187,6 +222,7 @@ export interface Banner {
 
 export interface PlatformConfig {
   commission_rate: number   // 0.05 - 0.15
-  top_price: { d1: number; d3: number; d7: number }
+  top_price: { d1: number; d3: number; d7: number }  // 单位：积分
   announce: string
+  points_per_yuan: number   // 积分换算比例（默认 100：100 积分 = 1 元）
 }

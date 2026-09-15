@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Save, Megaphone, Percent, Pin, CheckCircle, Loader2 } from 'lucide-react'
+import { Save, Megaphone, Percent, Pin, CheckCircle, Loader2, Send } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { PageHeader } from './ui'
 import type { PlatformConfig } from '../../lib/types'
@@ -7,13 +7,19 @@ import type { PlatformConfig } from '../../lib/types'
 export default function Config() {
   const config = useStore(s => s.config)
   const setConfig = useStore(s => s.setConfig)
+  const adminSendAnnounce = useStore(s => s.adminSendAnnounce)
   // 用默认值兜底：config 还在加载（null）时不挂；config 到位后再用真实数据
   const [draft, setDraft] = useState<PlatformConfig>({
     commission_rate: 0.10,
     top_price: { d1: 2, d3: 5, d7: 10 },
-    announce: ''
+    announce: '',
+    points_per_yuan: 100
   })
   const [saved, setSaved] = useState(false)
+  const [pushTitle, setPushTitle] = useState('')
+  const [pushContent, setPushContent] = useState('')
+  const [pushBusy, setPushBusy] = useState(false)
+  const [pushDone, setPushDone] = useState(false)
 
   // config 加载完成后同步到 draft；加载中的 draft 用兜底值，避免渲染时 .commission_rate 崩溃
   useEffect(() => {
@@ -66,16 +72,39 @@ export default function Config() {
                 <span className="text-sm text-gray-600 w-20">{['1 天', '3 天', '7 天'][i]}</span>
                 <input type="number" min="0" className="input" value={draft.top_price[k]}
                   onChange={e => setDraft({ ...draft, top_price: { ...draft.top_price, [k]: Number(e.target.value) } })} />
-                <span className="text-gray-400 text-sm">元</span>
+                <span className="text-gray-400 text-sm">积分</span>
               </div>
             ))}
           </div>
         </div>
 
+        <div className="card p-5">
+          <div className="flex items-center gap-2 font-bold text-ink mb-4"><Pin size={18} className="text-clay" /> 积分换算比例</div>
+          <label className="text-sm text-gray-600">多少积分等于 1 元（充值 / 提现换算用）</label>
+          <input type="number" min="1" className="input mt-2" value={draft.points_per_yuan}
+            onChange={e => setDraft({ ...draft, points_per_yuan: Number(e.target.value) })} />
+          <div className="text-xs text-gray-400 mt-1">当前：{draft.points_per_yuan} 积分 = 1 元</div>
+        </div>
+
         <div className="card p-5 lg:col-span-2">
-          <div className="flex items-center gap-2 font-bold text-ink mb-4"><Megaphone size={18} className="text-brand-600" /> 全局公告</div>
-          <textarea className="input h-28 resize-none" value={draft.announce}
+          <div className="flex items-center gap-2 font-bold text-ink mb-4"><Megaphone size={18} className="text-brand-600" /> 全站公告与推送</div>
+          <label className="text-sm text-gray-600">常驻公告（展示在前台公告位）</label>
+          <textarea className="input h-20 resize-none mt-2" value={draft.announce}
             onChange={e => setDraft({ ...draft, announce: e.target.value })} placeholder="发布全站公告…" />
+          <div className="border-t border-gray-100 my-4" />
+          <label className="text-sm text-gray-600">立即推送全站通知（写入每个用户的消息中心）</label>
+          <input className="input mt-2" value={pushTitle} onChange={e => setPushTitle(e.target.value)} placeholder="通知标题，如：系统升级通知" />
+          <textarea className="input h-20 resize-none mt-2" value={pushContent} onChange={e => setPushContent(e.target.value)} placeholder="通知内容…" />
+          <button className="btn-primary mt-3 inline-flex items-center gap-1" disabled={pushBusy || !pushTitle || !pushContent}
+            onClick={async () => {
+              setPushBusy(true); setPushDone(false)
+              try { await adminSendAnnounce(pushTitle, pushContent); setPushDone(true); setPushTitle(''); setPushContent(''); setTimeout(() => setPushDone(false), 2500) }
+              catch (e: any) { alert(e?.message || '推送失败') }
+              finally { setPushBusy(false) }
+            }}>
+            {pushBusy ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} 推送全站通知
+          </button>
+          {pushDone && <span className="text-xs text-green-600 ml-3 inline-flex items-center gap-1"><CheckCircle size={14} /> 已推送</span>}
         </div>
       </div>
     </div>

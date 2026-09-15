@@ -37,7 +37,7 @@ export default function Arbitration() {
                   <div className="font-bold text-ink flex items-center gap-2">
                     <Gavel size={16} className="text-clay" /> {a.task_title}
                   </div>
-                  <div className="text-xs text-gray-400 mt-1">争议编号 {a.id} · 悬赏 ¥{amount}</div>
+                  <div className="text-xs text-gray-400 mt-1">争议编号 {a.id} · 悬赏 {amount} 积分</div>
                 </div>
                 {a.status === 'open'
                   ? <StatusBadge text="待判定" tone="red" />

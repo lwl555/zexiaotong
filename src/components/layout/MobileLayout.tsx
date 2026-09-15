@@ -15,6 +15,8 @@ const ROUTE_TITLE: Record<string, string> = {
   '/document-workshop': '文档工坊',
   '/warnings': '避雷清单',
   '/community': '择校社区',
+  '/bulletins': '小黑板',
+  '/publish-bulletin': '发布小黑板',
   '/goods': '二手市场',
   '/publish': '发布任务',
   '/publish-goods': '发布闲置',
@@ -34,6 +36,7 @@ const ROUTE_TITLE: Record<string, string> = {
 }
 function titleOf(path: string): string {
   if (ROUTE_TITLE[path]) return ROUTE_TITLE[path]
+  if (path.startsWith('/bulletin')) return '小黑板'
   if (path.startsWith('/post')) return '帖子详情'
   if (path.startsWith('/task')) return '任务详情'
   if (path.startsWith('/goods/')) return '商品详情'
@@ -44,6 +47,7 @@ function titleOf(path: string): string {
 const tabs = [
   { to: '/', label: '首页', icon: HomeIcon, end: true },
   { to: '/community', label: '社区', icon: Users, end: false },
+  { to: '/bulletins', label: '小黑板', icon: MessageSquare, end: false },
   { to: '/discover', label: '发现', icon: Compass, end: false },
   { to: '/mine', label: '我', icon: User, end: false }
 ]

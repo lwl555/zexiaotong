@@ -1,7 +1,7 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, ListChecks, ShoppingBag, MessageSquare, Gavel,
-  Wallet, Settings2, Shield, ArrowLeft, Lock, Bell
+  Wallet, Settings2, Shield, ArrowLeft, Lock, Bell, ScrollText
 } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { useMe } from '../../store/useMe'
@@ -16,6 +16,7 @@ const menu = [
   { to: '/admin/withdraw', label: '提现审核', icon: Wallet },
   { to: '/admin/feature-chats', label: '功能反馈', icon: Bell },
   { to: '/admin/config', label: '运营配置', icon: Settings2 },
+  { to: '/admin/logs', label: '运行日志', icon: ScrollText },
   { to: '/admin/system', label: '系统安全', icon: Shield }
 ]
 
@@ -84,7 +85,7 @@ export default function AdminLayout() {
       <div className="flex-1 md:ml-56 flex flex-col min-w-0">
         <header className="h-14 bg-white border-b flex items-center justify-between px-4 md:px-6 sticky top-0 z-20">
           <div className="text-xs md:text-sm text-gray-500 truncate">
-            {cfg ? <>平台佣金 {Math.round(cfg.commission_rate * 100)}% · 置顶 ¥{cfg.top_price.d1}/¥{cfg.top_price.d3}/¥{cfg.top_price.d7}（1/3/7天）</> : '配置加载中…'}
+            {cfg ? <>平台佣金 {Math.round(cfg.commission_rate * 100)}% · 置顶 {cfg.top_price.d1}/{cfg.top_price.d3}/{cfg.top_price.d7} 积分（1/3/7天）</> : '配置加载中…'}
           </div>
           <div className="flex items-center gap-3 text-sm shrink-0">
             <span className="px-2 py-0.5 rounded bg-brand-50 text-brand-700">管理员</span>

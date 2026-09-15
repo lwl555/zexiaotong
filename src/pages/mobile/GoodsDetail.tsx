@@ -65,7 +65,7 @@ export default function GoodsDetail() {
 
       <div style={{ padding: '18px 6px 0' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
-          <div style={{ fontFamily: FONT, fontSize: 30, fontWeight: 800, color: ACCENT, letterSpacing: '-0.02em' }}>¥{good.price}</div>
+          <div style={{ fontFamily: FONT, fontSize: 30, fontWeight: 800, color: ACCENT, letterSpacing: '-0.02em' }}>{good.price} 积分</div>
           {good.status === 'off' ? (
             <Tag tone="ink">已下架</Tag>
           ) : (

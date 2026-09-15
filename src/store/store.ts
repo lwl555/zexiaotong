@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type {
   Profile, Role, Task, Goods, Post, Message, WalletTxn, Withdrawal,
   Arbitration, Notification, Category, Banner, PlatformConfig,
-  TaskStatus, GoodsStatus, PostStatus
+  TaskStatus, GoodsStatus, PostStatus, School, Bulletin, ActivityLog
 } from '../lib/types'
 import * as db from '../lib/db'
 import { notifyNative } from '../lib/nativeNotify'
@@ -46,6 +46,9 @@ interface State {
   categories: Category[]
   banners: Banner[]
   config: PlatformConfig | null
+  schools: School[]
+  bulletins: Bulletin[]
+  logs: ActivityLog[]
 
   // 初始化
   init: () => Promise<void>
@@ -103,6 +106,17 @@ interface State {
   approveWithdrawal: (id: string) => Promise<void>
   rejectWithdrawal: (id: string, reason: string) => Promise<void>
   setConfig: (c: PlatformConfig) => Promise<void>
+
+  // 院校 / 小黑板
+  fetchSchools: () => Promise<void>
+  fetchBulletins: (opts?: { schoolId?: string | null }) => Promise<void>
+  publishBulletin: (input: { content: string; schoolId: string | null; schoolName: string; isAll: boolean; images?: string[] }) => Promise<{ ok: boolean; msg: string }>
+  addBulletinComment: (bulletinId: string, content: string) => Promise<void>
+
+  // 后台：积分 / 公告 / 日志
+  adminAddPoints: (targetUserId: string, points: number, reason: string) => Promise<void>
+  adminSendAnnounce: (title: string, content: string) => Promise<void>
+  fetchLogs: (opts?: { actor_type?: string; action?: string }) => Promise<void>
 }
 
 export const useStore = create<State>((set, get) => ({
@@ -121,6 +135,9 @@ export const useStore = create<State>((set, get) => ({
   categories: [],
   banners: [],
   config: null,
+  schools: [],
+  bulletins: [],
+  logs: [],
 
   // ─── 初始化：从 Supabase 拉取所有数据 ───
   init: async () => {
@@ -162,7 +179,8 @@ export const useStore = create<State>((set, get) => ({
         db.fetchNotifications(me.id),
         db.fetchCategories(),
         db.fetchBanners(),
-        db.fetchPlatformConfig()
+        db.fetchPlatformConfig(),
+        db.fetchSchools()
       ])
       let bundle: any = null
       try {
@@ -173,9 +191,9 @@ export const useStore = create<State>((set, get) => ({
       } catch {
         bundle = null
       }
-      const [tasks, goods, posts, txns, withdrawals, arbitrations, notifications, categories, banners, config] =
-        bundle || Array(10).fill([])
-      set({ tasks, goods, posts, txns, withdrawals, arbitrations, notifications, categories, banners, config, loading: false })
+      const [tasks, goods, posts, txns, withdrawals, arbitrations, notifications, categories, banners, config, schools] =
+        bundle || Array(11).fill([])
+      set({ tasks, goods, posts, txns, withdrawals, arbitrations, notifications, categories, banners, config, schools, loading: false })
       // 启动通知栏轮询（App 后台时把新到达的站内消息弹到手机通知栏）
       get().startNotifyPoller()
     } catch (e: any) {
@@ -503,7 +521,7 @@ export const useStore = create<State>((set, get) => ({
     const config = get().config
     if (!config) return { ok: false, msg: '配置未加载' }
     const price = config.top_price['d' + days as 'd1' | 'd3' | 'd7']
-    if (me.balance < price) return { ok: false, msg: `余额不足，需 ¥${price}` }
+    if (me.balance < price) return { ok: false, msg: `积分不足，需 ${price} 积分` }
     const until = new Date(Date.now() + days * 86400000).toISOString()
     await db.updateTask(id, { top_until: until })
     await db.addTxn({
@@ -515,7 +533,7 @@ export const useStore = create<State>((set, get) => ({
     })
     const [tasks, txns] = await Promise.all([db.fetchTasks(), db.fetchTxns(me.id)])
     set(s => ({ tasks, txns, me: { ...me, balance: me.balance - price } }))
-    return { ok: true, msg: `已置顶 ${days} 天，扣费 ¥${price}` }
+    return { ok: true, msg: `已置顶 ${days} 天，扣费 ${price} 积分` }
   },
 
   approveWithdrawal: async (id) => {
@@ -537,5 +555,76 @@ export const useStore = create<State>((set, get) => ({
     const me = get().me!
     await db.setConfig(c, me.id)
     set({ config: c })
+  },
+
+  // ─── 院校 / 小黑板 ───
+  fetchSchools: async () => {
+    try {
+      const schools = await db.fetchSchools()
+      set({ schools })
+    } catch { /* 院校列表非关键，失败静默 */ }
+  },
+
+  fetchBulletins: async (opts) => {
+    try {
+      const bulletins = await db.fetchBulletins(opts)
+      set({ bulletins })
+    } catch { /* 失败保留旧数据 */ }
+  },
+
+  publishBulletin: async (input) => {
+    const me = get().me
+    if (!me) return { ok: false, msg: '请先登录' }
+    if (!input.content.trim()) return { ok: false, msg: '内容不能为空' }
+    try {
+      await db.createBulletin({
+        school_id: input.isAll ? null : input.schoolId,
+        school_name: input.isAll ? '全部院校' : input.schoolName,
+        author_id: me.id,
+        author_name: me.nickname,
+        author_avatar: me.avatar,
+        content: input.content.trim(),
+        images: input.images || [],
+        is_all_schools: input.isAll
+      })
+      const bulletins = await db.fetchBulletins()
+      set({ bulletins })
+      return { ok: true, msg: '已发布到小黑板' }
+    } catch (e: any) {
+      return { ok: false, msg: e?.message || '发布失败' }
+    }
+  },
+
+  addBulletinComment: async (bulletinId, content) => {
+    const me = get().me!
+    await db.addBulletinComment({
+      target_id: bulletinId,
+      author_id: me.id,
+      author_name: me.nickname,
+      author_avatar: me.avatar,
+      content
+    })
+    const bulletins = await db.fetchBulletins()
+    set({ bulletins })
+  },
+
+  // ─── 后台：积分 / 公告 / 日志 ───
+  adminAddPoints: async (targetUserId, points, reason) => {
+    const me = get().me!
+    await db.adminAddPoints(targetUserId, points, reason, me.id)
+  },
+
+  adminSendAnnounce: async (title, content) => {
+    const me = get().me!
+    await db.adminSendAnnounce(title, content, me.id)
+  },
+
+  fetchLogs: async (opts) => {
+    const me = get().me
+    if (!me) return
+    try {
+      const logs = await db.fetchActivityLogs({ ...opts, operatorId: me.id })
+      set({ logs })
+    } catch { /* 失败保留旧数据 */ }
   }
 }))

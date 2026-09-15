@@ -61,7 +61,7 @@ const ASSISTANTS: Channel[] = [
 const COMMUNITY: Channel[] = [
   { id: 'community',  name: '择校社区',       lastMsg: '26 护考大纲 PDF 已上传',         time: '16:26', unread: 86, to: '/community' },
   { id: 'goods',      name: '二手市场',       lastMsg: '二手教材 142 件在售',            time: '11:20', unread: 0,  to: '/goods' },
-  { id: 'tasks',      name: '任务大厅',       lastMsg: '新任务 5 条待认领，最高 ¥200',   time: '10:05', unread: 0,  to: '/publish' },
+  { id: 'tasks',      name: '任务大厅',       lastMsg: '新任务 5 条待认领，最高 20000 积分',   time: '10:05', unread: 0,  to: '/publish' },
 ]
 
 const ACCOUNT: Channel[] = [
@@ -69,7 +69,7 @@ const ACCOUNT: Channel[] = [
   { id: 'messages',   name: '消息中心',       lastMsg: '新私信 3 条未读',               time: '09:30', unread: 3, to: '/messages' },
   { id: 'notifications', name: '通知',       lastMsg: '志愿填报通道已开放',             time: '08:12', unread: 0, to: '/notifications' },
   { id: 'ai-history', name: 'AI 历史',        lastMsg: '历史对话 · 查询记录',           time: '昨天',  unread: 0, to: '/ai-history' },
-  { id: 'wallet',     name: '我的钱包',       lastMsg: '账户余额 ¥328.50',              time: '周一',  unread: 0, to: '/wallet' },
+  { id: 'wallet',     name: '我的钱包',       lastMsg: '账户余额 32850 积分',              time: '周一',  unread: 0, to: '/wallet' },
   { id: 'mine',       name: '个人中心',       lastMsg: '账号管理 · 设置',               time: '—',    unread: 0, to: '/mine' },
   { id: 'about',      name: '关于择校通',     lastMsg: '版本 2026.08 · 真实直接不客气', time: '—',    unread: 0, to: '/about' },
 ]

@@ -116,7 +116,7 @@ export default function PublishGoods() {
               inputMode="decimal"
               style={{ width: '100%', border: `1px solid #e8e8e8`, borderRadius: 2, padding: '10px 12px', fontFamily: FONT, fontSize: 15, outline: 'none' }}
             />
-            <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: 2, color: MUTED, marginTop: 5, textTransform: 'uppercase' }}>元</div>
+            <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: 2, color: MUTED, marginTop: 5, textTransform: 'uppercase' }}>积分</div>
           </div>
           <div style={{ flex: 1 }}>
             <select

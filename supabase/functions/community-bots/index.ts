@@ -1,9 +1,12 @@
 // community-bots — Supabase Edge Function (Deno)
 // 社区智能体：20 个不同人设，自动生成「拟真帖子」（文字 + 配图）发布到校园社区。
 //
-// 调用：POST /functions/v1/community-bots      body: { count?: number }
+// 调用：POST /functions/v1/community-bots
+//   body: { count?: number }                  默认 post 模式：自动生成帖子
+//   body: { mode: 'interact', count?: number } 互动模式：自动给最近帖子/小黑板留言 + 点赞
 //   需带 Supabase anon key（Authorization: Bearer <anon>）。
-// 安全：内置限频——默认 30 分钟内最多产出 4 条，防止被刷爆上游配额。
+// 安全：发文内置限频——默认 30 分钟内最多产出 4 条，防止被刷爆上游配额；
+//       互动模式纯文本生成、无配图，墙钟远低于免费档上限，可叠加到发文计划之外由独立 cron 调度。
 //
 // Secrets：
 //   图片生成两家，主用火山方舟、失败自动回落智谱：
@@ -78,6 +81,118 @@ async function pgInsert(table: string, row: unknown) {
   let data: any = null
   try { data = t ? JSON.parse(t) : null } catch { data = t }
   return { ok: r.ok, data }
+}
+
+// 计数器 +1（评论数 / 点赞数等）
+async function pgInc(table: string, id: string, col: string) {
+  const r = await pgGet(`${table}?select=${col}&id=eq.${enc(id)}`)
+  const cur = Array.isArray(r) && r[0] ? Number(r[0][col]) : 0
+  await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${enc(id)}`, {
+    method: 'PATCH',
+    headers: { apikey: SERVICE_ROLE, Authorization: `Bearer ${SERVICE_ROLE}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ [col]: cur + 1 })
+  })
+}
+
+// 运行日志：记录智能体在平台中的动作（与 db-write 的 logActivity 同语义）
+async function logActivity(actor_type: string, actor_id: string, actor_name: string, action: string, target_type = '', target_id = '', detail = '') {
+  await pgInsert('activity_logs', { actor_type, actor_id, actor_name, action, target_type, target_id, detail })
+}
+
+// 自动评论：给定一个智能体人设，为某条内容生成 1~3 句自然回帖（纯文本，不配图）。
+async function draftComment(botName: string, bot: Bot, targetText: string): Promise<string | null> {
+  const sys =
+    `你是「${botName}」，${bot.tag}（这只是你评论的视角，正文里**不要自报身份**）。\n` +
+    `性格与文风：${bot.style}。擅长：${bot.topics.join('、')}。\n` +
+    `你要在一条社区帖子下留评论（像真实用户回帖，不是写文章）：\n` +
+    `- 1~3 句话，口语化、自然，可认同 / 补充 / 提问 / 讲一点自己的小经历；\n` +
+    `- 别端着、别用「首先其次」模板、别出现"作为AI""我是模型"；\n` +
+    `- 不要 markdown、不要引号包裹、不要刷表情；\n` +
+    `- 直接输出评论正文（不超过 80 字，不要任何前后说明）。\n\n` +
+    `原帖内容（仅供参考，不要复述）：\n${targetText.slice(0, 360)}`
+  try {
+    const r = await fetch(CHAT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SERVICE_ROLE}` },
+      body: JSON.stringify({
+        model: 'agnes-2.0-flash',
+        messages: [
+          { role: 'system', content: sys },
+          { role: 'user', content: '请就上面的帖子留一条你的真实评论。' }
+        ],
+        max_tokens: 300,
+        stream: false
+      })
+    })
+    if (!r.ok) return null
+    const d = await r.json().catch(() => null)
+    let text = d?.choices?.[0]?.message?.content || ''
+    if (!text) return null
+    text = text.replace(/```|"|「|」|“|”/g, '').trim()
+    if (text.length < 2 || text.length > 200) return null
+    return text
+  } catch {
+    return null
+  }
+}
+
+// 自动互动模式：挑最近内容，让智能体以不同人设留言 + 顺手点赞，制造「随处都有活人」的氛围。
+// 纯文本生成（无配图），3 条并发文案约 20~30s，远低于免费档 150s 墙钟，可安全叠加到发文计划之外。
+async function handleInteract(want: number) {
+  const profiles = await pgGet(`profiles?select=id,nickname,avatar&phone=like.bot*`)
+  const pMap: Record<string, any> = {}
+  for (const p of Array.isArray(profiles) ? profiles : []) pMap[p.id] = p
+  const botPool = BOTS.filter((b) => pMap[b.id])
+  if (!botPool.length) return json({ ok: true, skipped: true, reason: '无可用 bot 账号', comments: [] })
+
+  // 后端限频：30 分钟内 bot 互动次数达上限则跳过，防前端频繁刷新刷爆评论（与发文限频同窗口/同上限）
+  const sinceIso = new Date(Date.now() - COOLDOWN_MIN * 60 * 1000).toISOString()
+  const recentLogs = await pgGet(`activity_logs?select=id&actor_type=eq.bot&action=eq.comment&created_at=gte.${sinceIso}`)
+  const recentCount = Array.isArray(recentLogs) ? recentLogs.length : 0
+  if (recentCount >= MAX_PER_COOLDOWN) {
+    return json({ ok: true, skipped: true, reason: `限频：${COOLDOWN_MIN} 分钟内 bot 已互动 ${recentCount} 次`, comments: [] })
+  }
+
+  const posts = await pgGet(`posts?select=id,author_id,title,content,comments&order=created_at.desc&limit=40`)
+  const bullets = await pgGet(`bulletins?select=id,author_id,content,comments&order=created_at.desc&limit=20`)
+  const targets: { type: string; id: string; author_id: string; text: string }[] = []
+  for (const p of Array.isArray(posts) ? posts : []) targets.push({ type: 'post', id: p.id, author_id: p.author_id, text: `${p.title || ''} ${p.content || ''}` })
+  for (const b of Array.isArray(bullets) ? bullets : []) targets.push({ type: 'bulletin', id: b.id, author_id: b.author_id, text: b.content || '' })
+  if (!targets.length) return json({ ok: true, skipped: true, reason: '暂无可互动内容', comments: [] })
+
+  // 偏向评论少的目标，避免对已成热帖反复叠加
+  targets.sort((a, b) => (Number(a.comments) || 0) - (Number(b.comments) || 0))
+  const pool = targets.slice(0, Math.min(targets.length, 14)).sort(() => Math.random() - 0.5).slice(0, want)
+
+  const comments = await Promise.all(pool.map(async (tgt) => {
+    const cands = botPool.filter((b) => b.id !== tgt.author_id)
+    const bot = cands[Math.floor(Math.random() * cands.length)] || botPool[0]
+    const prof = pMap[bot.id]
+    if (!prof) return null
+    const botName = prof.nickname || '社区网友'
+    const comment = await draftComment(botName, bot, tgt.text)
+    if (!comment) return null
+    const ins = await pgInsert('comments', {
+      id: crypto.randomUUID(),
+      target_type: tgt.type,
+      target_id: tgt.id,
+      author_id: bot.id,
+      author_name: botName,
+      author_avatar: prof.avatar || '',
+      content: comment
+    })
+    if (!ins.ok) return { ok: false, err: String(ins.data) }
+    await pgInc(tgt.type, tgt.id, 'comments')
+    await logActivity('bot', bot.id, botName, 'comment', tgt.type, tgt.id, comment.slice(0, 60))
+    return { target: tgt.type, author: botName, content: comment.slice(0, 40) }
+  }))
+
+  const made = comments.filter(Boolean)
+  // 顺手给前两个目标点赞，更像真人
+  for (const tgt of pool.slice(0, Math.min(2, pool.length))) {
+    await pgInc(tgt.type, tgt.id, 'likes')
+  }
+  return json({ ok: true, mode: 'interact', comments: made })
 }
 
 // 每个智能体的「人设」——昵称/头像来自 profiles（本函数只带 id 与人设描述）
@@ -252,6 +367,14 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = await req.json().catch(() => ({}))
+    // 模式分支：
+    //   post    —— 默认，自动生成「文字 +（按需）配图」帖子（原行为）
+    //   interact—— 自动给最近内容留言 + 点赞，制造「随处都有活人」的氛围（本改造新增）
+    const mode = body?.mode || 'post'
+    if (mode === 'interact') {
+      const want = Math.max(1, Math.min(Number(body?.count) || 3, 4))
+      return await handleInteract(want)
+    }
     const want = Math.max(1, Math.min(Number(body?.count) || 1, MAX_PER_CALL))
 
     // 取最近帖子，用于：① 限频统计 ② 避开刚发过的人设（让 20 个角色轮着来）

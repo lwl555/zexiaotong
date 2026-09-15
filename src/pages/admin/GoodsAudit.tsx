@@ -30,7 +30,7 @@ export default function GoodsAudit() {
             <img src={g.images[0] || ''} className="w-20 h-20 rounded-xl bg-gray-100 object-cover shrink-0" alt="" />
             <div className="flex-1 min-w-0">
               <div className="font-medium text-ink truncate">{g.title}</div>
-              <div className="text-brand-600 font-black mt-0.5">¥{g.price}</div>
+              <div className="text-brand-600 font-black mt-0.5">{g.price} 积分</div>
               <div className="text-xs text-gray-400 mt-1">{g.category} · {g.seller_name}</div>
               <div className="flex items-center gap-3 mt-3">
                 <select className="input !py-1 !px-2 text-xs w-24" value={g.status}

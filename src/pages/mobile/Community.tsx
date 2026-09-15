@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Heart, Star, MessageCircle, Search, Flame, Clock } from 'lucide-react'
 import { useStore } from '../../store/store'
+import { maybeBotInteract } from '../../lib/db'
 import {
   PageHeader,
   IndexGrid,
@@ -61,6 +62,7 @@ export default function Community() {
     inviteCommunityBots(1)
       .catch(() => 0)
       .finally(() => { if (alive) setBotBusy(false) })
+    maybeBotInteract(1) // 后台静默触发智能体评论/点赞，制造「随处有活人」氛围（双重限频，不阻塞 UI）
     return () => { alive = false }
   }, [inviteCommunityBots])
 

@@ -21,6 +21,7 @@ export default function Dashboard() {
   const arbitrations = useStore(s => s.arbitrations)
   const goods = useStore(s => s.goods)
   const posts = useStore(s => s.posts)
+  const bulletins = useStore(s => s.bulletins)
 
   const userTotal = users.length
   const banned = users.filter(u => u.status === 'banned').length
@@ -60,18 +61,19 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="注册用户" value={userTotal} sub={`封禁 ${banned} 人`} tone="brand" />
         <StatCard label="进行中任务" value={activeTasks} sub={`共 ${tasks.length} 个`} tone="amber" />
-        <StatCard label="累计成交额" value={'¥' + gmv.toFixed(0)} sub={`已完成 ${doneTasks.length} 单`} tone="green" />
-        <StatCard label="用户钱包总额" value={'¥' + totalBalance.toFixed(0)} sub="冻结计入余额" tone="ink" />
-        <StatCard label="待审提现" value={pendingWd} sub={`¥${withdrawals.filter(w => w.status === 'pending').reduce((s, w) => s + w.amount, 0)}`} tone="clay" />
+        <StatCard label="累计成交额" value={gmv.toLocaleString() + ' 积分'} sub={`已完成 ${doneTasks.length} 单`} tone="green" />
+        <StatCard label="用户钱包总额" value={totalBalance.toLocaleString() + ' 积分'} sub="冻结计入余额" tone="ink" />
+        <StatCard label="待审提现" value={pendingWd} sub={`${withdrawals.filter(w => w.status === 'pending').reduce((s, w) => s + w.amount, 0).toLocaleString()} 积分`} tone="clay" />
         <StatCard label="仲裁中" value={openArb} sub={`共 ${arbitrations.length} 起`} tone="red" />
         <StatCard label="在售二手" value={goods.filter(g => g.status === 'on').length} sub={`共 ${goods.length}`} tone="brand" />
         <StatCard label="社区帖子" value={posts.filter(p => p.status === 'on').length} sub={`共 ${posts.length}`} tone="green" />
+        <StatCard label="小黑板" value={bulletins.filter(b => b.status === 'on').length} sub={`共 ${bulletins.length}`} tone="brand" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-5">
         <div className="card p-4 lg:col-span-2">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="font-bold text-ink">近 7 日成交额（元）</h2>
+            <h2 className="font-bold text-ink">近 7 日成交额（积分）</h2>
             {!hasOrder && <span className="text-[11px] text-gray-400">演示数据</span>}
           </div>
           <ResponsiveContainer width="100%" height={240}>
@@ -108,7 +110,7 @@ export default function Dashboard() {
               <div key={t.id} className="flex items-center justify-between py-2 border-b border-gray-50">
                 <div className="min-w-0">
                   <div className="text-sm truncate">{t.title}</div>
-                  <div className="text-xs text-gray-400">¥{t.amount} · {t.poster_name}</div>
+                  <div className="text-xs text-gray-400">{t.amount} 积分 · {t.poster_name}</div>
                 </div>
                 <StatusBadge text={TASK_TEXT[t.status]} tone={TASK_TONE[t.status]} />
               </div>

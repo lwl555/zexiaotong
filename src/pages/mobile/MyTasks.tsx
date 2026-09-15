@@ -70,7 +70,7 @@ export default function MyTasks() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingTop: 12, borderTop: `1px solid ${HAIR}` }}>
               <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: 1, color: MUTED }}>{t.category}</span>
-              <span style={{ fontFamily: FONT, fontSize: 16, fontWeight: 800, color: ACCENT }}>¥{t.amount}</span>
+              <span style={{ fontFamily: FONT, fontSize: 16, fontWeight: 800, color: ACCENT }}>{t.amount} 积分</span>
             </div>
           </HardCard>
         ))}

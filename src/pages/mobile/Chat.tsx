@@ -95,15 +95,15 @@ const CHATS: Record<string, ChatDef> = {
   money: {
     name: '搞钱', Icon: Coins, color: '#a16207', status: '服务号',
     messages: [
-      { side: 'them', text: '第 3 单佣金 ¥18.00 已到账。' },
-      { side: 'them', text: '本周累计 ¥52.00,继续加油! ' },
+      { side: 'them', text: '第 3 单佣金 1800 积分 已到账。' },
+      { side: 'them', text: '本周累计 5200 积分,继续加油! ' },
     ],
     jump: { to: '/money', label: '打开搞钱' },
   },
   wallet: {
     name: '钱包', Icon: WalletIcon, color: '#047857', status: '服务号',
     messages: [
-      { side: 'them', text: '余额 ¥126.50。' },
+      { side: 'them', text: '余额 12650 积分。' },
       { side: 'them', text: '上次佣金已到账,点击查看账单。' },
     ],
     jump: { to: '/wallet', label: '打开钱包' },

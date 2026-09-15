@@ -15,7 +15,7 @@ export default function Withdraw() {
   return (
     <div>
       <PageHeader title="提现审核" desc="审核用户提现申请，确认打款或驳回">
-        <div className="text-sm text-gray-500">待处理合计 <b className="text-clay text-lg">¥{total.toFixed(2)}</b></div>
+        <div className="text-sm text-gray-500">待处理合计 <b className="text-clay text-lg">{total.toLocaleString()} 积分</b></div>
       </PageHeader>
 
       {withdrawals.length === 0 && <Empty text="暂无提现申请" />}
@@ -32,7 +32,7 @@ export default function Withdraw() {
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-xl font-black text-clay">¥{w.amount.toFixed(2)}</div>
+                <div className="text-xl font-black text-clay">{w.amount.toLocaleString()} 积分</div>
                 {w.status === 'pending' ? <StatusBadge text="待审核" tone="amber" />
                   : w.status === 'approved' ? <StatusBadge text="已打款" tone="green" />
                   : <StatusBadge text="已驳回" tone="red" />}

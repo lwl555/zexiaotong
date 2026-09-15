@@ -72,7 +72,7 @@ export default function TaskAudit() {
                   <div className="text-xs text-gray-400">{t.category} · {t.id}</div>
                 </td>
                 <td className="px-4 py-3 text-gray-600">{t.poster_name}</td>
-                <td className="px-4 py-3 text-right text-brand-600 font-bold">¥{t.amount}</td>
+                <td className="px-4 py-3 text-right text-brand-600 font-bold">{t.amount} 积分</td>
                 <td className="px-4 py-3 text-center">
                   <select className="input !py-1 !px-2 text-xs w-24" value={t.status}
                     onChange={e => setTaskStatus(t.id, e.target.value as TaskStatus)}>

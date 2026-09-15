@@ -61,12 +61,12 @@ const SESSIONS: {
   {
     key: 'money', to: '/chat/money', type: 'app',
     Icon: Coins, color: '#a16207', name: '搞钱',
-    preview: '第 3 单佣金 ¥18.00 已到账', time: '周一', unread: 0,
+    preview: '第 3 单佣金 1800 积分 已到账', time: '周一', unread: 0,
   },
   {
     key: 'wallet', to: '/chat/wallet', type: 'ai',
     Icon: WalletIcon, color: '#047857', name: '钱包',
-    preview: '余额 ¥126.50 · 上次佣金已到账', time: '8月13日', unread: 0,
+    preview: '余额 12650 积分 · 上次佣金已到账', time: '8月13日', unread: 0,
   },
 ]
 

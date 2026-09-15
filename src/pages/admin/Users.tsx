@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Ban, CheckCircle2, Download, Search, Trash2, Loader2, RefreshCw } from 'lucide-react'
+import { Ban, CheckCircle2, Download, Search, Trash2, Loader2, RefreshCw, PlusCircle } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { useMe } from '../../store/useMe'
 import { PageHeader, StatusBadge, confirmDanger } from './ui'
@@ -10,6 +10,7 @@ import type { Profile } from '../../lib/types'
 
 export default function Users() {
   const showToast = useStore((s) => s.showToast)
+  const adminAddPoints = useStore((s) => s.adminAddPoints)
   const me = useMe()
   const operatorId = me?.id
 
@@ -17,6 +18,10 @@ export default function Users() {
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [kw, setKw] = useState('')
+  const [ptsUser, setPtsUser] = useState<Profile | null>(null)
+  const [ptsVal, setPtsVal] = useState('')
+  const [ptsReason, setPtsReason] = useState('')
+  const [ptsBusy, setPtsBusy] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -84,6 +89,23 @@ export default function Users() {
     })
   }
 
+  const submitPoints = async () => {
+    if (!ptsUser || !operatorId) return
+    const val = Number(ptsVal)
+    if (!val || val === 0) { showToast('err', '请输入非零积分'); return }
+    setPtsBusy(true)
+    try {
+      await adminAddPoints(ptsUser.id, val, ptsReason.trim() || (val > 0 ? '管理员赠送积分' : '管理员扣减积分'))
+      setUsers(us => us.map(x => x.id === ptsUser.id ? { ...x, balance: (x.balance ?? 0) + val } : x))
+      showToast('ok', `已为「${ptsUser.nickname}」${val > 0 ? '增加' : '扣减'} ${Math.abs(val)} 积分`)
+      setPtsUser(null); setPtsVal(''); setPtsReason('')
+    } catch (e: any) {
+      showToast('err', e?.message || '操作失败')
+    } finally {
+      setPtsBusy(false)
+    }
+  }
+
   return (
     <div>
       <PageHeader title="用户管理" desc="查看、冻结 / 解封 / 删除账号（删除为真实删除，不可恢复）">
@@ -135,8 +157,8 @@ export default function Users() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-gray-600">{u.qq}</td>
-                  <td className="px-4 py-3 text-right text-ink font-medium">¥{(u.balance ?? 0).toFixed(2)}</td>
-                  <td className="px-4 py-3 text-right text-gray-500">¥{(u.frozen ?? 0).toFixed(2)}</td>
+                  <td className="px-4 py-3 text-right text-ink font-medium">{(u.balance ?? 0).toLocaleString()} 积分</td>
+                  <td className="px-4 py-3 text-right text-gray-500">{(u.frozen ?? 0).toLocaleString()} 积分</td>
                   <td className="px-4 py-3 text-center">
                     {u.status === 'banned'
                       ? <StatusBadge text="已冻结" tone="red" />
@@ -153,6 +175,8 @@ export default function Users() {
                                   {busy ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={14} />} 解封</button>
                               : <button className="text-amber-600 text-xs font-medium inline-flex items-center gap-1 disabled:opacity-50" disabled={busy} onClick={() => handleFreeze(u)}>
                                   {busy ? <Loader2 size={13} className="animate-spin" /> : <Ban size={14} />} 冻结</button>}
+                            <button className="text-brand-600 text-xs font-medium inline-flex items-center gap-1 disabled:opacity-50" disabled={busy} onClick={() => setPtsUser(u)}>
+                              <PlusCircle size={14} /> 积分</button>
                             <button className="text-red-500 text-xs font-medium ml-3 inline-flex items-center gap-1 disabled:opacity-50" disabled={busy} onClick={() => handleDelete(u)}>
                               {busy ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={14} />} 删除</button>
                           </>}
@@ -163,6 +187,26 @@ export default function Users() {
           </tbody>
         </table>
       </div>
+
+      {/* 增加 / 扣减积分弹窗 */}
+      {ptsUser && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => !ptsBusy && setPtsUser(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
+            <h3 className="font-bold text-ink text-lg mb-1">调整积分</h3>
+            <p className="text-sm text-gray-500 mb-4">用户：{ptsUser.nickname}（当前 {(ptsUser.balance ?? 0).toLocaleString()} 积分）</p>
+            <label className="text-sm text-gray-600">积分（正数增加，负数扣减）</label>
+            <input type="number" className="input mt-2" value={ptsVal} onChange={e => setPtsVal(e.target.value)} placeholder="如 100 或 -50" />
+            <label className="text-sm text-gray-600 mt-3 block">原因（可选）</label>
+            <input className="input mt-2" value={ptsReason} onChange={e => setPtsReason(e.target.value)} placeholder="如 活动奖励 / 违规扣减" />
+            <div className="flex gap-2 mt-5">
+              <button className="btn-ghost flex-1" onClick={() => setPtsUser(null)} disabled={ptsBusy}>取消</button>
+              <button className="btn-primary flex-1" onClick={submitPoints} disabled={ptsBusy}>
+                {ptsBusy ? <Loader2 size={14} className="inline animate-spin" /> : null} 确认
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

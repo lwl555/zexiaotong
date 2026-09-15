@@ -110,7 +110,7 @@ export default function Mine() {
             {[
               { v: String(myPosted), l: '发布', to: '/my-tasks?role=poster' },
               { v: String(myTaken), l: '接单', to: '/my-tasks?role=worker' },
-              { v: '¥' + (me.balance ?? 0).toFixed(2), l: '可用', to: '/wallet' },
+              { v: (me.balance ?? 0).toLocaleString() + ' 积分', l: '可用', to: '/wallet' },
             ].map((s, i) => (
               <div
                 key={s.l}

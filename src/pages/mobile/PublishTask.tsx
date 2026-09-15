@@ -42,7 +42,7 @@ export default function PublishTask() {
     if (!title.trim()) { setErr('请填写任务标题'); return }
     if (!amt || amt <= 0) { setErr('请填写正确的悬赏金额'); return }
     if (!deadline) { setErr('请选择截止时间'); return }
-    if (amt > usable) { setErr(`可用余额不足：需 ¥${amt}，当前可用 ¥${usable.toFixed(2)}`); return }
+    if (amt > usable) { setErr(`可用积分不足：需 ${amt} 积分，当前可用 ${usable.toLocaleString()} 积分`); return }
     const r = await publish({ title, category, amount: amt, deadline: new Date(deadline).toISOString(), description: desc, images })
     if (!r.ok) { setErr(r.msg); return }
     nav('/')
@@ -55,7 +55,7 @@ export default function PublishTask() {
       <PageHeader
         eyebrow="Publish"
         title="发布悬赏任务"
-        desc={(() => { const c = useStore.getState().config; return c ? `发布即冻结金额，任务完成自动解冻并分账（平台抽佣 ${Math.round(c.commission_rate * 100)}%）` : '发布即冻结金额，任务完成自动解冻并分账' })()}
+        desc={(() => { const c = useStore.getState().config; return c ? `发布即冻结积分，任务完成自动解冻并分账（平台抽佣 ${Math.round(c.commission_rate * 100)}%）` : '发布即冻结积分，任务完成自动解冻并分账' })()}
       />
 
       {/* 任务标题 */}
@@ -88,7 +88,7 @@ export default function PublishTask() {
       {/* 金额 + 截止时间 */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
         <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: 1.5, color: MUTED, textTransform: 'uppercase', marginBottom: 6 }}>悬赏金额（元）</div>
+          <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: 1.5, color: MUTED, textTransform: 'uppercase', marginBottom: 6 }}>悬赏积分（100 积分 = 1 元）</div>
           <input
             value={amount}
             onChange={e => setAmount(e.target.value.replace(/[^\d.]/g, ''))}
@@ -108,7 +108,7 @@ export default function PublishTask() {
         </div>
       </div>
       <div style={{ fontFamily: FONT, fontSize: 12, color: MUTED, marginTop: -8, marginBottom: 16 }}>
-        可用余额 ¥{usable.toFixed(2)}（冻结 ¥{me.frozen.toFixed(2)}）
+        可用积分 {usable.toLocaleString()}（冻结 {me.frozen.toLocaleString()}）
       </div>
 
       {/* 需求描述 */}
@@ -152,7 +152,7 @@ export default function PublishTask() {
         </div>
       )}
 
-      <BtnPrimary onClick={submit} style={{ width: '100%', marginTop: 8 }}>发布并冻结金额</BtnPrimary>
+      <BtnPrimary onClick={submit} style={{ width: '100%', marginTop: 8 }}>发布并冻结积分</BtnPrimary>
     </div>
   )
 }

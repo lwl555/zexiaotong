@@ -28,6 +28,7 @@ const TXN_LABEL: any = {
   refund: '退款',
   freeze: '冻结',
   unfreeze: '解冻',
+  adjust: '积分调整',
 }
 const TXN_COLOR: any = {
   recharge: POS,
@@ -38,6 +39,7 @@ const TXN_COLOR: any = {
   unfreeze: MUTED,
   commission: NEG,
   refund: POS,
+  adjust: ACCENT,
 }
 
 export default function Wallet() {
@@ -61,7 +63,7 @@ export default function Wallet() {
     if (!a || a <= 0) { showToast('err', '请输入正确金额'); return }
     if (mode === 'in') {
       await recharge(a)
-      showToast('ok', `充值 ¥${a.toFixed(2)} 成功`)
+      showToast('ok', `充值 ¥${a.toFixed(2)} 成功，到账 ${Math.round(a * 100)} 积分`)
     } else {
       const r = await withdraw(a)
       if (r.ok) showToast('ok', '提现申请已提交，等待管理员审核')
@@ -100,18 +102,18 @@ export default function Wallet() {
 
       {/* 账户总览：单卡三行（替代原三块硬边卡竖堆，减重） */}
       <div style={{ ...hard(), background: '#ffffff', padding: 18, marginBottom: 18 }}>
-        <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: 2, color: MUTED }}>账户余额</div>
+        <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: 2, color: MUTED }}>账户积分</div>
         <div style={{ fontFamily: FONT, fontSize: 34, fontWeight: 800, color: INK, marginTop: 6, letterSpacing: '-0.02em', lineHeight: 1.1 }}>
-          ¥{me.balance.toFixed(2)}
+          {me.balance.toLocaleString()} <span style={{ fontSize: 14, fontWeight: 600, color: MUTED }}>积分</span>
         </div>
         <div style={{ display: 'flex', gap: 28, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${HAIR}` }}>
           <div>
             <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: 2, color: MUTED }}>冻结</div>
-            <div style={{ fontFamily: FONT, fontSize: 16, fontWeight: 700, color: INK, marginTop: 3 }}>¥{me.frozen.toFixed(2)}</div>
+            <div style={{ fontFamily: FONT, fontSize: 16, fontWeight: 700, color: INK, marginTop: 3 }}>{me.frozen.toLocaleString()} 积分</div>
           </div>
           <div>
             <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: 2, color: MUTED }}>可用</div>
-            <div style={{ fontFamily: FONT, fontSize: 16, fontWeight: 700, color: ACCENT, marginTop: 3 }}>¥{usable.toFixed(2)}</div>
+            <div style={{ fontFamily: FONT, fontSize: 16, fontWeight: 700, color: ACCENT, marginTop: 3 }}>{usable.toLocaleString()} 积分</div>
           </div>
         </div>
       </div>
@@ -134,7 +136,7 @@ export default function Wallet() {
           <input
             value={amt}
             onChange={e => setAmt(e.target.value.replace(/[^\d.]/g, ''))}
-            placeholder={mode === 'in' ? '充值金额' : '提现金额'}
+            placeholder={mode === 'in' ? '充值金额（元）' : '提现积分'}
             inputMode="decimal"
             style={{ flex: 1, border: `1px solid #e8e8e8`, borderRadius: 2, padding: '10px 12px', fontFamily: FONT, fontSize: 15, outline: 'none' }}
           />
@@ -142,7 +144,7 @@ export default function Wallet() {
         </div>
         {mode === 'out' && (
           <p style={{ fontFamily: FONT, fontSize: 12, color: MUTED, marginTop: 10, marginBottom: 0 }}>
-            提现由管理员审核后手动打款，审核期间不影响余额展示。
+            提现按 100 积分 = 1 元 折算，由管理员审核后手动打款；审核期间不影响积分展示。
           </p>
         )}
       </div>
@@ -162,7 +164,7 @@ export default function Wallet() {
             </div>
             <div style={{ fontFamily: FONT, fontSize: 16, fontWeight: 800, color: TXN_COLOR[t.type] || INK }}>
               {t.amount > 0 ? '+' : ''}
-              {t.amount.toFixed(2)}
+              {t.amount.toLocaleString()}
             </div>
           </ListRow>
         ))}

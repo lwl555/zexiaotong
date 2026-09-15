@@ -95,7 +95,7 @@ export default function Home() {
                 <img src={x.images[0] || ''} className="w-20 h-20 rounded-xl bg-gray-100 object-cover" alt="" />
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">{x.title}</div>
-                  <div className="text-brand-600 font-black mt-1">¥{x.price}</div>
+                  <div className="text-brand-600 font-black mt-1">{x.price} 积分</div>
                   <div className="text-xs text-gray-400 mt-2">{x.seller_name} · {x.category}</div>
                 </div>
               </div>
@@ -129,7 +129,7 @@ export default function Home() {
                   <img src={x.poster_avatar} className="w-5 h-5 rounded-full" alt="" />{x.poster_name}
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-brand-600 font-black">¥{x.amount}</span>
+                  <span className="text-brand-600 font-black">{x.amount} 积分</span>
                   <span className="tag bg-gray-100 text-gray-500">{statusText[x.status]}</span>
                 </div>
               </div>

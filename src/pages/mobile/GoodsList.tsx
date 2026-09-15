@@ -144,7 +144,7 @@ export default function GoodsList() {
               {g.title}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 }}>
-              <span style={{ fontFamily: FONT, fontSize: 18, fontWeight: 800, color: ACCENT }}>¥{g.price}</span>
+              <span style={{ fontFamily: FONT, fontSize: 18, fontWeight: 800, color: ACCENT }}>{g.price} 积分</span>
               <Tag tone="line">{g.category}</Tag>
             </div>
             <div style={{ fontFamily: FONT, fontSize: 12, color: MUTED, marginTop: 8 }}>{g.seller_name}</div>
