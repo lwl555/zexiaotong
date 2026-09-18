@@ -236,14 +236,11 @@ export async function addTxn(txn: Partial<WalletTxn>): Promise<WalletTxn> {
   return d.row as WalletTxn
 }
 
+// 走 db-write 的 my_txns：txns 的 RLS 读策略是 `auth.uid() = user_id`，本平台不走 Supabase Auth，
+// anon 直连 auth.uid() 恒为 null → 直连查询永远返回 0 行（钱包「资金流水」因此一直是空的）。
 export async function fetchTxns(userId: string): Promise<WalletTxn[]> {
-  const { data, error } = await supabase!
-    .from('txns')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-  if (error) throw error
-  return (data || []) as WalletTxn[]
+  const d = await dbWrite('my_txns', { uid: userId })
+  return (d.txns || []) as WalletTxn[]
 }
 
 // ─── 二手商品 ───────────────────────────────────────────────────
@@ -396,14 +393,19 @@ export async function createNotification(notif: Partial<Notification>): Promise<
 
 // ─── 提现 ───────────────────────────────────────────────────────
 
-// 提现列表。传 userId 只取该用户的；不传则取全部（管理端「提现审核」需要看所有人的申请）。
-// 注意：RLS 对 withdrawals 是 select using(true)，anon 可读全表，所以这里用客户端过滤即可。
-export async function fetchWithdrawals(userId?: string): Promise<Withdrawal[]> {
-  let q = supabase!.from('withdrawals').select('*')
-  if (userId) q = q.eq('user_id', userId)
-  const { data, error } = await q.order('created_at', { ascending: false })
-  if (error) throw error
-  return (data || []) as Withdrawal[]
+// 提现列表。withdrawals 含收款账号，RLS 读策略同样是 auth.uid() 且不打算对 anon 全表开放，
+// 因此统一走 db-write 读取：本人只能取自己的（mine），全量必须管理员（all）。
+
+/** 我的提现申请（用户端钱包用） */
+export async function fetchMyWithdrawals(userId: string): Promise<Withdrawal[]> {
+  const d = await dbWrite('list_withdrawals', { uid: userId, scope: 'mine' })
+  return (d.withdrawals || []) as Withdrawal[]
+}
+
+/** 全部提现申请（管理端「提现审核」用，后端会校验管理员身份） */
+export async function fetchAllWithdrawals(operatorId: string): Promise<Withdrawal[]> {
+  const d = await dbWrite('list_withdrawals', { uid: operatorId, scope: 'all' })
+  return (d.withdrawals || []) as Withdrawal[]
 }
 
 // 提交提现申请：走 db-write 的 submit_withdraw（后端冻结积分 + 校验规则 + 落收款信息）。

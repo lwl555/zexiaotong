@@ -25,6 +25,19 @@ const NOTIFY_ROUTE: Record<string, string> = {
   announce: '/notifications',
 }
 
+// 提现列表加载：管理员取全量、普通用户取本人（后端 list_withdrawals 按 scope 校验权限）。
+// 拉取失败返回空数组而不是抛错——单张表读不到不该把整个 store 的加载一起搞崩。
+const loadWithdrawals = async (me: Profile | null): Promise<Withdrawal[]> => {
+  if (!me) return []
+  try {
+    return me.role === 'admin'
+      ? await db.fetchAllWithdrawals(me.id)
+      : await db.fetchMyWithdrawals(me.id)
+  } catch {
+    return []
+  }
+}
+
 interface State {
   // 加载状态
   loading: boolean
@@ -192,7 +205,7 @@ export const useStore = create<State>((set, get) => ({
         db.fetchTxns(me.id),
         // 提现取全量：管理端「提现审核」要看所有人的申请（原实现只取自己的，
         // 导致管理员打开审核页永远是空的）；用户端在 Wallet 里按 user_id 过滤。
-        db.fetchWithdrawals(),
+        loadWithdrawals(me),
         db.fetchArbitrations(me.id),
         db.fetchNotifications(me.id),
         db.fetchCategories(),
@@ -418,7 +431,7 @@ export const useStore = create<State>((set, get) => ({
     }
     // 冻结在后端完成，这里刷新余额与提现列表保持一致
     const [withdrawals, profile] = await Promise.all([
-      db.fetchWithdrawals(me.id),
+      db.fetchMyWithdrawals(me.id),
       db.getCurrentUser().catch(() => null)
     ])
     set(s => ({
@@ -431,8 +444,7 @@ export const useStore = create<State>((set, get) => ({
   },
 
   refreshWithdrawals: async () => {
-    const withdrawals = await db.fetchWithdrawals()
-    set({ withdrawals })
+    set({ withdrawals: await loadWithdrawals(get().me) })
   },
 
   // ─── 二手 / 社区 ───
@@ -594,13 +606,13 @@ export const useStore = create<State>((set, get) => ({
     const me = get().me!
     // 金额与收款人由后端按 wdId 反查并二次校验（仍 pending + 余额充足），前端只传单号
     await db.adminApproveWithdrawal(id, me.id)
-    set({ withdrawals: await db.fetchWithdrawals() })
+    set({ withdrawals: await loadWithdrawals(get().me) })
   },
 
   rejectWithdrawal: async (id, reason) => {
     const me = get().me!
     await db.adminRejectWithdrawal(id, reason, me.id)
-    set({ withdrawals: await db.fetchWithdrawals() })
+    set({ withdrawals: await loadWithdrawals(get().me) })
   },
 
   setConfig: async (c) => {

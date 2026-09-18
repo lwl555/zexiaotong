@@ -542,6 +542,34 @@ Deno.serve(async (req) => {
       return json({ ok: true })
     }
 
+    // ── 读：我的钱包流水 ──
+    // txns 的 SELECT 策略是 `auth.uid() = user_id`，而本平台自研 QQ 登录、不走 Supabase Auth，
+    // anon 连接下 auth.uid() 恒为 null → 前端直连永远读到 0 行（钱包"资金流水"一直是空的）。
+    // 这里用 service_role 读并按 uid 过滤；不用 requireUser，游客 uid 不存在时自然返回空数组。
+    if (action === 'my_txns') {
+      if (!uid) return json({ error: '缺少 uid' }, 400)
+      const lim = Math.min(Math.max(Number(body.limit) || 200, 1), 500)
+      const r = await pg('GET', `txns?select=*&user_id=eq.${enc(uid)}&order=created_at.desc&limit=${lim}`)
+      if (!r.ok) return json({ error: '读取流水失败' }, 500)
+      return json({ txns: r.data || [] })
+    }
+
+    // ── 读：提现列表（mine=本人 / all=管理员全量）──
+    // withdrawals 含收款账号，不开放 anon 全表读（策略同样是 auth.uid()，前端本来也读不到），
+    // 因此统一由本函数读：本人只能取自己的，全量必须管理员。
+    if (action === 'list_withdrawals') {
+      const scope = body.scope === 'all' ? 'all' : 'mine'
+      if (!uid) return json({ error: '缺少 uid' }, 400)
+      if (scope === 'all') await requireAdmin(uid)
+      const path =
+        scope === 'all'
+          ? 'withdrawals?select=*&order=created_at.desc&limit=500'
+          : `withdrawals?select=*&user_id=eq.${enc(uid)}&order=created_at.desc&limit=200`
+      const r = await pg('GET', path)
+      if (!r.ok) return json({ error: '读取提现列表失败' }, 500)
+      return json({ withdrawals: r.data || [] })
+    }
+
     // ── 通用 insert（白名单表 + owner 校验）──
     if (action === 'insert') {
       const { table, row } = body
