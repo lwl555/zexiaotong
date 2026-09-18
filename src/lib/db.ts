@@ -355,14 +355,16 @@ export async function createComment(comment: Partial<Comment>): Promise<Comment>
 
 // ─── 私信 ───────────────────────────────────────────────────────
 
-export async function fetchMessages(convId: string): Promise<Message[]> {
-  const { data, error } = await supabase!
-    .from('messages')
-    .select('*')
-    .eq('conv_id', convId)
-    .order('created_at', { ascending: true })
-  if (error) throw error
-  return (data || []) as Message[]
+// 取当前用户参与的所有私信（私信页在前端按 conv_id 聚合）。messages 的 SELECT 策略用 auth.uid()，
+// 自研登录下 anon 恒 null → 直连读 0 行，故走 db-write（service_role）按 uid 过滤。
+export async function fetchMyMessages(uid: string): Promise<Message[]> {
+  const d = await dbWrite('my_messages', { uid })
+  return (d.messages || []) as Message[]
+}
+
+// 标记某条私信为已读：仅收件人可改（后端 UPDATE_ALLOWED.messages=receiver_id，列白名单仅 read）。
+export async function markMessageRead(id: string): Promise<void> {
+  await dbWrite('update', { table: 'messages', id, updates: { read: true }, uid: currentUid() })
 }
 
 export async function sendMessage(msg: Partial<Message>): Promise<Message> {
@@ -373,13 +375,9 @@ export async function sendMessage(msg: Partial<Message>): Promise<Message> {
 // ─── 通知 ───────────────────────────────────────────────────────
 
 export async function fetchNotifications(userId: string): Promise<Notification[]> {
-  const { data, error } = await supabase!
-    .from('notifications')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-  if (error) throw error
-  return (data || []) as Notification[]
+  // notifications 的 SELECT 策略用 auth.uid()，前端直连读 0 行，走 db-write 按 uid 过滤。
+  const d = await dbWrite('my_notifications', { uid: userId })
+  return (d.notifications || []) as Notification[]
 }
 
 export async function markRead(notifId: string): Promise<void> {
@@ -430,12 +428,11 @@ export async function submitWithdraw(input: {
 
 // ─── 仲裁 ───────────────────────────────────────────────────────
 
-export async function fetchArbitrations(userId?: string): Promise<Arbitration[]> {
-  let query = supabase!.from('arbitrations').select('*').order('created_at', { ascending: false })
-  if (userId) query = query.or(`plaintiff_id.eq.${userId},defendant_id.eq.${userId}`)
-  const { data, error } = await query
-  if (error) throw error
-  return (data || []) as Arbitration[]
+export async function fetchArbitrations(userId: string, scope: 'mine' | 'all' = 'mine'): Promise<Arbitration[]> {
+  // arbitrations 的 SELECT 策略用 auth.uid()，前端直连读 0 行；管理员审核页需要全量。
+  // 走 db-write：scope=mine 取本人相关，scope=all 必须管理员（后端校验 admin）。
+  const d = await dbWrite('list_arbitrations', { uid: userId, scope })
+  return (d.arbitrations || []) as Arbitration[]
 }
 
 export async function createArbitration(arb: Partial<Arbitration>): Promise<Arbitration> {

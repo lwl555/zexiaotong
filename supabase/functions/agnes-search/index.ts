@@ -1194,6 +1194,34 @@ async function callV9(payload: any, timeoutMs = 30000): Promise<{ data: any; sta
   }
 }
 
+// —— 备用生成模型：智谱 GLM-4-Flash（免费、稳定，实测 3–19s 出答案）——
+// 背景：agnes-2.0-flash 是推理模型，免费档冷启动偶发 60s+ 卡死，导致「检索到了资料却给不出回答」
+// （前端表现为「AI 生成超时」）。智谱 GLM 走 open.bigmodel.cn，稳定且快，作为主生成模型最可靠。
+// 密钥复用已有的 BACKUP_KEY / IMAGE_API_KEY（智谱平台，文本与图像通用同一 key）。
+const ZHIPU_KEY = Deno.env.get('BACKUP_KEY') || Deno.env.get('IMAGE_API_KEY') || ''
+const ZHIPU_BASE = (Deno.env.get('ZHIPU_BASE') || 'https://open.bigmodel.cn/api/paas/v4').replace(/\/+$/, '')
+const ZHIPU_MODEL = Deno.env.get('ZHIPU_MODEL') || 'glm-4-flash'
+
+async function callZhipu(payload: any, timeoutMs = 45000): Promise<{ data: any; status: number }> {
+  if (!ZHIPU_KEY) return { data: {}, status: 0 }
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs)
+  try {
+    const r = await fetch(`${ZHIPU_BASE}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ZHIPU_KEY}` },
+      body: JSON.stringify(payload),
+      signal: ctrl.signal
+    })
+    const data = await r.json().catch(() => ({}))
+    return { data, status: r.status }
+  } catch {
+    return { data: {}, status: 0 }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 // —— 检索决策器：让模型判断「这个问题是否需要检索最新公开资料才能准确回答」——
 // 纯历史 / 概念 / 常识 / 数学 / 创作 / 闲聊类无需检索；涉及具体院校 / 公司 / 城市当前信息、
 // 最新政策 / 实时数据 / 新闻类则需要。返回 true 才真正发起多源检索（省额度、降延迟）。
@@ -1607,10 +1635,30 @@ Deno.serve(async (req: Request) => {
   // 40s 是经验值：暖路径实测 1–12s（curl 杭电 19.78s 拿到 1183 token），冷启动 25–35s 也覆盖；
   // 比之前 30s 更宽容，彻底避开偶发 30-40s 卡死的冷启动——本轮用户截图"杭州电子科技大学超时"根因就是阈值太紧。
   let v9Resp: { data: any; status: number } | null = null
-  // 生成预算硬截止（从检索结束后起算 40s，给网关 50s 预算留余量）：
-  //  - 429（上游免费额度限流，秒回）/5xx：视为可重试失败，退避 3s 再试（窗口分钟级，重试是抽奖但远好于裸透传）；
-  //  - 超时（40s 级冷启动卡死）：受预算控制最多容得下一次重试；
-  //  - 预算耗尽仍失败 → 走下方 degraded 降级（返回已检索资料），绝不把 429 裸透传给前端。
+  // 生成主链路：优先用智谱 GLM-4-Flash（免费、稳定、实测 3–19s 出答案），
+  // 彻底绕开 agnes-2.0-flash 推理模型免费档偶发的 60s+ 冷启动卡死（旧链路「检索到了资料却给不出回答」的根因）。
+  // 仅当 GLM 不可用/失败时，才回落 Agnes（保留原 40s 预算 + 重试，作为最后兜底）。
+  if (ZHIPU_KEY) {
+    try {
+      const zr = await callZhipu(
+        {
+          model: ZHIPU_MODEL,
+          messages: [...sysMessages, ...otherMessages],
+          max_tokens: 4096,
+          stream: false,
+          temperature: body.temperature ?? 0.7
+        },
+        45000
+      )
+      if (zr.status === 200 && (zr.data?.choices?.[0]?.message?.content || '').trim()) {
+        v9Resp = { data: zr.data, status: 200 }
+      }
+    } catch {
+      /* GLM 失败则继续走 Agnes 兜底 */
+    }
+  }
+
+  // —— Agnes 兜底（保留原逻辑）：40s 预算 + 重试，覆盖 GLM 也偶发不可用的情况 ——
   const genDeadline = Date.now() + 40000
   for (let i = 0; i < 3 && !v9Resp && Date.now() < genDeadline; i++) {
     try {

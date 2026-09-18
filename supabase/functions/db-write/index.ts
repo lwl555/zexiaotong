@@ -154,6 +154,7 @@ const UPDATE_ALLOWED: Record<string, string[]> = {
   notifications: ['user_id'],
   withdrawals: ['user_id'],
   arbitrations: ['plaintiff_id', 'defendant_id'],
+  messages: ['receiver_id'], // 仅收件人可标记已读
   profiles: ['id']
 }
 
@@ -168,6 +169,7 @@ const UPDATE_COLUMNS: Record<string, string[]> = {
   // 提现单不允许通过通用 update 改任何列：状态流转只能走 approve_wd / reject_wd，
   // 否则申请人可以自己把 status 改成 approved/rejected 干扰审核。
   withdrawals: [],
+  messages: ['read'], // 私信已读态只允许收件人翻转，防发件人篡改/越权改他人私信
   arbitrations: ['status', 'winner', 'result']
 }
 
@@ -699,6 +701,44 @@ Deno.serve(async (req) => {
       const r = await pg('GET', path)
       if (!r.ok) return json({ error: '读取提现列表失败' }, 500)
       return json({ withdrawals: r.data || [] })
+    }
+
+    // ── 读：我的私信 ──
+    // messages 的 SELECT 策略是 `auth.uid() in (sender_id, receiver_id)`，自研登录下 anon 恒 null
+    // → 前端直连永远读到 0 行（私信页收件箱长期空）。这里用 service_role 读并按 uid 过滤
+    // （发件或收件都算「我的会话」），不用 requireUser，游客 uid 不存在时自然返回空数组。
+    if (action === 'my_messages') {
+      if (!uid) return json({ error: '缺少 uid' }, 400)
+      const lim = Math.min(Math.max(Number(body.limit) || 500, 1), 1000)
+      const r = await pg('GET', `messages?select=*&or=(sender_id.eq.${enc(uid)},receiver_id.eq.${enc(uid)})&order=created_at.desc&limit=${lim}`)
+      if (!r.ok) return json({ error: '读取私信失败' }, 500)
+      return json({ messages: r.data || [] })
+    }
+
+    // ── 读：我的通知 ──
+    // notifications 的 SELECT 策略是 `auth.uid() = user_id`，同样会被 RLS 挡成 0 行（通知中心长期空）。
+    if (action === 'my_notifications') {
+      if (!uid) return json({ error: '缺少 uid' }, 400)
+      const lim = Math.min(Math.max(Number(body.limit) || 200, 1), 500)
+      const r = await pg('GET', `notifications?select=*&user_id=eq.${enc(uid)}&order=created_at.desc&limit=${lim}`)
+      if (!r.ok) return json({ error: '读取通知失败' }, 500)
+      return json({ notifications: r.data || [] })
+    }
+
+    // ── 读：仲裁列表（mine=本人 / all=管理员全量）──
+    // arbitrations 的 SELECT 策略是 `auth.uid() in (plaintiff_id, defendant_id)`，前端直连也读不到；
+    // 管理员审核页需要全量，故统一走这里：本人取自己的，全量必须管理员。
+    if (action === 'list_arbitrations') {
+      const scope = body.scope === 'all' ? 'all' : 'mine'
+      if (!uid) return json({ error: '缺少 uid' }, 400)
+      if (scope === 'all') await requireAdmin(uid)
+      const path =
+        scope === 'all'
+          ? 'arbitrations?select=*&order=created_at.desc&limit=500'
+          : `arbitrations?select=*&or=(plaintiff_id.eq.${enc(uid)},defendant_id.eq.${enc(uid)})&order=created_at.desc&limit=200`
+      const r = await pg('GET', path)
+      if (!r.ok) return json({ error: '读取仲裁列表失败' }, 500)
+      return json({ arbitrations: r.data || [] })
     }
 
     // ── 通用 insert（白名单表 + owner 校验）──

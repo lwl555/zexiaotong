@@ -113,6 +113,7 @@ interface State {
   // 私信 / 通知
   sendMessage: (toId: string, content: string) => Promise<void>
   markRead: (id: string) => Promise<void>
+  markMessageRead: (id: string) => Promise<void>
 
   // 后台
   banUser: (id: string) => Promise<void>
@@ -208,6 +209,7 @@ export const useStore = create<State>((set, get) => ({
         loadWithdrawals(me),
         db.fetchArbitrations(me.id),
         db.fetchNotifications(me.id),
+        db.fetchMyMessages(me.id),
         db.fetchCategories(),
         db.fetchBanners(),
         db.fetchPlatformConfig(),
@@ -222,9 +224,9 @@ export const useStore = create<State>((set, get) => ({
       } catch {
         bundle = null
       }
-      const [tasks, goods, posts, txns, withdrawals, arbitrations, notifications, categories, banners, config, schools] =
-        bundle || Array(11).fill([])
-      set({ tasks, goods, posts, txns, withdrawals, arbitrations, notifications, categories, banners, config, schools, loading: false })
+      const [tasks, goods, posts, txns, withdrawals, arbitrations, notifications, messages, categories, banners, config, schools] =
+        bundle || Array(12).fill([])
+      set({ tasks, goods, posts, txns, withdrawals, arbitrations, notifications, messages, categories, banners, config, schools, loading: false })
       // 启动通知栏轮询（App 后台时把新到达的站内消息弹到手机通知栏）
       get().startNotifyPoller()
     } catch (e: any) {
@@ -378,14 +380,14 @@ export const useStore = create<State>((set, get) => ({
     await db.updateTask(taskId, { status: 'arbitration' })
     const [tasks, arbitrations] = await Promise.all([
       db.fetchTasks(),
-      db.fetchArbitrations()
+      db.fetchArbitrations(me.id, 'all')
     ])
     set({ tasks, arbitrations })
   },
 
   adminDecide: async (arbId, winner, result) => {
     await db.updateArbitration(arbId, { status: 'closed', winner, result })
-    const arbitrations = await db.fetchArbitrations()
+    const arbitrations = await db.fetchArbitrations(get().me!.id, 'all')
     set({ arbitrations })
   },
 
@@ -507,13 +509,15 @@ export const useStore = create<State>((set, get) => ({
   sendMessage: async (toId, content) => {
     const me = get().me!
     const conv = [me.id, toId].sort().join('_')
-    await db.sendMessage({
+    const msg = await db.sendMessage({
       conv_id: conv,
       sender_id: me.id,
       receiver_id: toId,
       content,
       type: 'text'
     })
+    // 乐观更新：本地立即把这条消息放进会话列表，避免发完要等刷新才看到
+    set(s => ({ messages: [...s.messages, msg] }))
     await db.createNotification({
       user_id: toId,
       type: 'message',
@@ -525,6 +529,11 @@ export const useStore = create<State>((set, get) => ({
   markRead: async (id) => {
     await db.markRead(id)
     set(s => ({ notifications: s.notifications.map(n => n.id === id ? { ...n, read: true } : n) }))
+  },
+
+  markMessageRead: async (id) => {
+    await db.markMessageRead(id)
+    set(s => ({ messages: s.messages.map(m => m.id === id ? { ...m, read: true } : m) }))
   },
 
   // ─── 后台 ───

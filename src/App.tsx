@@ -1,5 +1,5 @@
 import { useEffect, Component, ReactNode, Suspense } from 'react'
-import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import Layout from './components/Layout'
 import MobileLayout from './components/layout/MobileLayout'
 import AdminLayout from './components/layout/AdminLayout'
@@ -139,7 +139,6 @@ function DeviceMoney() {
 export default function App() {
   const loc = useLocation()
   const isMobile = useIsMobile()
-  const nav = useNavigate()
 
   // 动态设置浏览器标签标题
   useEffect(() => {
@@ -159,15 +158,10 @@ export default function App() {
     return () => document.body.classList.remove('theme-home')
   }, [loc.pathname, isMobile])
 
-  // 微信式默认行为：页面冷加载（刷新 / 直接打开站点）时回到微信首页（聊天列表），
-  // 不停留在某个聊天（糖豆 / 百事通等）。仅在首次加载执行一次，不影响站内导航。
-  useEffect(() => {
-    const p = loc.pathname
-    // 收银台也要放行：支付页刷新/直接打开链接时不能被弹回首页，否则订单就丢了
-    const keep = p === '/' || p === '/splash' || p === '/login' || p === '/theme-preview' || p.startsWith('/admin') || p.startsWith('/pay/')
-    if (!keep) nav('/', { replace: true })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  // 冷加载不再强制弹回首页：自研登录下 store 会在 init 时拉取当前用户并自行决定登录态，
+  // 任何已登录的深链（/mine、/wallet、/community、/messages…）刷新或直开都应保留，
+  // 否则功能入口「点开再刷新就跳回首页」会被当成坏入口。
+  // 仅收银台仍需特殊处理（订单不能被丢）——已在路由白名单直觉之外，这里直接放行。
 
   if (loc.pathname === '/jobs') return <Navigate to="/ai-search" replace />
   if (loc.pathname === '/history') return <Navigate to="/ai-search?openHistory=1" replace />

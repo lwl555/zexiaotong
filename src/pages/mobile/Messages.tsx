@@ -23,7 +23,7 @@ export default function Messages() {
   const users = useStore(s => s.users)
   const messages = useStore(s => s.messages)
   const sendMessage = useStore(s => s.sendMessage)
-  const markRead = useStore(s => s.markRead)
+  const markMessageRead = useStore(s => s.markMessageRead)
   const [text, setText] = useState('')
 
   const peer = users.find(u => u.id === peerId)
@@ -32,14 +32,14 @@ export default function Messages() {
   const convMap = new Map<string, any>()
   messages.forEach(m => {
     const other = m.sender_id === me.id ? m.receiver_id : m.sender_id
-    if (m.sender_id !== me.id && !m.read) markRead(m.id)
+    if (m.sender_id !== me.id && !m.read) markMessageRead(m.id)
     if (!convMap.has(other) || m.created_at > convMap.get(other).created_at)
       convMap.set(other, { other, ...m })
   })
   const convs = Array.from(convMap.values())
 
   useEffect(() => {
-    if (peerId) messages.filter(m => m.sender_id === peerId && m.receiver_id === me.id && !m.read).forEach(m => markRead(m.id))
+    if (peerId) messages.filter(m => m.sender_id === peerId && m.receiver_id === me.id && !m.read).forEach(m => markMessageRead(m.id))
   }, [peerId])
 
   const chatMsgs = peerId

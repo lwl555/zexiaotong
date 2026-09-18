@@ -53,7 +53,8 @@ async function call<T = any>(
   // 正常情况下 44s 内就会拿到结果（含 degraded 降级），不会走到这里；
   // 仅当整条链路异常时才触发，避免用户无限转圈。
   // 图片生成单独放宽（timeoutMs）：方舟 Seedream 2K 图热态 ~20s、冷启动实测可达 60s。
-  const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? 75_000)
+  // 普通 chat：主链路智谱 GLM（3–19s）+ Agnes 兜底（40s 预算），极端情况合计可能接近 60s，默认给到 100s 防误杀
+  const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? 100_000)
   // 外部中断（如「停止生成」）：与超时共用一个 controller，任一触发即取消请求
   if (opts.signal) {
     if (opts.signal.aborted) controller.abort()
