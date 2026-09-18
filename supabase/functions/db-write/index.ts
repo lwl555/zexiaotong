@@ -40,6 +40,13 @@ const RECHARGE_MAX_YUAN = 10000  // 兜底上限（档位之外的最后一道�
 // 提现规则（单位：积分）
 const WITHDRAW_MIN = 1000        // 最低提现 1000 积分（= 10 元）
 const WITHDRAW_STEP = 100        // 必须为 100 的整数倍
+const WITHDRAW_MAX_PER_TXN = 50000   // 单笔上限 50000 积分（= 500 元）
+const WITHDRAW_MAX_PER_DAY = 100000  // 单日上限 100000 积分（= 1000 元）
+// 余额异常告警线：超过此值在管理端「资金对账」里标红（2026-09-18 有人刷到 64.9 万分才被发现，
+// 这条线就是为了让同类情况自动浮出来，而不是等用户反馈）
+const BALANCE_ALERT_THRESHOLD = 100000
+// 对账时拉取流水的行数保护（超过则截断并标记，避免函数墙钟超时）
+const HEALTH_TXN_LIMIT = 50000
 
 // 中国日期（东八区）。按服务器本地时区换算，避免 UTC 错位导致「差一天」。
 function chinaDate(d: Date = new Date()): string {
@@ -64,6 +71,15 @@ function strip(row: any): any {
   if (!row) return row
   const { password_hash, ...rest } = row
   return rest
+}
+
+// 带 HTTP 状态码的错误：让「没权限 / 不存在」返回 403 / 404，而不是被外层 catch 一律变成 500
+class HttpError extends Error {
+  status: number
+  constructor(message: string, status = 400) {
+    super(message)
+    this.status = status
+  }
 }
 
 // 用 service_role 直接调 PostgREST（绕过 RLS）
@@ -92,16 +108,16 @@ async function getProfile(uid: string): Promise<any | null> {
   return r.data[0]
 }
 
-// 校验调用者身份，返回 profile（不存在即 403）
+// 校验调用者身份，返回 profile（不存在即 404）
 async function requireUser(uid: string): Promise<any> {
   const p = await getProfile(uid)
-  if (!p) throw new Error('用户不存在')
+  if (!p) throw new HttpError('用户不存在', 404)
   return p
 }
 
 async function requireAdmin(uid: string): Promise<any> {
   const p = await requireUser(uid)
-  if (p.role !== 'admin') throw new Error('无权限：需要管理员')
+  if (p.role !== 'admin') throw new HttpError('无权限：需要管理员', 403)
   return p
 }
 
@@ -442,11 +458,26 @@ Deno.serve(async (req) => {
       if (!Number.isFinite(pts) || pts <= 0) return json({ error: '提现积分无效' }, 400)
       if (pts < WITHDRAW_MIN) return json({ error: `最低提现 ${WITHDRAW_MIN} 积分` }, 400)
       if (pts % WITHDRAW_STEP !== 0) return json({ error: `提现需为 ${WITHDRAW_STEP} 的整数倍` }, 400)
+      if (pts > WITHDRAW_MAX_PER_TXN) {
+        return json({ error: `单笔提现不超过 ${WITHDRAW_MAX_PER_TXN} 积分（= ${WITHDRAW_MAX_PER_TXN / 100} 元）` }, 400)
+      }
       const ch = String(channel || '').trim()
       const acc = String(account || '').trim()
       if (!ch || !acc) return json({ error: '请填写收款方式与收款账号' }, 400)
       const me = await requireUser(uid)
       if (me.status === 'banned') return json({ error: '账号已被冻结，暂不能提现' }, 403)
+      // 单日累计额度（含待审与已打款；被驳回的申请不占额度）
+      const dayRes = await pg(
+        'GET',
+        `withdrawals?select=amount&user_id=eq.${enc(uid)}&status=in.(pending,approved)&created_at=gte.${enc(chinaDate() + 'T00:00:00+08:00')}`
+      )
+      const todaySum = (Array.isArray(dayRes.data) ? dayRes.data : [])
+        .reduce((s: number, r: any) => s + Number(r.amount || 0), 0)
+      if (todaySum + pts > WITHDRAW_MAX_PER_DAY) {
+        return json({
+          error: `今日已申请提现 ${todaySum} 积分，单日上限 ${WITHDRAW_MAX_PER_DAY} 积分`
+        }, 400)
+      }
       const avail = Number(me.balance) - Number(me.frozen)
       if (avail < pts) return json({ error: `可用积分不足（当前可用 ${avail} 积分）` }, 400)
       // 冻结（预扣）：以 frozen 做乐观锁条件更新，并发重复提交只有一笔能成功
@@ -540,6 +571,106 @@ Deno.serve(async (req) => {
       }
       await logActivity('admin', uid, '', 'reject_withdrawal', 'user', wd.user_id, `驳回提现 ${wd.amount} 积分：${String(reason || '')}`)
       return json({ ok: true })
+    }
+
+    // ── 读：钱包规则下发 ──
+    // 档位与提现规则由后端下发，避免前端再抄一份常量（历史上两处镜像改一处忘一处）。
+    if (action === 'wallet_rules') {
+      return json({
+        rechargeTiers: RECHARGE_TIERS,
+        rechargeMaxYuan: RECHARGE_MAX_YUAN,
+        withdrawMin: WITHDRAW_MIN,
+        withdrawStep: WITHDRAW_STEP,
+        withdrawMaxPerTxn: WITHDRAW_MAX_PER_TXN,
+        withdrawMaxPerDay: WITHDRAW_MAX_PER_DAY
+      })
+    }
+
+    // ── 读：资金对账（管理员）──
+    // 口径：余额 − 流水累计 = 冻结 属正常（freeze 流水记 -金额但 balance 不变），
+    // 因此真异常判定为 |balance − txn_sum − frozen| > 0。
+    // 同时用告警线标出余额异常高的账号（余额本身对得上，但金额不合理，例如被刷过）。
+    if (action === 'points_health') {
+      await requireAdmin(uid)
+      const pr = await pg('GET', 'profiles?select=id,nickname,phone,role,balance,frozen,status&limit=2000')
+      const profiles: any[] = Array.isArray(pr.data) ? pr.data : []
+      let txns: any[] = []
+      let offset = 0
+      const PAGE = 1000
+      while (txns.length < HEALTH_TXN_LIMIT) {
+        const tr = await pg('GET', `txns?select=user_id,amount,type&order=created_at.asc&limit=${PAGE}&offset=${offset}`)
+        const rows: any[] = Array.isArray(tr.data) ? tr.data : []
+        if (!rows.length) break
+        txns = txns.concat(rows)
+        if (rows.length < PAGE) break
+        offset += PAGE
+      }
+      // 余额只由「会动余额」的流水决定。
+      // 注意：freeze / unfreeze 只挪冻结、不动余额（发布任务时记 freeze，任务结算时连流水都不写），
+      // 所以它们必须排除，否则任务进行中的账号会全部被误报为对账异常。
+      const BALANCE_NEUTRAL_TYPES = ['freeze', 'unfreeze']
+      const sumByUser = new Map<string, number>()
+      for (const t of txns) {
+        if (BALANCE_NEUTRAL_TYPES.includes(String(t.type))) continue
+        const k = String(t.user_id)
+        sumByUser.set(k, (sumByUser.get(k) || 0) + Number(t.amount || 0))
+      }
+
+      // 冻结的应有值 = 进行中任务的雇主托管 + 待审提现（任务结算时雇主 frozen 会减回去）
+      const expectFrozen = new Map<string, number>()
+      const addExpect = (uid2: any, amt: any) => {
+        const k = String(uid2)
+        expectFrozen.set(k, (expectFrozen.get(k) || 0) + Number(amt || 0))
+      }
+      const escrowRes = await pg('GET', 'tasks?select=poster_id,amount&status=in.(open,accepted,doing,review,arbitration)&limit=5000')
+      for (const t of (Array.isArray(escrowRes.data) ? escrowRes.data : [])) addExpect(t.poster_id, t.amount)
+      const wdRes = await pg('GET', 'withdrawals?select=user_id,amount&status=eq.pending&limit=5000')
+      for (const w of (Array.isArray(wdRes.data) ? wdRes.data : [])) addExpect(w.user_id, w.amount)
+
+      const anomalies: any[] = []
+      const frozenAnomalies: any[] = []
+      const highBalance: any[] = []
+      let totalBalance = 0
+      let totalFrozen = 0
+      for (const p of profiles) {
+        const bal = Number(p.balance) || 0
+        const frozen = Number(p.frozen) || 0
+        totalBalance += bal
+        totalFrozen += frozen
+        const s = sumByUser.get(String(p.id)) || 0
+        const diff = bal - s
+        if (Math.abs(diff) > 0.001) {
+          anomalies.push({
+            id: p.id, nickname: p.nickname, phone: p.phone,
+            balance: bal, frozen, txnSum: s, diff: Math.round(diff * 100) / 100
+          })
+        }
+        const expectF = expectFrozen.get(String(p.id)) || 0
+        if (Math.abs(frozen - expectF) > 0.001) {
+          frozenAnomalies.push({
+            id: p.id, nickname: p.nickname, phone: p.phone,
+            frozen, expected: expectF, diff: Math.round((frozen - expectF) * 100) / 100
+          })
+        }
+        if (bal >= BALANCE_ALERT_THRESHOLD) {
+          highBalance.push({ id: p.id, nickname: p.nickname, phone: p.phone, balance: bal, frozen })
+        }
+      }
+      anomalies.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff))
+      frozenAnomalies.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff))
+      highBalance.sort((a, b) => b.balance - a.balance)
+      return json({
+        generatedAt: new Date().toISOString(),
+        totalUsers: profiles.length,
+        totalBalance,
+        totalFrozen,
+        txnRows: txns.length,
+        truncated: txns.length >= HEALTH_TXN_LIMIT,
+        alertThreshold: BALANCE_ALERT_THRESHOLD,
+        anomalies,
+        frozenAnomalies,
+        highBalance
+      })
     }
 
     // ── 读：我的钱包流水 ──
@@ -727,6 +858,7 @@ Deno.serve(async (req) => {
 
     return json({ error: '未知操作：' + action }, 400)
   } catch (e: any) {
-    return json({ error: e?.message || 'server error' }, 500)
+    const status = typeof e?.status === 'number' ? e.status : 500
+    return json({ error: e?.message || 'server error' }, status)
   }
 })

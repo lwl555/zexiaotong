@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../store/store'
 import { useMe } from '../../store/useMe'
+import { fetchWalletRules, type WalletRules } from '../../lib/db'
 import { CheckCircle, XCircle } from 'lucide-react'
 import {
   PageHeader,
@@ -22,19 +23,27 @@ import {
   NEG,
 } from '../../components/Editorial'
 
-// 充值档位（元）—— ⚠️ 必须与 supabase/functions/db-write/index.ts 的 RECHARGE_TIERS 保持一致，
-// 后端是权威校验方，这里只是把可选档位渲染出来。
-const RECHARGE_TIERS = [1, 6, 30, 98, 298]
-
-// 提现规则（积分），与后端的 WITHDRAW_MIN / WITHDRAW_STEP 对应
-const WITHDRAW_MIN = 1000
-const WITHDRAW_STEP = 100
+// 兜底规则：后端 wallet_rules 拉不到时才用（真实规则以服务端为准，前端不再自己定档位）
+const DEFAULT_RULES: WalletRules = {
+  rechargeTiers: [1, 6, 30, 98, 298],
+  rechargeMaxYuan: 10000,
+  withdrawMin: 1000,
+  withdrawStep: 100,
+  withdrawMaxPerTxn: 50000,
+  withdrawMaxPerDay: 100000,
+}
 
 const CHANNELS = [
   { key: 'wechat', label: '微信' },
   { key: 'alipay', label: '支付宝' },
   { key: 'qq', label: 'QQ' },
 ]
+
+/** 按中国时区取日期（单日提现额度按东八区自然日计算） */
+const chinaDate = (iso?: string) => {
+  const t = iso ? new Date(iso).getTime() : Date.now()
+  return new Date(t + 8 * 3600 * 1000).toISOString().slice(0, 10)
+}
 
 const WD_STATUS: Record<string, { label: string; tone: 'line' | 'accent' | 'ink' }> = {
   pending: { label: '待审核', tone: 'line' },
@@ -89,7 +98,8 @@ export default function Wallet() {
   const refreshWithdrawals = useStore(s => s.refreshWithdrawals)
   const config = useStore(s => s.config)
 
-  const [tier, setTier] = useState(RECHARGE_TIERS[2])
+  const [tier, setTier] = useState(DEFAULT_RULES.rechargeTiers[2])
+  const [rules, setRules] = useState<WalletRules>(DEFAULT_RULES)
   const [wdAmt, setWdAmt] = useState('')
   const [channel, setChannel] = useState(CHANNELS[0].key)
   const [account, setAccount] = useState('')
@@ -97,10 +107,28 @@ export default function Wallet() {
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState<{ type: 'ok' | 'err'; msg: string } | null>(null)
 
+  // 规则以后端为准（档位 / 门槛 / 单笔与单日上限）
+  useEffect(() => {
+    let alive = true
+    fetchWalletRules()
+      .then(r => {
+        if (!alive) return
+        setRules(r)
+        setTier(prev => (r.rechargeTiers.includes(prev) ? prev : r.rechargeTiers[Math.min(2, r.rechargeTiers.length - 1)]))
+      })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [])
+
   const txns = allTxns.filter(t => t.user_id === me.id)
   const myWd = allWithdrawals.filter(w => w.user_id === me.id)
   const ppu = config?.points_per_yuan || 100
   const usable = Number(me.balance) - Number(me.frozen || 0)
+  // 今日已占用的提现额度（待审 + 已打款；被驳回的不占额度）
+  const todayUsed = myWd
+    .filter(w => w.status !== 'rejected' && chinaDate(w.created_at) === chinaDate())
+    .reduce((s, w) => s + Number(w.amount || 0), 0)
+  const todayLeft = Math.max(0, rules.withdrawMaxPerDay - todayUsed)
 
   const showToast = (type: 'ok' | 'err', msg: string) => {
     setToast({ type, msg })
@@ -126,8 +154,16 @@ export default function Wallet() {
     if (busy) return
     const amount = Number(wdAmt)
     if (!amount || amount <= 0) { showToast('err', '请输入提现积分'); return }
-    if (amount < WITHDRAW_MIN) { showToast('err', `最低提现 ${WITHDRAW_MIN} 积分`); return }
-    if (amount % WITHDRAW_STEP !== 0) { showToast('err', `提现需为 ${WITHDRAW_STEP} 的整数倍`); return }
+    if (amount < rules.withdrawMin) { showToast('err', `最低提现 ${rules.withdrawMin} 积分`); return }
+    if (amount % rules.withdrawStep !== 0) { showToast('err', `提现需为 ${rules.withdrawStep} 的整数倍`); return }
+    if (amount > rules.withdrawMaxPerTxn) {
+      showToast('err', `单笔提现不超过 ${rules.withdrawMaxPerTxn} 积分（= ¥${rules.withdrawMaxPerTxn / ppu}）`)
+      return
+    }
+    if (todayUsed + amount > rules.withdrawMaxPerDay) {
+      showToast('err', `今日已申请 ${todayUsed} 积分，单日上限 ${rules.withdrawMaxPerDay} 积分`)
+      return
+    }
     if (!account.trim()) { showToast('err', '请填写收款账号'); return }
     setBusy(true)
     try {
@@ -197,7 +233,7 @@ export default function Wallet() {
       <SectionLabel index="01" label="充值积分" />
       <div style={{ ...hard(), background: '#ffffff', padding: 18, marginBottom: 24 }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          {RECHARGE_TIERS.map(t => {
+          {rules.rechargeTiers.map(t => {
             const on = t === tier
             return (
               <button
@@ -240,7 +276,7 @@ export default function Wallet() {
         <input
           value={wdAmt}
           onChange={e => setWdAmt(e.target.value.replace(/[^\d]/g, ''))}
-          placeholder={`提现积分（最低 ${WITHDRAW_MIN}，须为 ${WITHDRAW_STEP} 的整数倍）`}
+          placeholder={`提现积分（最低 ${rules.withdrawMin}，须为 ${rules.withdrawStep} 的整数倍）`}
           inputMode="numeric"
           style={inputStyle}
         />
@@ -293,6 +329,10 @@ export default function Wallet() {
         </div>
         <p style={{ fontFamily: FONT, fontSize: 12, color: MUTED, marginTop: 12, marginBottom: 0, lineHeight: 1.7 }}>
           提交后对应积分会被<strong style={{ color: INK }}>冻结</strong>，管理员审核通过后打款并扣除；若被驳回，冻结的积分会自动退回可用。
+          <br />
+          限额：单笔 ≤ {rules.withdrawMaxPerTxn.toLocaleString()} 积分（= ¥{rules.withdrawMaxPerTxn / ppu}），
+          单日 ≤ {rules.withdrawMaxPerDay.toLocaleString()} 积分（= ¥{rules.withdrawMaxPerDay / ppu}），
+          今日剩余额度 {todayLeft.toLocaleString()} 积分。
         </p>
       </div>
 

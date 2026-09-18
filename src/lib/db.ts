@@ -611,6 +611,58 @@ export async function adminRejectWithdrawal(wdId: string, reason: string, operat
   await dbWrite('reject_wd', { wdId, reason, uid: operatorId })
 }
 
+// ─── 钱包规则 · 资金对账 ───────────────────────────────────────
+
+export interface WalletRules {
+  rechargeTiers: number[]
+  rechargeMaxYuan: number
+  withdrawMin: number
+  withdrawStep: number
+  withdrawMaxPerTxn: number
+  withdrawMaxPerDay: number
+}
+
+/** 钱包规则由后端下发（档位、提现门槛与上限），前端不再镜像常量，避免改一处忘一处 */
+export async function fetchWalletRules(): Promise<WalletRules> {
+  const d = await dbWrite('wallet_rules', {})
+  return {
+    rechargeTiers: Array.isArray(d.rechargeTiers) ? d.rechargeTiers.map(Number) : [1, 6, 30, 98, 298],
+    rechargeMaxYuan: Number(d.rechargeMaxYuan) || 10000,
+    withdrawMin: Number(d.withdrawMin) || 1000,
+    withdrawStep: Number(d.withdrawStep) || 100,
+    withdrawMaxPerTxn: Number(d.withdrawMaxPerTxn) || 50000,
+    withdrawMaxPerDay: Number(d.withdrawMaxPerDay) || 100000
+  }
+}
+
+export interface PointsHealth {
+  generatedAt: string
+  totalUsers: number
+  totalBalance: number
+  totalFrozen: number
+  txnRows: number
+  truncated: boolean
+  alertThreshold: number
+  anomalies: {
+    id: string; nickname: string; phone: string
+    balance: number; frozen: number; txnSum: number; diff: number
+  }[]
+  frozenAnomalies: {
+    id: string; nickname: string; phone: string
+    frozen: number; expected: number; diff: number
+  }[]
+  highBalance: {
+    id: string; nickname: string; phone: string
+    balance: number; frozen: number
+  }[]
+}
+
+/** 资金对账（管理员）：余额−流水−冻结 的差异 + 余额超告警线的账号 */
+export async function fetchPointsHealth(operatorId: string): Promise<PointsHealth> {
+  const d = await dbWrite('points_health', { uid: operatorId })
+  return d as PointsHealth
+}
+
 // ─── 充值（三步：下单 →（模拟）支付 → 入账）──────────────────────
 // 旧实现是「点一下充值就加钱」，没有支付、没有订单、没有幂等，连点即无限刷积分。
 // 现在下单只生成 pending 订单，入账只认订单且同一订单只能入账一次。
