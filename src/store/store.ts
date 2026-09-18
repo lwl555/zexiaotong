@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type {
-  Profile, Role, Task, Goods, Post, Message, WalletTxn, Withdrawal,
+  Profile, Role, Task, Goods, Post, Message, WalletTxn, Withdrawal, RechargeOrder,
   Arbitration, Notification, Category, Banner, PlatformConfig,
   TaskStatus, GoodsStatus, PostStatus, School, Bulletin, ActivityLog, CheckIn
 } from '../lib/types'
@@ -75,9 +75,17 @@ interface State {
   applyArbitration: (taskId: string, reason: string) => Promise<void>
   adminDecide: (arbId: string, winner: 'plaintiff' | 'defendant' | 'split', result: string) => Promise<void>
 
-  // 钱包
-  recharge: (amount: number) => Promise<void>
-  withdraw: (amount: number) => Promise<{ ok: boolean; msg: string }>
+  // 钱包（充值走「下单 → 收银台支付 → 入账」三步，订单 id 即幂等键）
+  createRechargeOrder: (amountYuan: number) => Promise<RechargeOrder>
+  confirmRecharge: (orderId: string) => Promise<{ ok: boolean; msg: string; points: number; duplicate: boolean }>
+  withdraw: (input: {
+    amount: number
+    channel: string
+    account: string
+    accountName?: string
+  }) => Promise<{ ok: boolean; msg: string }>
+  /** 重新拉取提现列表（管理端审核后、用户提交后刷新用） */
+  refreshWithdrawals: () => Promise<void>
 
   // 二手 / 社区
   publishGoods: (input: any) => Promise<void>
@@ -182,7 +190,9 @@ export const useStore = create<State>((set, get) => ({
         db.fetchGoods(),
         db.fetchPosts(),
         db.fetchTxns(me.id),
-        db.fetchWithdrawals(me.id),
+        // 提现取全量：管理端「提现审核」要看所有人的申请（原实现只取自己的，
+        // 导致管理员打开审核页永远是空的）；用户端在 Wallet 里按 user_id 过滤。
+        db.fetchWithdrawals(),
         db.fetchArbitrations(me.id),
         db.fetchNotifications(me.id),
         db.fetchCategories(),
@@ -367,26 +377,62 @@ export const useStore = create<State>((set, get) => ({
   },
 
   // ─── 钱包 ───
-  recharge: async (amount) => {
+  createRechargeOrder: async (amountYuan) => {
     const me = get().me!
-    // 走 db-write（service_role 绕过 RLS，后端改余额 + 记流水）
-    const balance = await db.recharge(me.id, amount)
-    const txns = await db.fetchTxns(me.id)
-    set(s => ({ me: { ...me, balance }, txns }))
+    return await db.createRechargeOrder(me.id, amountYuan)
   },
 
-  withdraw: async (amount) => {
+  confirmRecharge: async (orderId) => {
     const me = get().me!
-    if (me.balance < amount) return { ok: false, msg: '余额不足' }
-    await db.createWithdrawal({
-      user_id: me.id,
-      user_name: me.nickname,
-      amount,
-      status: 'pending'
-    })
-    const withdrawals = await db.fetchWithdrawals(me.id)
-    set({ withdrawals })
+    try {
+      const r = await db.confirmRecharge(me.id, orderId)
+      const txns = await db.fetchTxns(me.id)
+      set(s => ({ me: { ...(s.me as Profile), balance: r.balance }, txns }))
+      return {
+        ok: true,
+        msg: r.duplicate ? '该订单已支付过，积分不会重复到账' : `支付成功，到账 ${r.points} 积分`,
+        points: r.points,
+        duplicate: r.duplicate
+      }
+    } catch (e: any) {
+      return { ok: false, msg: e?.message || '支付失败，请重试', points: 0, duplicate: false }
+    }
+  },
+
+  withdraw: async ({ amount, channel, account, accountName }) => {
+    const me = get().me!
+    const avail = Number(me.balance) - Number(me.frozen || 0)
+    if (avail < amount) return { ok: false, msg: `可用积分不足（当前可用 ${avail} 积分）` }
+    try {
+      await db.submitWithdraw({
+        userId: me.id,
+        userName: me.nickname,
+        amount,
+        channel,
+        account,
+        accountName
+      })
+    } catch (e: any) {
+      // 后端有明确规则（最低额 / 整数倍 / 可用不足 / 收款信息缺失），原话透传给用户
+      return { ok: false, msg: e?.message || '提现申请提交失败' }
+    }
+    // 冻结在后端完成，这里刷新余额与提现列表保持一致
+    const [withdrawals, profile] = await Promise.all([
+      db.fetchWithdrawals(me.id),
+      db.getCurrentUser().catch(() => null)
+    ])
+    set(s => ({
+      withdrawals,
+      me: profile
+        ? { ...(s.me as Profile), balance: profile.balance, frozen: profile.frozen }
+        : s.me
+    }))
     return { ok: true, msg: '提现申请已提交，等待管理员审核' }
+  },
+
+  refreshWithdrawals: async () => {
+    const withdrawals = await db.fetchWithdrawals()
+    set({ withdrawals })
   },
 
   // ─── 二手 / 社区 ───
@@ -546,17 +592,15 @@ export const useStore = create<State>((set, get) => ({
 
   approveWithdrawal: async (id) => {
     const me = get().me!
-    const wd = get().withdrawals.find(w => w.id === id)!
-    await db.adminApproveWithdrawal(id, wd.user_id, wd.amount, me.id)
-    const withdrawals = await db.fetchWithdrawals(get().me?.id || '')
-    set({ withdrawals })
+    // 金额与收款人由后端按 wdId 反查并二次校验（仍 pending + 余额充足），前端只传单号
+    await db.adminApproveWithdrawal(id, me.id)
+    set({ withdrawals: await db.fetchWithdrawals() })
   },
 
   rejectWithdrawal: async (id, reason) => {
     const me = get().me!
     await db.adminRejectWithdrawal(id, reason, me.id)
-    const withdrawals = await db.fetchWithdrawals(get().me?.id || '')
-    set({ withdrawals })
+    set({ withdrawals: await db.fetchWithdrawals() })
   },
 
   setConfig: async (c) => {

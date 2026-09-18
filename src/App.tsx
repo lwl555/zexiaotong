@@ -41,6 +41,7 @@ const Notifications = safeLazy(() => import('./pages/mobile/Notifications'))
 const MyTasks       = safeLazy(() => import('./pages/mobile/MyTasks'))
 const AIHistory     = safeLazy(() => import('./pages/mobile/AIHistory'))
 const Wallet        = safeLazy(() => import('./pages/mobile/Wallet'))
+const Pay           = safeLazy(() => import('./pages/mobile/Pay'))
 const Mine          = safeLazy(() => import('./pages/mobile/Mine'))
 const FeatureNotify = safeLazy(() => import('./pages/mobile/FeatureNotify'))
 const News          = safeLazy(() => import('./pages/mobile/News'))
@@ -162,7 +163,8 @@ export default function App() {
   // 不停留在某个聊天（糖豆 / 百事通等）。仅在首次加载执行一次，不影响站内导航。
   useEffect(() => {
     const p = loc.pathname
-    const keep = p === '/' || p === '/splash' || p === '/login' || p === '/theme-preview' || p.startsWith('/admin')
+    // 收银台也要放行：支付页刷新/直接打开链接时不能被弹回首页，否则订单就丢了
+    const keep = p === '/' || p === '/splash' || p === '/login' || p === '/theme-preview' || p.startsWith('/admin') || p.startsWith('/pay/')
     if (!keep) nav('/', { replace: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -214,6 +216,8 @@ export default function App() {
             <Route path="my-tasks" element={<MyTasks />} />
             <Route path="ai-history" element={<AIHistory />} />
             <Route path="wallet" element={<Wallet />} />
+            {/* 收银台：充值必须经此确认支付才入账（订单号即幂等键） */}
+            <Route path="pay/:orderId" element={<Pay />} />
             <Route path="mine" element={<Mine />} />
             <Route path="settings" element={<Settings />} />
             <Route path="discover" element={<Discover />} />

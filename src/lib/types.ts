@@ -186,6 +186,24 @@ export interface Withdrawal {
   reason: string
   created_at: string
   handled_at: string | null
+  // 收款信息（2026-09 新增：没有这三列时管理员不知道该打给谁）
+  channel?: string
+  account?: string
+  account_name?: string
+}
+
+// 充值订单：充值走「下单 →（模拟）支付 → 入账」三步，
+// 订单 id 即幂等键，同一订单只能入账一次（连点 / 重放不会重复加积分）。
+export type RechargeOrderStatus = 'pending' | 'paid' | 'cancelled' | 'expired'
+export interface RechargeOrder {
+  id: string
+  user_id: string
+  amount_yuan: number
+  points: number
+  status: RechargeOrderStatus
+  channel: string
+  paid_at: string | null
+  created_at: string
 }
 
 export type ArbitrationStatus = 'open' | 'closed'

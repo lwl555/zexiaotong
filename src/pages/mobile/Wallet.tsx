@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../store/store'
 import { useMe } from '../../store/useMe'
 import { CheckCircle, XCircle } from 'lucide-react'
@@ -8,16 +9,38 @@ import {
   BtnPrimary,
   BtnGhost,
   SectionLabel,
+  Tag,
   hard,
   INK,
   MUTED,
   ACCENT,
   HAIR,
+  LINE,
   FONT,
   MONO,
   POS,
   NEG,
 } from '../../components/Editorial'
+
+// 充值档位（元）—— ⚠️ 必须与 supabase/functions/db-write/index.ts 的 RECHARGE_TIERS 保持一致，
+// 后端是权威校验方，这里只是把可选档位渲染出来。
+const RECHARGE_TIERS = [1, 6, 30, 98, 298]
+
+// 提现规则（积分），与后端的 WITHDRAW_MIN / WITHDRAW_STEP 对应
+const WITHDRAW_MIN = 1000
+const WITHDRAW_STEP = 100
+
+const CHANNELS = [
+  { key: 'wechat', label: '微信' },
+  { key: 'alipay', label: '支付宝' },
+  { key: 'qq', label: 'QQ' },
+]
+
+const WD_STATUS: Record<string, { label: string; tone: 'line' | 'accent' | 'ink' }> = {
+  pending: { label: '待审核', tone: 'line' },
+  approved: { label: '已打款', tone: 'accent' },
+  rejected: { label: '已驳回', tone: 'ink' },
+}
 
 const TXN_LABEL: any = {
   recharge: '充值',
@@ -44,34 +67,84 @@ const TXN_COLOR: any = {
   checkin: ACCENT,
 }
 
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  border: `1px solid ${LINE}`,
+  borderRadius: 2,
+  padding: '10px 12px',
+  fontFamily: FONT,
+  fontSize: 15,
+  outline: 'none',
+  background: '#ffffff',
+  color: INK,
+}
+
 export default function Wallet() {
+  const nav = useNavigate()
   const me = useMe()
   const allTxns = useStore(s => s.txns)
-  const txns = allTxns.filter(t => t.user_id === me.id)
-  const recharge = useStore(s => s.recharge)
+  const allWithdrawals = useStore(s => s.withdrawals)
+  const createRechargeOrder = useStore(s => s.createRechargeOrder)
   const withdraw = useStore(s => s.withdraw)
-  const [amt, setAmt] = useState('')
-  const [mode, setMode] = useState<'in' | 'out'>('in')
+  const refreshWithdrawals = useStore(s => s.refreshWithdrawals)
+  const config = useStore(s => s.config)
+
+  const [tier, setTier] = useState(RECHARGE_TIERS[2])
+  const [wdAmt, setWdAmt] = useState('')
+  const [channel, setChannel] = useState(CHANNELS[0].key)
+  const [account, setAccount] = useState('')
+  const [accountName, setAccountName] = useState('')
+  const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState<{ type: 'ok' | 'err'; msg: string } | null>(null)
-  const usable = me.balance - me.frozen
+
+  const txns = allTxns.filter(t => t.user_id === me.id)
+  const myWd = allWithdrawals.filter(w => w.user_id === me.id)
+  const ppu = config?.points_per_yuan || 100
+  const usable = Number(me.balance) - Number(me.frozen || 0)
 
   const showToast = (type: 'ok' | 'err', msg: string) => {
     setToast({ type, msg })
-    setTimeout(() => setToast(null), 3000)
+    setTimeout(() => setToast(null), 3200)
   }
 
-  const doIt = async () => {
-    const a = Number(amt)
-    if (!a || a <= 0) { showToast('err', '请输入正确金额'); return }
-    if (mode === 'in') {
-      await recharge(a)
-      showToast('ok', `充值 ¥${a.toFixed(2)} 成功，到账 ${Math.round(a * 100)} 积分`)
-    } else {
-      const r = await withdraw(a)
-      if (r.ok) showToast('ok', '提现申请已提交，等待管理员审核')
-      else showToast('err', r.msg)
+  // 充值：先在下单接口拿到订单号，再跳到收银台页面确认支付。
+  // 未确认支付不会到账；同一订单重复支付也只会入账一次（后端幂等）。
+  const goPay = async () => {
+    if (busy) return
+    setBusy(true)
+    try {
+      const order = await createRechargeOrder(tier)
+      nav(`/pay/${order.id}`)
+    } catch (e: any) {
+      showToast('err', e?.message || '创建订单失败，请重试')
+    } finally {
+      setBusy(false)
     }
-    setAmt('')
+  }
+
+  const submitWd = async () => {
+    if (busy) return
+    const amount = Number(wdAmt)
+    if (!amount || amount <= 0) { showToast('err', '请输入提现积分'); return }
+    if (amount < WITHDRAW_MIN) { showToast('err', `最低提现 ${WITHDRAW_MIN} 积分`); return }
+    if (amount % WITHDRAW_STEP !== 0) { showToast('err', `提现需为 ${WITHDRAW_STEP} 的整数倍`); return }
+    if (!account.trim()) { showToast('err', '请填写收款账号'); return }
+    setBusy(true)
+    try {
+      const r = await withdraw({ amount, channel, account: account.trim(), accountName: accountName.trim() })
+      if (r.ok) {
+        showToast('ok', r.msg)
+        setWdAmt('')
+        setAccount('')
+        setAccountName('')
+      } else {
+        showToast('err', r.msg)
+      }
+    } catch (e: any) {
+      showToast('err', e?.message || '提交失败，请重试')
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -102,7 +175,7 @@ export default function Wallet() {
 
       <PageHeader eyebrow="Wallet" title="我的钱包" desc="余额、冻结与每一笔流水，清清楚楚。" />
 
-      {/* 账户总览：单卡三行（替代原三块硬边卡竖堆，减重） */}
+      {/* 账户总览 */}
       <div style={{ ...hard(), background: '#ffffff', padding: 18, marginBottom: 18 }}>
         <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: 2, color: MUTED }}>账户积分</div>
         <div style={{ fontFamily: FONT, fontSize: 34, fontWeight: 800, color: INK, marginTop: 6, letterSpacing: '-0.02em', lineHeight: 1.1 }}>
@@ -111,7 +184,7 @@ export default function Wallet() {
         <div style={{ display: 'flex', gap: 28, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${HAIR}` }}>
           <div>
             <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: 2, color: MUTED }}>冻结</div>
-            <div style={{ fontFamily: FONT, fontSize: 16, fontWeight: 700, color: INK, marginTop: 3 }}>{me.frozen.toLocaleString()} 积分</div>
+            <div style={{ fontFamily: FONT, fontSize: 16, fontWeight: 700, color: INK, marginTop: 3 }}>{Number(me.frozen || 0).toLocaleString()} 积分</div>
           </div>
           <div>
             <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: 2, color: MUTED }}>可用</div>
@@ -120,38 +193,148 @@ export default function Wallet() {
         </div>
       </div>
 
-      {/* 操作区：粗黑边硬卡 */}
+      {/* 01 充值：选档位 → 去收银台 */}
+      <SectionLabel index="01" label="充值积分" />
       <div style={{ ...hard(), background: '#ffffff', padding: 18, marginBottom: 24 }}>
-        <SectionLabel label="操作" />
-        <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
-          <BtnPrimary onClick={() => setMode('in')} style={mode === 'in' ? {} : { background: '#ffffff', color: INK }}>
-            充值
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {RECHARGE_TIERS.map(t => {
+            const on = t === tier
+            return (
+              <button
+                key={t}
+                onClick={() => setTier(t)}
+                style={{
+                  flex: '1 1 82px',
+                  minWidth: 82,
+                  padding: '11px 6px',
+                  border: `1px solid ${on ? ACCENT : LINE}`,
+                  background: on ? ACCENT : '#ffffff',
+                  color: on ? '#ffffff' : INK,
+                  borderRadius: 2,
+                  cursor: 'pointer',
+                  fontFamily: FONT,
+                  textAlign: 'center',
+                }}
+              >
+                <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: '-0.01em' }}>¥{t}</div>
+                <div style={{ fontFamily: MONO, fontSize: 10, marginTop: 3, color: on ? 'rgba(255,255,255,0.85)' : MUTED }}>
+                  {t * ppu} 积分
+                </div>
+              </button>
+            )
+          })}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16, flexWrap: 'wrap' }}>
+          <BtnPrimary onClick={goPay} disabled={busy}>
+            {busy ? '正在创建订单…' : `去支付 ¥${tier}`}
           </BtnPrimary>
-          <BtnGhost
-            onClick={() => setMode('out')}
-            style={mode === 'out' ? { background: ACCENT, color: '#ffffff', borderColor: INK } : {}}
-          >
-            提现
-          </BtnGhost>
+          <span style={{ fontFamily: FONT, fontSize: 12, color: MUTED }}>
+            下一步进入收银台确认支付；未支付的订单不会到账，重复支付也只会到账一次。
+          </span>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <input
-            value={amt}
-            onChange={e => setAmt(e.target.value.replace(/[^\d.]/g, ''))}
-            placeholder={mode === 'in' ? '充值金额（元）' : '提现积分'}
-            inputMode="decimal"
-            style={{ flex: 1, border: `1px solid #e8e8e8`, borderRadius: 2, padding: '10px 12px', fontFamily: FONT, fontSize: 15, outline: 'none' }}
-          />
-          <BtnPrimary onClick={doIt}>{mode === 'in' ? '充值' : '申请'}</BtnPrimary>
-        </div>
-        {mode === 'out' && (
-          <p style={{ fontFamily: FONT, fontSize: 12, color: MUTED, marginTop: 10, marginBottom: 0 }}>
-            提现按 100 积分 = 1 元 折算，由管理员审核后手动打款；审核期间不影响积分展示。
-          </p>
-        )}
       </div>
 
-      <SectionLabel label="资金流水" />
+      {/* 02 提现 */}
+      <SectionLabel index="02" label="申请提现" />
+      <div style={{ ...hard(), background: '#ffffff', padding: 18, marginBottom: 24 }}>
+        <input
+          value={wdAmt}
+          onChange={e => setWdAmt(e.target.value.replace(/[^\d]/g, ''))}
+          placeholder={`提现积分（最低 ${WITHDRAW_MIN}，须为 ${WITHDRAW_STEP} 的整数倍）`}
+          inputMode="numeric"
+          style={inputStyle}
+        />
+        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+          {CHANNELS.map(c => {
+            const on = c.key === channel
+            return (
+              <button
+                key={c.key}
+                onClick={() => setChannel(c.key)}
+                style={{
+                  flex: '1 1 0',
+                  padding: '9px 6px',
+                  border: `1px solid ${on ? ACCENT : LINE}`,
+                  background: on ? ACCENT : '#ffffff',
+                  color: on ? '#ffffff' : INK,
+                  borderRadius: 2,
+                  cursor: 'pointer',
+                  fontFamily: FONT,
+                  fontSize: 14,
+                  fontWeight: 600,
+                }}
+              >
+                {c.label}
+              </button>
+            )
+          })}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
+          <input
+            value={account}
+            onChange={e => setAccount(e.target.value)}
+            placeholder="收款账号（微信号 / 支付宝账号 / QQ 号）"
+            style={inputStyle}
+          />
+          <input
+            value={accountName}
+            onChange={e => setAccountName(e.target.value)}
+            placeholder="收款人姓名（选填，便于核对）"
+            style={inputStyle}
+          />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14, flexWrap: 'wrap' }}>
+          <BtnPrimary onClick={submitWd} disabled={busy || !wdAmt}>
+            {busy ? '提交中…' : '提交提现申请'}
+          </BtnPrimary>
+          <span style={{ fontFamily: FONT, fontSize: 12, color: MUTED }}>
+            {ppu} 积分 = 1 元，本次可提 ≈ ¥{(Number(wdAmt || 0) / ppu).toFixed(2)}
+          </span>
+        </div>
+        <p style={{ fontFamily: FONT, fontSize: 12, color: MUTED, marginTop: 12, marginBottom: 0, lineHeight: 1.7 }}>
+          提交后对应积分会被<strong style={{ color: INK }}>冻结</strong>，管理员审核通过后打款并扣除；若被驳回，冻结的积分会自动退回可用。
+        </p>
+      </div>
+
+      {/* 03 我的提现申请 */}
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+        <SectionLabel index="03" label="我的提现申请" />
+        <BtnGhost onClick={() => refreshWithdrawals()} style={{ fontSize: 12, padding: '5px 10px' }}>刷新</BtnGhost>
+      </div>
+      <div style={{ marginBottom: 24 }}>
+        {myWd.length === 0 && (
+          <div style={{ color: MUTED, fontSize: 13, padding: '18px 2px' }}>还没有提现申请</div>
+        )}
+        {myWd.map(w => {
+          const st = WD_STATUS[w.status] || { label: w.status, tone: 'line' as const }
+          return (
+            <ListRow key={w.id}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontFamily: FONT, fontSize: 14, fontWeight: 700, color: INK }}>
+                    {w.amount.toLocaleString()} 积分
+                  </span>
+                  <Tag tone={st.tone}>{st.label}</Tag>
+                </div>
+                <div style={{ fontFamily: FONT, fontSize: 12, color: MUTED, marginTop: 3 }}>
+                  ≈ ¥{(w.amount / ppu).toFixed(2)}
+                  {w.channel ? ` · ${w.channel === 'wechat' ? '微信' : w.channel === 'alipay' ? '支付宝' : w.channel === 'qq' ? 'QQ' : w.channel} ${w.account || ''}` : ''}
+                  {' · '}{new Date(w.created_at).toLocaleString('zh-CN')}
+                </div>
+                {w.status === 'rejected' && w.reason && (
+                  <div style={{ fontFamily: FONT, fontSize: 12, color: ACCENT, marginTop: 3 }}>驳回原因：{w.reason}</div>
+                )}
+              </div>
+              <div style={{ fontFamily: MONO, fontSize: 10.5, color: MUTED, letterSpacing: 1, whiteSpace: 'nowrap' }}>
+                #{w.id.slice(0, 6)}
+              </div>
+            </ListRow>
+          )
+        })}
+      </div>
+
+      {/* 04 资金流水 */}
+      <SectionLabel index="04" label="资金流水" />
       <div>
         {txns.length === 0 && (
           <div style={{ textAlign: 'center', color: MUTED, fontSize: 14, padding: '40px 0' }}>暂无流水</div>

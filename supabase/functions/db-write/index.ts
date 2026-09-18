@@ -31,6 +31,16 @@ const CHECKIN_BONUS_PER_DAY = 2 // 连续每多 1 天额外 +2
 const CHECKIN_BONUS_CAP = 20    // 连签奖励封顶 +20（连续 11 天起每天 30）
 const CHECKIN_WEEK_BONUS = 50   // 连续满 7 天额外周奖励
 
+// ── 钱包：充值 / 提现规则 ──────────────────────────────────────
+// 充值改为「下单 →（模拟）支付 → 入账」两步，金额只允许档位白名单，
+// 杜绝 Infinity / 超大金额 / 任意数值（旧实现只校验 > 0，可被脚本刷爆）。
+// ⚠️ 前端 src/pages/mobile/Wallet.tsx 有同名镜像常量 RECHARGE_TIERS，改动需同步。
+const RECHARGE_TIERS = [1, 6, 30, 98, 298]
+const RECHARGE_MAX_YUAN = 10000  // 兜底上限（档位之外的最后一道闸）
+// 提现规则（单位：积分）
+const WITHDRAW_MIN = 1000        // 最低提现 1000 积分（= 10 元）
+const WITHDRAW_STEP = 100        // 必须为 100 的整数倍
+
 // 中国日期（东八区）。按服务器本地时区换算，避免 UTC 错位导致「差一天」。
 function chinaDate(d: Date = new Date()): string {
   const sh = new Date(d.getTime() + 8 * 3600 * 1000 - d.getTimezoneOffset() * 60000)
@@ -115,7 +125,8 @@ const INSERT_ALLOWED: Record<string, string[]> = {
   comments: [],                       // 评论无 owner 字段，按目标关联写入
   messages: ['sender_id'],
   notifications: ['user_id'],
-  withdrawals: ['user_id'],
+  // withdrawals 已从白名单移除：提现必须走 submit_withdraw（冻结余额 + 规则校验），
+  // 否则可用通用 insert 绕过冻结逻辑重复提交申请。
   arbitrations: ['plaintiff_id'],
   txns: ['user_id']
 }
@@ -138,7 +149,9 @@ const UPDATE_COLUMNS: Record<string, string[]> = {
   posts: ['title', 'content', 'images', 'status', 'liked', 'likes', 'collected', 'collects', 'comments'],
   profiles: ['nickname', 'avatar', 'status'], // 严禁 role / balance / frozen / password_hash
   notifications: ['read'],
-  withdrawals: ['status', 'reason', 'handled_at'],
+  // 提现单不允许通过通用 update 改任何列：状态流转只能走 approve_wd / reject_wd，
+  // 否则申请人可以自己把 status 改成 approved/rejected 干扰审核。
+  withdrawals: [],
   arbitrations: ['status', 'winner', 'result']
 }
 
@@ -223,26 +236,82 @@ Deno.serve(async (req) => {
       return json({ profile: strip(ins.data?.[0]) })
     }
 
-    // ── 充值（前端传「元」，后端按 points_per_yuan 换算成「积分」入账）──
-    if (action === 'recharge') {
-      const { amount } = body
-      if (typeof amount !== 'number' || amount <= 0) return json({ error: '金额无效' }, 400)
+    // ── 充值第一步：下单（不碰余额，只生成一笔待支付订单）──
+    // 旧实现是「前端说充多少钱，后端就直接加多少积分」，且没有幂等键，
+    // 连点 / 脚本并发即可无限刷积分（用户反馈的「连点器卡充值成功」）。
+    // 现在物理上拆成两步：下单只写订单，入账只认订单，且同一订单只能入账一次。
+    if (action === 'create_recharge_order') {
+      const yuan = Number(body.amount)
+      if (!Number.isFinite(yuan)) return json({ error: '金额无效' }, 400)
+      if (yuan <= 0 || yuan > RECHARGE_MAX_YUAN) return json({ error: `金额需在 0~${RECHARGE_MAX_YUAN} 元之间` }, 400)
+      if (!RECHARGE_TIERS.includes(yuan)) return json({ error: '请选择可选的充值金额' }, 400)
       const me = await requireUser(uid)
+      if (me.status === 'banned') return json({ error: '账号已被冻结，暂不能充值' }, 403)
       const cfgRes = await pg('GET', 'platform_config?select=points_per_yuan&limit=1')
       const ppu = Array.isArray(cfgRes.data) && cfgRes.data[0]?.points_per_yuan ? Number(cfgRes.data[0].points_per_yuan) : 100
-      const points = Math.round(Number(amount) * ppu)
+      const points = Math.round(yuan * ppu)
+      if (!Number.isFinite(points) || points <= 0) return json({ error: '兑换比例异常，请联系管理员' }, 500)
+      const ins = await pg('POST', 'recharge_orders', {
+        user_id: uid,
+        amount_yuan: yuan,
+        points,
+        status: 'pending',
+        channel: 'mock'
+      })
+      if (!ins.ok || !Array.isArray(ins.data) || !ins.data.length) return json({ error: '下单失败' }, 500)
+      const order = ins.data[0]
+      await logActivity('user', uid, me.nickname || '', 'recharge_order', 'wallet', String(order.id), `创建充值订单 ¥${yuan.toFixed(2)}`)
+      return json({ orderId: order.id, amountYuan: yuan, points, status: order.status })
+    }
+
+    // ── 充值第二步：支付确认并入账（幂等核心）──
+    // 用「条件更新 status: pending → paid」抢单：并发 / 连点 / 重放时只有一个请求能改到行，
+    // 抢不到的请求落到 duplicate 分支直接返回，不会重复加积分。
+    if (action === 'confirm_recharge') {
+      const { orderId, channel } = body
+      if (!orderId) return json({ error: '缺少订单号' }, 400)
+      await requireUser(uid)
+      const claim = await pg(
+        'PATCH',
+        `recharge_orders?id=eq.${enc(orderId)}&user_id=eq.${enc(uid)}&status=eq.pending`,
+        { status: 'paid', paid_at: new Date().toISOString(), channel: String(channel || 'mock') }
+      )
+      if (!claim.ok) return json({ error: '订单确认失败' }, 500)
+      const claimed = Array.isArray(claim.data) ? claim.data : []
+
+      if (!claimed.length) {
+        // 没抢到：要么已经支付过（幂等返回成功，不重复入账），要么订单不存在 / 状态异常
+        const cur = await pg('GET', `recharge_orders?select=id,status,points&id=eq.${enc(orderId)}&user_id=eq.${enc(uid)}`)
+        const row = Array.isArray(cur.data) ? cur.data[0] : null
+        if (!row) return json({ error: '订单不存在' }, 404)
+        if (row.status === 'paid') {
+          const meNow = await requireUser(uid)
+          return json({ ok: true, duplicate: true, points: Number(row.points) || 0, balance: Number(meNow.balance) || 0 })
+        }
+        return json({ error: '订单状态不可支付：' + row.status }, 409)
+      }
+
+      const order = claimed[0]
+      const points = Number(order.points) || 0
+      if (points <= 0) return json({ error: '订单金额异常' }, 400)
+      // 抢单成功后重新读一次余额，缩小「读改写」竞态窗口
+      const me = await requireUser(uid)
       const newBal = Number(me.balance) + points
       const u = await pg('PATCH', `profiles?id=eq.${enc(uid)}`, { balance: newBal })
-      if (!u.ok) return json({ error: '充值失败' }, 500)
+      if (!u.ok) {
+        // 入账失败：把订单退回 pending，避免「订单已支付但积分没到」的钱货两空
+        await pg('PATCH', `recharge_orders?id=eq.${enc(orderId)}`, { status: 'pending', paid_at: null })
+        return json({ error: '入账失败，请重试' }, 500)
+      }
       await pg('POST', 'txns', {
         user_id: uid,
         type: 'recharge',
         amount: points,
         balance_after: newBal,
-        remark: `充值 ¥${Number(amount).toFixed(2)}，得 ${points} 积分`
+        remark: `充值 ¥${Number(order.amount_yuan).toFixed(2)}，得 ${points} 积分（订单 ${String(orderId).slice(0, 8)}）`
       })
-      await logActivity('user', uid, me.nickname || '', 'recharge', 'wallet', '', `充值 ¥${Number(amount).toFixed(2)}，得 ${points} 积分`)
-      return json({ balance: newBal, points })
+      await logActivity('user', uid, me.nickname || '', 'recharge', 'wallet', String(orderId), `充值 ¥${Number(order.amount_yuan).toFixed(2)}，得 ${points} 积分`)
+      return json({ ok: true, balance: newBal, points })
     }
 
     // ── 发布任务（冻结余额 + 建任务 + 记流水）──
@@ -364,28 +433,84 @@ Deno.serve(async (req) => {
       return json({ ok: true })
     }
 
-    // ── 审核提现：通过（管理员）──
-    if (action === 'approve_wd') {
-      const { wdId, userId, amount } = body
-      await requireAdmin(uid)
-      const u = await pg('GET', `profiles?select=balance&id=eq.${enc(userId)}`)
-      const bal = Array.isArray(u.data) && u.data[0] ? Number(u.data[0].balance) : 0
-      const newBal = bal - Number(amount)
-      await pg('PATCH', `profiles?id=eq.${enc(userId)}`, { balance: newBal })
-      // 补写提现流水（原代码漏写，导致「余额少了但流水里看不到提现」）
-      await pg('POST', 'txns', {
-        user_id: userId,
-        type: 'withdraw',
-        amount: -Number(amount),
-        balance_after: newBal,
-        remark: '提现审核通过'
+    // ── 提现申请（冻结积分 + 收款信息 + 规则校验）──
+    // 旧实现走通用 insert：不冻结余额、不校验待审总额、也没有收款账号，
+    // 用户可以重复提交多笔申请，管理员逐笔放款后余额会被扣成负数。
+    if (action === 'submit_withdraw') {
+      const { channel, account, accountName } = body
+      const pts = Number(body.amount)
+      if (!Number.isFinite(pts) || pts <= 0) return json({ error: '提现积分无效' }, 400)
+      if (pts < WITHDRAW_MIN) return json({ error: `最低提现 ${WITHDRAW_MIN} 积分` }, 400)
+      if (pts % WITHDRAW_STEP !== 0) return json({ error: `提现需为 ${WITHDRAW_STEP} 的整数倍` }, 400)
+      const ch = String(channel || '').trim()
+      const acc = String(account || '').trim()
+      if (!ch || !acc) return json({ error: '请填写收款方式与收款账号' }, 400)
+      const me = await requireUser(uid)
+      if (me.status === 'banned') return json({ error: '账号已被冻结，暂不能提现' }, 403)
+      const avail = Number(me.balance) - Number(me.frozen)
+      if (avail < pts) return json({ error: `可用积分不足（当前可用 ${avail} 积分）` }, 400)
+      // 冻结（预扣）：以 frozen 做乐观锁条件更新，并发重复提交只有一笔能成功
+      const fz = await pg(
+        'PATCH',
+        `profiles?id=eq.${enc(uid)}&frozen=eq.${Number(me.frozen)}`,
+        { frozen: Number(me.frozen) + pts }
+      )
+      if (!fz.ok) return json({ error: '提交失败，请重试' }, 500)
+      if (!Array.isArray(fz.data) || !fz.data.length) return json({ error: '提交过于频繁，请稍后重试' }, 409)
+      const ins = await pg('POST', 'withdrawals', {
+        user_id: uid,
+        user_name: me.nickname || '',
+        amount: pts,
+        status: 'pending',
+        channel: ch,
+        account: acc,
+        account_name: String(accountName || '').trim()
       })
-      const w = await pg('PATCH', `withdrawals?id=eq.${enc(wdId)}`, {
+      if (!ins.ok || !Array.isArray(ins.data) || !ins.data.length) {
+        // 落单失败必须回滚冻结，否则用户的积分被白锁
+        await pg('PATCH', `profiles?id=eq.${enc(uid)}`, { frozen: Number(me.frozen) })
+        return json({ error: '提现申请提交失败，请重试' }, 500)
+      }
+      const wd = ins.data[0]
+      await logActivity('user', uid, me.nickname || '', 'withdraw_apply', 'wallet', String(wd.id), `申请提现 ${pts} 积分（${ch} ${acc}）`)
+      return json({ ok: true, withdrawal: wd, frozen: Number(me.frozen) + pts })
+    }
+
+    // ── 审核提现：通过（管理员）──
+    // 打款前二次校验：申请仍为 pending、余额充足；金额与收款人只从库里读，
+    // 不采信客户端传入的 userId/amount（否则可被篡改指定任意账号扣款）。
+    if (action === 'approve_wd') {
+      const { wdId } = body
+      await requireAdmin(uid)
+      if (!wdId) return json({ error: '缺少提现单号' }, 400)
+      const q = await pg('GET', `withdrawals?select=*&id=eq.${enc(wdId)}`)
+      const wd = Array.isArray(q.data) ? q.data[0] : null
+      if (!wd) return json({ error: '提现申请不存在' }, 404)
+      if (wd.status !== 'pending') return json({ error: `该申请已处理（${wd.status}），无需重复打款` }, 409)
+      const amount = Number(wd.amount) || 0
+      if (amount <= 0) return json({ error: '提现金额异常' }, 400)
+      const target = await getProfile(wd.user_id)
+      if (!target) return json({ error: '申请用户不存在' }, 404)
+      const bal = Number(target.balance) || 0
+      if (bal < amount) return json({ error: `余额不足，无法打款（当前 ${bal} 积分）` }, 400)
+      // 条件更新抢单：仍是 pending 才置为 approved —— 双击 / 多管理员并发只会有一次成功
+      const claim = await pg('PATCH', `withdrawals?id=eq.${enc(wdId)}&status=eq.pending`, {
         status: 'approved',
         handled_at: new Date().toISOString()
       })
-      if (!w.ok) return json({ error: '更新失败' }, 500)
-      await logActivity('admin', uid, '', 'approve_withdrawal', 'user', userId, `通过提现 ${amount} 积分`)
+      if (!claim.ok) return json({ error: '更新失败' }, 500)
+      if (!Array.isArray(claim.data) || !claim.data.length) return json({ error: '该申请已被处理，请刷新后查看' }, 409)
+      const newBal = bal - amount
+      const newFrozen = Math.max(0, Number(target.frozen) - amount)
+      await pg('PATCH', `profiles?id=eq.${enc(wd.user_id)}`, { balance: newBal, frozen: newFrozen })
+      await pg('POST', 'txns', {
+        user_id: wd.user_id,
+        type: 'withdraw',
+        amount: -amount,
+        balance_after: newBal,
+        remark: `提现打款（${wd.channel || '未填渠道'}）`
+      })
+      await logActivity('admin', uid, '', 'approve_withdrawal', 'user', wd.user_id, `通过提现 ${amount} 积分`)
       return json({ ok: true })
     }
 
@@ -393,12 +518,27 @@ Deno.serve(async (req) => {
     if (action === 'reject_wd') {
       const { wdId, reason } = body
       await requireAdmin(uid)
-      const w = await pg('PATCH', `withdrawals?id=eq.${enc(wdId)}`, {
+      if (!wdId) return json({ error: '缺少提现单号' }, 400)
+      const q = await pg('GET', `withdrawals?select=*&id=eq.${enc(wdId)}`)
+      const wd = Array.isArray(q.data) ? q.data[0] : null
+      if (!wd) return json({ error: '提现申请不存在' }, 404)
+      if (wd.status !== 'pending') return json({ error: `该申请已处理（${wd.status}）` }, 409)
+      const claim = await pg('PATCH', `withdrawals?id=eq.${enc(wdId)}&status=eq.pending`, {
         status: 'rejected',
-        reason,
+        reason: String(reason || ''),
         handled_at: new Date().toISOString()
       })
-      if (!w.ok) return json({ error: '更新失败' }, 500)
+      if (!claim.ok) return json({ error: '更新失败' }, 500)
+      if (!Array.isArray(claim.data) || !claim.data.length) return json({ error: '该申请已被处理，请刷新后查看' }, 409)
+      // 驳回必须把冻结的积分退回可用，否则用户积分被白锁
+      const target = await getProfile(wd.user_id)
+      if (target) {
+        const amount = Number(wd.amount) || 0
+        await pg('PATCH', `profiles?id=eq.${enc(wd.user_id)}`, {
+          frozen: Math.max(0, Number(target.frozen) - amount)
+        })
+      }
+      await logActivity('admin', uid, '', 'reject_withdrawal', 'user', wd.user_id, `驳回提现 ${wd.amount} 积分：${String(reason || '')}`)
       return json({ ok: true })
     }
 
@@ -444,7 +584,7 @@ Deno.serve(async (req) => {
     if (action === 'add_points') {
       const { targetUserId, points, reason } = body
       await requireAdmin(uid)
-      if (typeof points !== 'number' || points === 0) return json({ error: '积分无效' }, 400)
+      if (typeof points !== 'number' || !Number.isFinite(points) || points === 0) return json({ error: '积分无效' }, 400)
       const t = await getProfile(targetUserId)
       if (!t) return json({ error: '目标用户不存在' }, 404)
       const newBal = Number(t.balance) + points

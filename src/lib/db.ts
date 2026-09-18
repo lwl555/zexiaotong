@@ -10,7 +10,7 @@ import { supabase } from './supabase'
 import { sha256Hex } from './hash'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
-  Profile, Task, Goods, Post, Comment, Message, WalletTxn, Withdrawal,
+  Profile, Task, Goods, Post, Comment, Message, WalletTxn, Withdrawal, RechargeOrder,
   Arbitration, Notification, Category, Banner, PlatformConfig, Role,
   TaskStatus, GoodsStatus, PostStatus, School, Bulletin, ActivityLog, CheckIn
 } from './types'
@@ -396,19 +396,34 @@ export async function createNotification(notif: Partial<Notification>): Promise<
 
 // ─── 提现 ───────────────────────────────────────────────────────
 
-export async function fetchWithdrawals(userId: string): Promise<Withdrawal[]> {
-  const { data, error } = await supabase!
-    .from('withdrawals')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
+// 提现列表。传 userId 只取该用户的；不传则取全部（管理端「提现审核」需要看所有人的申请）。
+// 注意：RLS 对 withdrawals 是 select using(true)，anon 可读全表，所以这里用客户端过滤即可。
+export async function fetchWithdrawals(userId?: string): Promise<Withdrawal[]> {
+  let q = supabase!.from('withdrawals').select('*')
+  if (userId) q = q.eq('user_id', userId)
+  const { data, error } = await q.order('created_at', { ascending: false })
   if (error) throw error
   return (data || []) as Withdrawal[]
 }
 
-export async function createWithdrawal(wd: Partial<Withdrawal>): Promise<Withdrawal> {
-  const d = await dbWrite('insert', { table: 'withdrawals', row: wd })
-  return d.row as Withdrawal
+// 提交提现申请：走 db-write 的 submit_withdraw（后端冻结积分 + 校验规则 + 落收款信息）。
+// 旧实现直接 insert，不冻结余额，可重复提交多笔导致管理员重复打款。
+export async function submitWithdraw(input: {
+  userId: string
+  userName: string
+  amount: number
+  channel: string
+  account: string
+  accountName?: string
+}): Promise<Withdrawal> {
+  const d = await dbWrite('submit_withdraw', {
+    uid: input.userId,
+    amount: input.amount,
+    channel: input.channel,
+    account: input.account,
+    accountName: input.accountName || ''
+  })
+  return d.withdrawal as Withdrawal
 }
 
 // ─── 仲裁 ───────────────────────────────────────────────────────
@@ -585,20 +600,64 @@ export async function fetchCheckinStatus(uid: string): Promise<{
 
 // ─── 管理员操作 ─────────────────────────────────────────────────
 
-export async function adminApproveWithdrawal(wdId: string, userId: string, amount: number, operatorId: string) {
-  await dbWrite('approve_wd', { wdId, userId, amount, uid: operatorId })
+// 打款：金额与收款人由后端按 wdId 反查，前端只传单号（防篡改指定任意扣款）
+export async function adminApproveWithdrawal(wdId: string, operatorId: string) {
+  await dbWrite('approve_wd', { wdId, uid: operatorId })
 }
 
 export async function adminRejectWithdrawal(wdId: string, reason: string, operatorId: string) {
   await dbWrite('reject_wd', { wdId, reason, uid: operatorId })
 }
 
-// ─── 供 store 直接调用（替代原本绕过 db 层的裸 supabase!.from 写操作）───
+// ─── 充值（三步：下单 →（模拟）支付 → 入账）──────────────────────
+// 旧实现是「点一下充值就加钱」，没有支付、没有订单、没有幂等，连点即无限刷积分。
+// 现在下单只生成 pending 订单，入账只认订单且同一订单只能入账一次。
 
-// 充值：走 db-write 的 recharge action（绕过 RLS 写限制，后端改余额 + 记流水）
-export async function recharge(uid: string, amount: number): Promise<number> {
-  const d = await dbWrite('recharge', { uid, amount })
-  return d.balance as number
+/** 第一步：下单。返回订单号（后续收银台凭它入账）。金额必须是后端档位白名单内的值。 */
+export async function createRechargeOrder(uid: string, amountYuan: number): Promise<RechargeOrder> {
+  const d = await dbWrite('create_recharge_order', { uid, amount: amountYuan })
+  return {
+    id: d.orderId,
+    user_id: uid,
+    amount_yuan: d.amountYuan,
+    points: d.points,
+    status: d.status || 'pending',
+    channel: 'mock',
+    paid_at: null,
+    created_at: new Date().toISOString()
+  } as RechargeOrder
+}
+
+/** 第二步：支付确认并入账。幂等——重复调用只会到账一次。 */
+export async function confirmRecharge(
+  uid: string,
+  orderId: string,
+  channel = 'mock'
+): Promise<{ balance: number; points: number; duplicate: boolean }> {
+  const d = await dbWrite('confirm_recharge', { uid, orderId, channel })
+  return { balance: Number(d.balance) || 0, points: Number(d.points) || 0, duplicate: !!d.duplicate }
+}
+
+/** 读单笔订单（收银台刷新后靠 URL 里的订单号重新拉取） */
+export async function fetchRechargeOrder(orderId: string): Promise<RechargeOrder | null> {
+  const { data } = await supabase!
+    .from('recharge_orders')
+    .select('*')
+    .eq('id', orderId)
+    .maybeSingle()
+  return (data as RechargeOrder) || null
+}
+
+/** 我的充值订单（钱包页展示最近几笔） */
+export async function fetchRechargeOrders(userId: string): Promise<RechargeOrder[]> {
+  const { data, error } = await supabase!
+    .from('recharge_orders')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(20)
+  if (error) throw error
+  return (data || []) as RechargeOrder[]
 }
 
 // 平台配置：仅管理员可改
