@@ -353,8 +353,11 @@ export async function fetchComments(target_type: string, target_id: string): Pro
 }
 
 export async function createComment(comment: Partial<Comment>): Promise<Comment> {
-  const d = await dbWrite('insert', { table: 'comments', row: comment })
-  return d.row as Comment
+  // 走 add_comment 专用动作：服务端原子自增目标（posts/bulletins/goods）的 comments 计数并写运行日志。
+  // 此前走通用 insert 不增计数 → 真用户给帖子评论时 posts.comments 永远不自增，
+  // 卡片/详情页的评论数偏低、且和真实评论数对不上（AI 评论靠 community-bots 的 pgInc 才加得上）。
+  const d = await dbWrite('add_comment', comment)
+  return d.comment as Comment
 }
 
 // ─── 私信 ───────────────────────────────────────────────────────

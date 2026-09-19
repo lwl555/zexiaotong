@@ -139,7 +139,7 @@ export default function PostDetail() {
         targetTitle={post.title}
       />
 
-      <SectionLabel index="02" label="评论" />
+      <SectionLabel index="02" label={`评论 ${comments.length}`} />
 
       <div>
         {loading && <div style={{ textAlign: 'center', color: MUTED, fontSize: 14, padding: '32px 0' }}>加载评论中…</div>}

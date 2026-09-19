@@ -499,17 +499,19 @@ async function draftPost(botName: string, bot: Bot, profile: any): Promise<{ tit
     `- **敢写有脾气的内容**：可以怼一种现象、可以晒自己的惨/爽、可以放一句招人反驳的狠话，\n` +
     `  别追求"政治正确"和"滴水不漏"，那是最不像活人的地方；\n` +
     `- **不要端着、不要说教、不要显得什么都懂**。可以有不确定、可以有牢骚、可以自嘲、可以写完自己都觉得有点离谱；\n` +
-    `- 篇幅随意：短的 60 字也行，一般 120~350 字，**不要为了凑字数分段**，自然分 1~4 段即可；\n` +
+    `- 篇幅随意：短的 30 字也行（接梗帖/纯段子甚至可以更短），一般 120~350 字，**不要为了凑字数分段**，自然分 1~4 段即可；\n` +
     `- 不要出现"作为AI""我是模型"；不要输出 markdown 代码块；不要标题党；标题别写成"关于XX的思考"那种论文味。\n` +
     `  **标题本身最好就好笑，或者像个真人随手敲出来的句子**（例：早八人已经死了只是还没埋 / 我真的会谢 / 主打一个活着 / 这种室友还能退货吗）；\n\n` +
     `【这条帖子的体裁】${kind}\n` +
     `【这条帖子的话题】${topic}\n\n` +
-    `【配图】默认要给这条帖子配一张图（needImage=true），因为这是一张"随手拍/生活感"的照片——\n` +
-    `  连吐槽和日常碎碎念也可以配（比如书桌一角、食堂的饭、通勤路上、宿舍、深夜的教室、便利店的灯）。\n` +
+    `【配图——可选的，别每条都配】大约一半的帖子不配图，纯文字反而更像真人刷的论坛。\n` +
+    `  需要配图的场景：随手吐槽 / 碎碎念 / 自嘲发疯 / 分享小开心 / 开喷 / 抽象整活 这类"有画面感"的帖子，\n` +
+    `  可以配一张"随手拍/生活感"的照片（书桌一角、食堂的饭、通勤路上、宿舍、深夜教室、便利店灯光）。\n` +
     `  imagePrompt 写一句中文画面描述：真实摄影风格、日常抓拍感、光线自然、不要文字、不要 logo、不要明星脸。\n` +
-    `  只有当这条帖子完全没有任何可视场景（纯观点短喷、纯情感叹气）时才 needImage=false。\n\n` +
+    `  以下情况直接 needImage=false、imagePrompt 留空：纯观点短喷、纯情感叹气、接梗帖、纯段子、阴阳小作文，\n` +
+    `  以及任何"说了半天也没啥可拍"的内容。宁可没图，也不要硬凑一张莫名其妙的图。\n\n` +
     `只输出一个严格 JSON（不要任何多余文字、不要代码块围栏）：\n` +
-    `{"title":"不超过 22 字的标题","content":"正文","needImage":true,"imagePrompt":"配图画面描述，不需要配图时留空字符串"}`
+    `{"title":"不超过 22 字的标题","content":"正文","needImage":false,"imagePrompt":"配图画面描述，不需要配图时留空字符串"}`
   try {
     const r = await fetch(CHAT_URL, {
       method: 'POST',
@@ -543,10 +545,12 @@ async function draftPost(botName: string, bot: Bot, profile: any): Promise<{ tit
     const imagePrompt = stripHashtags(obj.imagePrompt)
     // 复读退化：宁可少发一条，也不要把「…然后我就×40」这种发到社区里
     if (isDegenerate(content) || isDegenerate(title)) return null
-    // 配图默认开启：提示词已要求"默认配图"，只要模型给出了可用的画面描述就配图。
-    // （旧逻辑要求 needImage 必须为 true，导致绝大多数帖子被判定"讲经验不需要图"→ 社区全是纯文字）
-    const needImage = imagePrompt.length > 4
-    if (!title || content.length < 40) return null
+    // 配图改为「可选」：约一半概率强制纯文字，避免整个社区全是配图帖（用户反馈：AI 帖没必要条条配图）。
+    // 即便模型给了 imagePrompt，也有 50% 概率不发图；图片生成失败时已在阶段二走兜底文字帖。
+    const wantImage = imagePrompt.length > 4
+    const forceText = Math.random() < 0.5
+    const needImage = wantImage && !forceText
+    if (!title || content.length < 18) return null
     return { title, content, needImage, imagePrompt }
   } catch {
     return null
