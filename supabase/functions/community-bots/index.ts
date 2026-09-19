@@ -99,6 +99,15 @@ async function logActivity(actor_type: string, actor_id: string, actor_name: str
   await pgInsert('activity_logs', { actor_type, actor_id, actor_name, action, target_type, target_id, detail })
 }
 
+// 计数器「设为真实值」（对账用）：把某目标的 comments 计数直接改成 comments 表里的真实条数。
+async function pgUpdate(table: string, id: string, patch: Record<string, unknown>) {
+  await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${enc(id)}`, {
+    method: 'PATCH',
+    headers: { apikey: SERVICE_ROLE, Authorization: `Bearer ${SERVICE_ROLE}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch)
+  })
+}
+
 // ── 语感铁律（发帖 / 回帖共用）────────────────────────────────────
 // 为什么单独抽出来：此前提示词只写了「口语化、别写文章」，但**没有告诉模型当代大学生
 // 的网感长什么样**，也没有给任何范例，模型就退回默认的书面客气话 —— 结果社区一眼假：
@@ -259,6 +268,32 @@ async function handleInteract(want: number) {
     await pgInc(tgt.type, tgt.id, 'likes')
   }
   return json({ ok: true, mode: 'interact', comments: made })
+}
+
+// 维护模式：把 posts / bulletins 的 comments 计数按 comments 表真实条数回填，修复历史漂移。
+// （早期 bot 评论经 pgInc 自增时部分丢失，导致卡片显示 0 但详情页有评论。幂等、只读后写。）
+async function handleRecalc() {
+  const rows = await pgGet(`comments?select=target_type,target_id&limit=5000`)
+  const counts: Record<string, number> = {}
+  for (const c of Array.isArray(rows) ? rows : []) {
+    const k = `${c.target_type}:${c.target_id}`
+    counts[k] = (counts[k] || 0) + 1
+  }
+  let fixed = 0
+  const sync = async (table: string) => {
+    const items = await pgGet(`${table}?select=id,comments&limit=5000`)
+    for (const it of Array.isArray(items) ? items : []) {
+      const real = counts[`${table === 'posts' ? 'post' : 'bulletin'}:${it.id}`] || 0
+      if (Number(it.comments) !== real) {
+        await pgUpdate(table, it.id, { comments: real })
+        fixed++
+      }
+    }
+  }
+  await sync('posts')
+  await sync('bulletins')
+  const total = Object.values(counts).reduce((a, b) => a + b, 0)
+  return json({ ok: true, mode: 'recalc', fixed, totalComments: total })
 }
 
 // 每个智能体的「人设」——昵称/头像来自 profiles（本函数只带 id 与人设描述）
@@ -655,6 +690,9 @@ Deno.serve(async (req: Request) => {
     if (mode === 'interact') {
       const want = Math.max(1, Math.min(Number(body?.count) || 3, 4))
       return await handleInteract(want)
+    }
+    if (mode === 'recalc') {
+      return await handleRecalc()
     }
     const want = Math.max(1, Math.min(Number(body?.count) || 1, MAX_PER_CALL))
 
