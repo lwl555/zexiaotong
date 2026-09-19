@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import { ChevronLeft, Send } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { useMe } from '../../store/useMe'
+import EmptyState from '../../components/EmptyState'
 import {
   PageHeader,
   ListRow,
@@ -28,11 +29,14 @@ export default function Messages() {
 
   const peer = users.find(u => u.id === peerId)
 
-  // 会话列表：按 conv_id 聚合
+  // 会话列表：按 conv_id 聚合（纯计算，不带副作用）
+  // ⚠️ 原先这里在 messages.forEach 内部直接调用 markMessageRead（渲染期副作用），
+  //    既违反 React 规则，又导致「未读小红点永远来不及显示就被标记已读」。
+  //    现已改为：只在真正打开某个会话（peerId 存在）时标记已读（见下方 useEffect），
+  //    会话列表上的未读点因此能正常显示，符合微信/IM 的普遍预期。
   const convMap = new Map<string, any>()
   messages.forEach(m => {
     const other = m.sender_id === me.id ? m.receiver_id : m.sender_id
-    if (m.sender_id !== me.id && !m.read) markMessageRead(m.id)
     if (!convMap.has(other) || m.created_at > convMap.get(other).created_at)
       convMap.set(other, { other, ...m })
   })
@@ -59,7 +63,12 @@ export default function Messages() {
       <div style={{ padding: '8px 16px 48px', maxWidth: 1200, margin: '0 auto', fontFamily: FONT }}>
         <PageHeader eyebrow="Messages" title="私信" desc="和接单伙伴、护考前辈一对一聊聊。" />
         {convs.length === 0 && (
-          <div style={{ textAlign: 'center', color: MUTED, fontSize: 14, padding: '64px 0' }}>暂无会话</div>
+          <EmptyState
+            title="还没有私信"
+            hint="在任务详情或帖子里点对方头像，就能私聊。接单、问细节都靠它。"
+            actionLabel="去社区逛逛"
+            to="/community"
+          />
         )}
         <div>
           {convs.map(c => {

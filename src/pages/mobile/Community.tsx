@@ -3,12 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, Heart, Star, MessageCircle, Search, Flame, Clock } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { maybeBotInteract } from '../../lib/db'
+import EmptyState from '../../components/EmptyState'
 import {
   PageHeader,
   IndexGrid,
   HardCard,
   BtnPrimary,
-  Tag,
   INK,
   MUTED,
   FAINT,
@@ -139,9 +139,12 @@ export default function Community() {
       )}
 
       {list.length === 0 && !botBusy && (
-        <div style={{ textAlign: 'center', color: MUTED, fontSize: 14, padding: '64px 0' }}>
-          暂无帖子，来发第一篇。
-        </div>
+        <EmptyState
+          title="社区还没有帖子"
+          hint="聊聊择校、避坑、找搭子都行。发第一篇，让别人先认识你。"
+          actionLabel="去发帖"
+          to="/publish-post"
+        />
       )}
 
       <IndexGrid>
@@ -209,7 +212,9 @@ export default function Community() {
                   <span style={{ width: 22, height: 22, borderRadius: '50%', border: `1.5px solid ${INK}`, display: 'inline-block', background: '#efefef' }} />
                 )}
                 <span style={{ maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.author_name}</span>
-                {p.is_bot && <Tag tone="line">AI 生成</Tag>}
+                {/* 「AI 生成」角标已从列表卡片移除：社区里 99% 内容都会带上它，
+                    列表页满屏 AI 标签会直接摧毁「真人交流」的观感。
+                    合规标识改为在帖子详情页底部以一行浅灰说明呈现（见 PostDetail.tsx）。 */}
               </div>
               <div style={{ display: 'flex', gap: 12, fontFamily: FONT, fontSize: 12, color: MUTED }}>
                 <button

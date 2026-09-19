@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { exportDocx } from '../lib/docx'
+import { useIsMobile } from '../lib/useIsMobile'
 import {
   PageHeader,
   SectionLabel,
@@ -29,6 +30,7 @@ interface Warning {
 }
 
 export default function Warnings() {
+  const isMobile = useIsMobile()
   const [items, setItems] = useState<Warning[]>([])
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState({ target_type: 'school', title: '', content: '', tags: '' })
@@ -82,7 +84,16 @@ export default function Warnings() {
         }
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 320px) minmax(0, 1fr)', gap: 22, alignItems: 'start' }}>
+      {/* 响应式：窄屏（手机）单列堆叠，避免固定双栏把内容挤出屏幕右侧
+          （此前写死 minmax(280px,320px)+1fr，390px 屏必然横向溢出、右侧被裁） */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'minmax(280px, 320px) minmax(0, 1fr)',
+          gap: isMobile ? 14 : 22,
+          alignItems: 'start',
+        }}
+      >
         {/* 发布面板：粗黑边硬卡 */}
         <HardCard style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <SectionLabel label="添加避雷" />
@@ -139,7 +150,7 @@ export default function Warnings() {
             </div>
           ) : items.length === 0 ? (
             <SoftCard style={{ textAlign: 'center', color: MUTED, fontSize: 14, padding: '48px 0' }}>
-              还没有避雷记录，左边加第一条。
+              还没有避雷记录，{isMobile ? '在上方' : '在左侧'}添加第一条。
             </SoftCard>
           ) : (
             <div>

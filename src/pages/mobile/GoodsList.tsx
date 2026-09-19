@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Plus, MessageSquare, ArrowDownWideNarrow } from 'lucide-react'
 import { useStore } from '../../store/store'
+import EmptyState from '../../components/EmptyState'
 import {
   PageHeader,
   SectionLabel,
@@ -101,8 +102,13 @@ export default function GoodsList() {
       <SectionLabel label="商品" />
       <IndexGrid min={220}>
         {list.length === 0 && (
-          <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: MUTED, fontSize: 14, padding: '64px 0' }}>
-            暂无商品
+          <div style={{ gridColumn: '1 / -1' }}>
+            <EmptyState
+              title={cat === '全部' ? '还没有二手商品' : `「${cat}」分类下暂无商品`}
+              hint="闲置的书本、数码、出行装备都可以挂上来换积分，比扔掉划算。"
+              actionLabel="去发布商品"
+              to="/publish-goods"
+            />
           </div>
         )}
         {list.map((g, i) => (

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, Clock, Search, Bot, FileText, AlertTriangle, Trash2 } from 'lucide-react'
 import { getQueries, deleteQuery, QueryRecord } from '../../lib/history'
+import EmptyState from '../../components/EmptyState'
 import {
   PageHeader,
   SectionLabel,
@@ -97,9 +98,18 @@ export default function AIHistory() {
       )}
 
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', color: MUTED, fontSize: 14, padding: '64px 0' }}>
-          {kw ? '没有匹配的记录' : '还没有 AI 查询记录'}
-        </div>
+        kw ? (
+          <div style={{ textAlign: 'center', color: MUTED, fontSize: 14, padding: '64px 0' }}>
+            没有匹配的记录
+          </div>
+        ) : (
+          <EmptyState
+            title="还没有 AI 查询记录"
+            hint="用 AI 百事通查院校、问择校问题，问过的都会自动存在这里。"
+            actionLabel="去问 AI 百事通"
+            to="/ai-search"
+          />
+        )
       ) : (
         <div>
           {Object.entries(grouped).reverse().map(([date, items]) => (

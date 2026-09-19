@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { CheckCircle2, UserCheck, Clock, Scale, MessageCircle, Mail, Megaphone, CheckCheck, ChevronLeft } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { useMe } from '../../store/useMe'
+import EmptyState from '../../components/EmptyState'
 import {
   PageHeader,
   ListRow,
@@ -65,7 +66,12 @@ export default function Notifications() {
       />
 
       {list.length === 0 && (
-        <div style={{ textAlign: 'center', color: MUTED, fontSize: 14, padding: '64px 0' }}>暂无通知</div>
+        <EmptyState
+          title="还没有通知"
+          hint="别人接单、任务被验收、有人评论你、平台发公告，都会在这里提醒。"
+          actionLabel="去任务大厅看看"
+          to="/"
+        />
       )}
 
       <div>

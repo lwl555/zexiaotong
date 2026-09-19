@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../store/store'
-import { CheckCircle, XCircle } from 'lucide-react'
+import { CheckCircle, XCircle, Eye, EyeOff } from 'lucide-react'
 import { useIsMobile } from '../../lib/useIsMobile'
 import {
   BtnPrimary,
@@ -55,6 +55,7 @@ function AuthForm({ mobile }: { mobile: boolean }) {
   const [pwd, setPwd] = useState('')
   const [confirm, setConfirm] = useState('')
   const [agree, setAgree] = useState(true)
+  const [showPwd, setShowPwd] = useState(false)
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState<{ type: 'ok' | 'err'; msg: string } | null>(null)
 
@@ -153,12 +154,32 @@ function AuthForm({ mobile }: { mobile: boolean }) {
       <input className="input" value={qq} onChange={(e) => setQq(e.target.value)} placeholder="请输入QQ号" inputMode="numeric" maxLength={11} style={inputStyle} />
 
       <label style={labelStyle}>密码</label>
-      <input className="input" value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder={mode === 'register' ? '6-20 位，含字母和数字' : '请输入密码'} type="password" maxLength={20} style={inputStyle} />
+      <div style={{ position: 'relative', marginTop: 6 }}>
+        <input className="input" value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder={mode === 'register' ? '6-20 位，含字母和数字' : '请输入密码'} type={showPwd ? 'text' : 'password'} maxLength={20} style={{ ...inputStyle, marginTop: 0, paddingRight: 42 }} />
+        <button
+          type="button"
+          onClick={() => setShowPwd((v) => !v)}
+          aria-label={showPwd ? '隐藏密码' : '显示密码'}
+          style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', padding: 6, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', color: MUTED }}
+        >
+          {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
+        </button>
+      </div>
 
       {mode === 'register' && (
         <>
           <label style={labelStyle}>确认密码</label>
-          <input className="input" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="再次输入密码" type="password" maxLength={20} style={inputStyle} />
+          <div style={{ position: 'relative', marginTop: 6 }}>
+            <input className="input" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="再次输入密码" type={showPwd ? 'text' : 'password'} maxLength={20} style={{ ...inputStyle, marginTop: 0, paddingRight: 42 }} />
+            <button
+              type="button"
+              onClick={() => setShowPwd((v) => !v)}
+              aria-label={showPwd ? '隐藏密码' : '显示密码'}
+              style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', padding: 6, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', color: MUTED }}
+            >
+              {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
           <p style={{ fontFamily: FONT, fontSize: 12, color: MUTED, marginTop: 10, marginBottom: 0, lineHeight: 1.6 }}>
             密码两层验证：① 满足强度规则（6-20 位，含字母和数字）② 两次输入完全一致
           </p>
@@ -177,22 +198,9 @@ function AuthForm({ mobile }: { mobile: boolean }) {
         {loading ? '处理中…' : mode === 'register' ? '注册并登录' : '登录'}
       </button>
 
-      {mode === 'login' && (
-        <button
-          onClick={() => setMode('register')}
-          style={{ background: 'none', border: 'none', color: FAINT, fontFamily: FONT, fontSize: 13, marginTop: 14, width: '100%', cursor: 'pointer' }}
-        >
-          没有账号？去注册
-        </button>
-      )}
-      {mode === 'register' && (
-        <button
-          onClick={() => setMode('login')}
-          style={{ background: 'none', border: 'none', color: FAINT, fontFamily: FONT, fontSize: 13, marginTop: 14, width: '100%', cursor: 'pointer' }}
-        >
-          已有账号？去登录
-        </button>
-      )}
+      {/* 说明：原先这里还有「没有账号？去注册 / 已有账号？去登录」两个文字按钮，
+          与上方「登录 / 注册」分段切换完全重复，容易让用户以为要点两次。
+          统一保留上方的分段切换作为唯一切换入口。 */}
     </div>
   )
 }

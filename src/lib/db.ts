@@ -476,7 +476,18 @@ export async function fetchCategories(kind?: 'task' | 'goods'): Promise<Category
   if (kind) query = query.eq('kind', kind)
   const { data, error } = await query
   if (error) throw error
-  return (data || []) as Category[]
+  // 兜底去重：历史上种子迁移跑过两次导致同一 (kind,name) 重复入库，
+  // 会让首页 tab / 发布任务 / 二手筛选出现「同一个分类出现两遍」。
+  // DB 侧已加 UNIQUE(kind,name) 约束（迁移 0011），这里再兜一层，防止存量/异常数据漏网。
+  const seen = new Set<string>()
+  const uniq: Category[] = []
+  for (const c of (data || []) as Category[]) {
+    const key = `${c.kind}::${c.name}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    uniq.push(c)
+  }
+  return uniq
 }
 
 export async function fetchBanners(): Promise<Banner[]> {

@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { useMe } from '../../store/useMe'
+import EmptyState from '../../components/EmptyState'
 import {
   PageHeader,
   HardCard,
@@ -57,9 +58,21 @@ export default function MyTasks() {
       </div>
 
       {list.length === 0 && (
-        <div style={{ textAlign: 'center', color: MUTED, fontSize: 14, padding: '64px 0' }}>
-          {tab === 'poster' ? '还没有发布任务' : '还没有接单'}
-        </div>
+        tab === 'poster' ? (
+          <EmptyState
+            title="还没有发布任务"
+            hint="写个需求（悬赏 / 跑腿 / 文档设计都行），设置好积分，等同学来接单。"
+            actionLabel="去发布任务"
+            to="/publish"
+          />
+        ) : (
+          <EmptyState
+            title="还没有接单"
+            hint="去任务大厅看看有没有你能做的，接单后交付完成即可拿到积分。"
+            actionLabel="去逛任务大厅"
+            to="/"
+          />
+        )
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

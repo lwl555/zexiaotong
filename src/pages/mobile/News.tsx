@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../store/store'
+import EmptyState from '../../components/EmptyState'
 import {
   PageHeader,
   IndexGrid,
@@ -32,7 +33,12 @@ export default function News() {
       />
 
       {list.length === 0 && (
-        <div style={{ textAlign: 'center', color: MUTED, fontSize: 14, padding: '64px 0' }}>暂无资讯</div>
+        <EmptyState
+          title="资讯台暂时没有新内容"
+          hint="资讯来自社区里的真实讨论。想让它热闹起来，可以先去发一条。"
+          actionLabel="去社区发帖"
+          to="/publish-post"
+        />
       )}
 
       <IndexGrid min={300}>

@@ -6,6 +6,7 @@ import AdminLayout from './components/layout/AdminLayout'
 import { useIsMobile } from './lib/useIsMobile'
 import { ROUTE_TITLES } from './lib/nav'
 import { safeLazy, reloadForNewVersion } from './lib/safeLazy'
+import RouteSkeleton from './components/RouteSkeleton'
 
 // 性能优化：路由级 code splitting（v1）。
 // 改造前 App.tsx 静态 import 了 ~37 个页面（含管理后台 10 个、桌面 AI 站 8 个），
@@ -67,13 +68,10 @@ const System        = safeLazy(() => import('./pages/admin/System'))
 const FeatureChats  = safeLazy(() => import('./pages/admin/FeatureChats'))
 const Logs          = safeLazy(() => import('./pages/admin/Logs'))
 
-// 路由切换时的加载占位（陶土红品牌色；只在 chunk 下载期间出现一帧）
+// 路由切换时的加载占位：骨架屏（首帧立即出现页面结构，不再是孤立转圈）
+// 见 src/components/RouteSkeleton.tsx —— 重页面首屏 5–8 秒也不会「看起来像白屏」
 function RouteFallback() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-[#ededed]">
-      <div className="w-7 h-7 border-[3px] border-[#D8451F]/30 border-t-[#D8451F] rounded-full animate-spin" />
-    </div>
-  )
+  return <RouteSkeleton />
 }
 
 // 生产级兜底：任一路由子树渲染抛错时，显示错误而不是整页白屏（也方便定位问题）。

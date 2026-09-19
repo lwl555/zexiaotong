@@ -15,6 +15,7 @@ import {
   Tag,
   INK,
   MUTED,
+  FAINT,
   ACCENT,
   HAIR,
   FONT,
@@ -107,7 +108,6 @@ export default function PostDetail() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, paddingBottom: 12, borderBottom: `1px solid ${HAIR}` }}>
           <img src={post.author_avatar} alt="" style={{ width: 30, height: 30, borderRadius: '50%', border: `1.5px solid ${INK}` }} />
           <span style={{ fontFamily: FONT, fontSize: 14, fontWeight: 700, color: INK }}>{post.author_name}</span>
-          {post.is_bot && <Tag tone="line">AI 生成</Tag>}
           <span style={{ fontFamily: MONO, fontSize: 11, color: MUTED, letterSpacing: 1, marginLeft: 'auto' }}>
             {String(post.likes + post.collects).padStart(3, '0')} 互动
           </span>
@@ -152,6 +152,14 @@ export default function PostDetail() {
           </ListRow>
         ))}
       </div>
+
+      {/* 合规标识（弱化版）：AI 参与生成的内容在文末做一行浅灰说明，
+          代替原先作者名旁的醒目「AI 生成」角标 —— 既满足标识要求，又不破坏阅读观感。 */}
+      {post.is_bot && (
+        <div style={{ fontFamily: FONT, fontSize: 11, color: FAINT, marginTop: 16, paddingBottom: 26, lineHeight: 1.7 }}>
+          本内容由 AI 参与生成，已按平台规则标注。
+        </div>
+      )}
 
       {/* 固定评论输入栏：白底 + 1px 灰线。手机端抬到底部 Tab 栏（48px）之上，
           否则 z-index 相同、DOM 在后的 Tab 栏会把它整个盖住。 */}

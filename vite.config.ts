@@ -6,6 +6,25 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   base: '/zexiaotong/',
   plugins: [react()],
+  build: {
+    // 分包：把体积大 / 变更频率低的库拆成独立 chunk。
+    // 背景：此前 docx(≈500KB) 与 recharts(≈400KB) 会跟随业务路由 chunk 一起下载，
+    // 导致 AI 聊天 / 文档工坊 / 后台看板首屏白屏 5–8 秒。
+    // 拆开后：① 这些重库各自独立缓存，业务代码更新不再让用户重下；② docx 只在实际
+    // 点「导出 Word」时才被动态拉取（见 src/lib/docx.ts），首屏完全不碰。
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-supabase': ['@supabase/supabase-js'],
+          'vendor-icons': ['lucide-react'],
+          'vendor-charts': ['recharts'],
+          'vendor-docx': ['docx'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 900,
+  },
   server: {
     proxy: {
       '/api/agnes': {

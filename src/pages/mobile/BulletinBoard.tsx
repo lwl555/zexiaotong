@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../store/store'
 import { maybeBotInteract } from '../../lib/db'
+import EmptyState from '../../components/EmptyState'
 import { MapPin, Plus, MessageCircle, Clock, Megaphone, GraduationCap } from 'lucide-react'
 
 function timeAgo(iso: string): string {
@@ -69,9 +70,12 @@ export default function BulletinBoard() {
       </div>
 
       {bulletins.length === 0 && (
-        <div style={{ textAlign: 'center', color: '#9a9a9a', fontSize: 14, padding: '48px 0' }}>
-          这里还没有小黑板内容，去发布第一条吧
-        </div>
+        <EmptyState
+          title="小黑板还是空的"
+          hint="这里发校园动态、拼单、失物招领、组队信息，比发帖更随意。"
+          actionLabel="发布第一条"
+          to="/publish-bulletin"
+        />
       )}
 
       {bulletins.map(b => (

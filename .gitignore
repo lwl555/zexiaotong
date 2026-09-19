@@ -20,3 +20,14 @@ _*.txt
 posts.json
 live2.js
 _*.mjs
+
+# 本地构建/巡检产物（绝不入库，避免仓库膨胀与凭证外泄）
+dist_ux2/
+dist_verify/
+audit-shots/
+ux-shots/
+ux-shots2/
+audit-result.json
+*.log
+vite.config.ts.timestamp-*.mjs
+.chk.sql

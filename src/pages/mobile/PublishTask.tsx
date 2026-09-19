@@ -9,6 +9,7 @@ import {
   BtnPrimary,
   INK,
   MUTED,
+  FAINT,
   ACCENT,
   HAIR,
   FONT,
@@ -88,12 +89,12 @@ export default function PublishTask() {
       {/* 金额 + 截止时间 */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
         <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: 1.5, color: MUTED, textTransform: 'uppercase', marginBottom: 6 }}>悬赏积分（100 积分 = 1 元）</div>
+          <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: 1.5, color: MUTED, textTransform: 'uppercase', marginBottom: 6 }}>悬赏积分</div>
           <input
             value={amount}
-            onChange={e => setAmount(e.target.value.replace(/[^\d.]/g, ''))}
-            placeholder="0.00"
-            inputMode="decimal"
+            onChange={e => setAmount(e.target.value.replace(/[^\d]/g, ''))}
+            placeholder="如 500"
+            inputMode="numeric"
             style={{ width: '100%', boxSizing: 'border-box', border: `1px solid #e8e8e8`, borderRadius: 2, padding: '10px 12px', fontFamily: FONT, fontSize: 15, color: INK, outline: 'none' }}
           />
         </div>
@@ -109,6 +110,10 @@ export default function PublishTask() {
       </div>
       <div style={{ fontFamily: FONT, fontSize: 12, color: MUTED, marginTop: -8, marginBottom: 16 }}>
         可用积分 {usable.toLocaleString()}（冻结 {me.frozen.toLocaleString()}）
+        <span style={{ color: FAINT }}> · 100 积分 = 1 元</span>
+        {Number(amount) > 0 && (
+          <span style={{ color: ACCENT, fontWeight: 600 }}> · 本次悬赏 ≈ ¥{(Number(amount) / 100).toFixed(2)}</span>
+        )}
       </div>
 
       {/* 需求描述 */}

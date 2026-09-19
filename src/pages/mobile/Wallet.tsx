@@ -15,6 +15,7 @@ import {
   INK,
   MUTED,
   ACCENT,
+  ACCENT_SOFT,
   HAIR,
   LINE,
   FONT,
@@ -272,6 +273,25 @@ export default function Wallet() {
 
       {/* 02 提现 */}
       <SectionLabel index="02" label="申请提现" />
+      {/* 余额低于提现门槛时先给出明确提示，避免用户填完表点提交才被告知「不够」
+          （此前表单照常展示、无任何提示，余额 20 积分也能一路填到底） */}
+      {usable < rules.withdrawMin && (
+        <div
+          style={{
+            ...hard({ borderColor: ACCENT, background: ACCENT_SOFT, padding: '12px 14px' }),
+            marginBottom: 12,
+            fontFamily: FONT,
+            fontSize: 13,
+            color: INK,
+            lineHeight: 1.7,
+          }}
+        >
+          当前可提现 <strong>{usable.toLocaleString()} 积分</strong>，还未达到最低提现门槛 {rules.withdrawMin.toLocaleString()} 积分
+          （= ¥{(rules.withdrawMin / ppu).toFixed(0)}）。
+          还差 <strong style={{ color: ACCENT }}>{(rules.withdrawMin - usable).toLocaleString()} 积分</strong>
+          —— 去完成任务、或先充值都可以。
+        </div>
+      )}
       <div style={{ ...hard(), background: '#ffffff', padding: 18, marginBottom: 24 }}>
         <input
           value={wdAmt}
