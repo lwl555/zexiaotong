@@ -22,7 +22,7 @@ live2.js
 _*.mjs
 
 # 本地构建/巡检产物（绝不入库，避免仓库膨胀与凭证外泄）
-dist_ux2/
+dist_ux*/
 dist_verify/
 audit-shots/
 ux-shots/
@@ -31,3 +31,9 @@ audit-result.json
 *.log
 vite.config.ts.timestamp-*.mjs
 .chk.sql
+
+# 一次性排查/冒烟测试用的 SQL（可能含 id 等，不入库）
+.chk*.sql
+.tmp*.sql
+.top-*.sql
+.cleanup.sql

@@ -12,7 +12,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   Profile, Task, Goods, Post, Comment, Message, WalletTxn, Withdrawal, RechargeOrder,
   Arbitration, Notification, Category, Banner, PlatformConfig, Role,
-  TaskStatus, GoodsStatus, PostStatus, School, Bulletin, ActivityLog, CheckIn
+  TaskStatus, GoodsStatus, PostStatus, School, Bulletin, ActivityLog, CheckIn,
+  Report, ReportTarget, ReportStatus
 } from './types'
 
 export { supabase }
@@ -210,10 +211,8 @@ export async function fetchMyTasks(userId: string): Promise<Task[]> {
   return (data || []) as Task[]
 }
 
-export async function createTask(task: Partial<Task>): Promise<Task> {
-  const d = await dbWrite('insert', { table: 'tasks', row: task })
-  return d.row as Task
-}
+// 说明：原 createTask（通用 insert 写 tasks）已删除 —— tasks 不在 insert 白名单，
+// 调用它必然返回「不允许写入该表：tasks」。发布任务请用文件下方的 publishTask()（专用动作）。
 
 export async function updateTask(id: string, updates: Partial<Task>): Promise<Task> {
   const d = await dbWrite('update', { table: 'tasks', id, updates, uid: currentUid() })
@@ -231,10 +230,10 @@ export async function fetchBalance(userId: string): Promise<{ balance: number; f
   return { balance: data?.balance || 0, frozen: data?.frozen || 0 }
 }
 
-export async function addTxn(txn: Partial<WalletTxn>): Promise<WalletTxn> {
-  const d = await dbWrite('insert', { table: 'txns', row: txn })
-  return d.row as WalletTxn
-}
+// 说明：原 addTxn（通用 insert 写 txns）已删除。
+// txns 的 owner 是 user_id，通用 insert 必须传 uid 才能通过校验；而流水本就不该由前端随意写
+// （等于随手给自己记账）。所有余额变动现在都在服务端动作里连带写流水
+// （add_points / check_in / top_task / confirm_recharge / submit_withdraw / review_pass）。
 
 // 走 db-write 的 my_txns：txns 的 RLS 读策略是 `auth.uid() = user_id`，本平台不走 Supabase Auth，
 // anon 直连 auth.uid() 恒为 null → 直连查询永远返回 0 行（钱包「资金流水」因此一直是空的）。
@@ -255,9 +254,11 @@ export async function fetchGoods(status: GoodsStatus = 'on'): Promise<Goods[]> {
   return (data || []) as Goods[]
 }
 
+// 发布商品必须走专用动作 publish_goods：goods 不在通用 insert 白名单内
+// （通用 insert 会直接返回「不允许写入该表：goods」——这正是此前发布商品静默失败的原因）。
 export async function createGoods(goods: Partial<Goods>): Promise<Goods> {
-  const d = await dbWrite('insert', { table: 'goods', row: goods })
-  return d.row as Goods
+  const d = await dbWrite('publish_goods', { goods, uid: currentUid() })
+  return d.goods as Goods
 }
 
 // ─── 社区帖子 ───────────────────────────────────────────────────
@@ -272,9 +273,12 @@ export async function fetchPosts(status: PostStatus = 'on'): Promise<Post[]> {
   return (data || []) as Post[]
 }
 
+// 发帖必须走专用动作 publish_post：posts 不在通用 insert 白名单内
+// （通用 insert 会直接返回「不允许写入该表：posts」——这正是此前发帖静默失败的原因）。
+// 后端会校验 post.author_id === uid，防冒名发帖。
 export async function createPost(post: Partial<Post>): Promise<Post> {
-  const d = await dbWrite('insert', { table: 'posts', row: post })
-  return d.row as Post
+  const d = await dbWrite('publish_post', { post, uid: currentUid() })
+  return d.post as Post
 }
 
 /**
@@ -367,8 +371,11 @@ export async function markMessageRead(id: string): Promise<void> {
   await dbWrite('update', { table: 'messages', id, updates: { read: true }, uid: currentUid() })
 }
 
+// ⚠️ 必须带 uid：db-write 的 insert 对 messages 做 owner 校验（row.sender_id === uid）。
+// 之前这里没传 uid，后端拿 undefined 比对恒不相等 → 发私信一直报「身份不匹配」，
+// 而前端做了乐观更新，界面上「看起来发出去了」，实则未落库。
 export async function sendMessage(msg: Partial<Message>): Promise<Message> {
-  const d = await dbWrite('insert', { table: 'messages', row: msg })
+  const d = await dbWrite('insert', { table: 'messages', row: msg, uid: currentUid() })
   return d.row as Message
 }
 
@@ -384,9 +391,17 @@ export async function markRead(notifId: string): Promise<void> {
   await dbWrite('update', { table: 'notifications', id: notifId, updates: { read: true }, uid: currentUid() })
 }
 
-export async function createNotification(notif: Partial<Notification>): Promise<Notification> {
-  const d = await dbWrite('insert', { table: 'notifications', row: notif })
-  return d.row as Notification
+// 站内通知：收件人通常是「别人」（如"有人给你发私信"），无法用带 owner 校验的通用 insert
+//（notifications 的 owner 是 user_id，而 user_id 不是当前登录用户，必然 403）。
+// 故走专用动作 notify：后端要求调用者是真实登录用户，字段白名单收敛，read 强制 false。
+export async function createNotification(notif: Partial<Notification>): Promise<void> {
+  await dbWrite('notify', {
+    uid: currentUid(),
+    target_user_id: notif.user_id,
+    type: notif.type,
+    title: notif.title,
+    content: notif.content,
+  })
 }
 
 // ─── 提现 ───────────────────────────────────────────────────────
@@ -435,14 +450,41 @@ export async function fetchArbitrations(userId: string, scope: 'mine' | 'all' = 
   return (d.arbitrations || []) as Arbitration[]
 }
 
+// 同上：arbitrations 的 owner 是 plaintiff_id，insert 必须带 uid 才能通过校验。
 export async function createArbitration(arb: Partial<Arbitration>): Promise<Arbitration> {
-  const d = await dbWrite('insert', { table: 'arbitrations', row: arb })
+  const d = await dbWrite('insert', { table: 'arbitrations', row: arb, uid: currentUid() })
   return d.row as Arbitration
 }
 
 export async function updateArbitration(id: string, updates: Partial<Arbitration>): Promise<Arbitration> {
   const d = await dbWrite('update', { table: 'arbitrations', id, updates, uid: currentUid() })
   return (d.row || { id, ...updates }) as Arbitration
+}
+
+// ─── 举报 ───────────────────────────────────────────────────────
+// reports 表**不开放 anon 读策略**（举报内容含双方身份，不应匿名可读）。
+// 写入走 db-write 的 insert（表在 INSERT_ALLOWED，owner=reporter_id 校验，防伪造举报人）；
+// 读取走 list_reports（service_role + 后端 requireAdmin），只有管理员能拿到全量。
+export async function createReport(input: {
+  target_type: ReportTarget
+  target_id: string
+  target_title?: string
+  reason: string
+  detail?: string
+  reporter_id: string
+  reporter_name: string
+}): Promise<void> {
+  await dbWrite('insert', { table: 'reports', row: input, uid: input.reporter_id })
+}
+
+export async function fetchReports(adminId: string): Promise<Report[]> {
+  const d = await dbWrite('list_reports', { uid: adminId })
+  return (d.reports || []) as Report[]
+}
+
+/** 管理员处理举报：标记已处理 / 驳回。列白名单只允许 status，行校验要求管理员。 */
+export async function handleReport(id: string, status: ReportStatus, adminId: string): Promise<void> {
+  await dbWrite('update', { table: 'reports', id, updates: { status }, uid: adminId })
 }
 
 // ─── 平台配置 ───────────────────────────────────────────────────
@@ -768,6 +810,15 @@ export async function takeTask(taskId: string) {
   const me = await getCurrentUser()
   if (!me) throw new Error('请先登录')
   await dbWrite('take_task', { taskId, uid: me.id, nickname: me.nickname })
+}
+
+// 付费置顶：扣费/写流水/改置顶时间全部在服务端原子完成
+// （前端无权改 profiles.balance，必须走后端动作；见 db-write 的 top_task）
+export async function topTask(taskId: string, days: 1 | 3 | 7): Promise<{ ok: boolean; balance: number; top_until: string; price: number }> {
+  const me = await getCurrentUser()
+  if (!me) throw new Error('请先登录')
+  const d = await dbWrite('top_task', { taskId, days, uid: me.id })
+  return { ok: true, balance: d.balance, top_until: d.top_until, price: d.price }
 }
 
 // 验收通过：结算（整段走 db-write 的 review_pass action，原子执行）

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../store/store'
+import { toast } from '../../lib/toast'
 import { Megaphone, GraduationCap, Check } from 'lucide-react'
 
 export default function PublishBulletin() {
@@ -23,7 +24,7 @@ export default function PublishBulletin() {
 
   const submit = async () => {
     if (!content.trim()) return
-    if (!isAll && !schoolId) { alert('请选择指定学校'); return }
+    if (!isAll && !schoolId) { toast('请选择指定学校'); return }
     const r = await publishBulletin({
       content,
       isAll,
@@ -31,7 +32,7 @@ export default function PublishBulletin() {
       schoolName: isAll ? '全部院校' : schoolName
     })
     if (r.ok) nav('/bulletins')
-    else alert(r.msg)
+    else toast(r.msg)
   }
 
   return (

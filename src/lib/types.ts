@@ -224,6 +224,22 @@ export interface Arbitration {
   created_at: string
 }
 
+// 举报（reports 表）：用户在帖子/商品/任务等页提交，管理员在后台处理。
+export type ReportTarget = 'post' | 'goods' | 'task' | 'comment' | 'user'
+export type ReportStatus = 'pending' | 'handled' | 'rejected'
+export interface Report {
+  id: string
+  target_type: ReportTarget
+  target_id: string
+  target_title?: string
+  reason: string
+  detail?: string
+  reporter_id?: string
+  reporter_name?: string
+  status: ReportStatus
+  created_at: string
+}
+
 export type NotiType = 'task_status' | 'task_taken' | 'task_review' | 'arbitration' | 'comment' | 'message' | 'announce' | 'bulletin'
 export interface Notification {
   id: string

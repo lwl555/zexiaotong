@@ -144,7 +144,8 @@ const INSERT_ALLOWED: Record<string, string[]> = {
   // withdrawals 已从白名单移除：提现必须走 submit_withdraw（冻结余额 + 规则校验），
   // 否则可用通用 insert 绕过冻结逻辑重复提交申请。
   arbitrations: ['plaintiff_id'],
-  txns: ['user_id']
+  txns: ['user_id'],
+  reports: ['reporter_id'] // 举报：只能以自己身份提交（防伪造举报人）
 }
 
 // 通用 update：白名单表 + 所有权（或管理员）校验，owner 字段映射
@@ -155,7 +156,10 @@ const UPDATE_ALLOWED: Record<string, string[]> = {
   withdrawals: ['user_id'],
   arbitrations: ['plaintiff_id', 'defendant_id'],
   messages: ['receiver_id'], // 仅收件人可标记已读
-  profiles: ['id']
+  profiles: ['id'],
+  // 举报：owner 列表刻意留空 ⇒ 无「本人」概念，只有管理员能改状态（处理/驳回）。
+  // 否则举报人可自行把 status 改成 handled 让举报石沉大海。
+  reports: []
 }
 
 // 列级白名单：update 动作只允许改这些列，其余字段静默丢弃。
@@ -170,7 +174,8 @@ const UPDATE_COLUMNS: Record<string, string[]> = {
   // 否则申请人可以自己把 status 改成 approved/rejected 干扰审核。
   withdrawals: [],
   messages: ['read'], // 私信已读态只允许收件人翻转，防发件人篡改/越权改他人私信
-  arbitrations: ['status', 'winner', 'result']
+  arbitrations: ['status', 'winner', 'result'],
+  reports: ['status'] // 仅管理员改处理状态
 }
 
 Deno.serve(async (req) => {
@@ -739,6 +744,73 @@ Deno.serve(async (req) => {
       const r = await pg('GET', path)
       if (!r.ok) return json({ error: '读取仲裁列表失败' }, 500)
       return json({ arbitrations: r.data || [] })
+    }
+
+    // 举报列表：仅管理员可读（reports 表不开放 anon 读策略，举报内容不外泄）
+    if (action === 'list_reports') {
+      if (!uid) return json({ error: '缺少 uid' }, 400)
+      await requireAdmin(uid)
+      const r = await pg('GET', 'reports?select=*&order=created_at.desc&limit=500')
+      if (!r.ok) return json({ error: '读取举报列表失败' }, 500)
+      return json({ reports: r.data || [] })
+    }
+
+    // 站内通知（跨用户）：给「别人」发通知，例如「有人给你发了私信」。
+    // 用通用 insert 走不通——notifications 的 owner 是 user_id，而接收方不是当前登录用户，
+    // 必然被 owner 校验拒绝（这也是此前私信通知一直写不进去的原因）。
+    // 这里单独开一个动作：必须是已登录真实用户，字段做白名单收敛，read 强制 false 防伪造已读。
+    if (action === 'notify') {
+      if (!uid) return json({ error: '缺少 uid' }, 400)
+      await requireUser(uid)
+      const { target_user_id, type, title, content } = body
+      if (!target_user_id) return json({ error: '缺少接收人' }, 400)
+      const ALLOWED_NOTI = ['task_status', 'task_taken', 'task_review', 'arbitration', 'comment', 'message', 'announce', 'bulletin']
+      const row = {
+        user_id: target_user_id,
+        type: ALLOWED_NOTI.includes(type) ? type : 'announce',
+        title: String(title || '').slice(0, 60),
+        content: String(content || '').slice(0, 300),
+        read: false
+      }
+      const ins = await pg('POST', 'notifications', row)
+      if (!ins.ok) return json({ error: '通知写入失败：' + JSON.stringify(ins.data) }, 500)
+      return json({ ok: true, notification: ins.data?.[0] })
+    }
+
+    // ── 付费置顶任务（服务端原子扣费）──
+    // 为什么必须放后端：profiles.balance 故意不在 UPDATE_COLUMNS 白名单里（防止前端自改积分），
+    // 所以前端**无法**自己扣余额；此前 store 用 updateTask + addTxn 的做法既扣不到钱
+    // （仅改了本地 state），addTxn 又因漏传 uid 直接被 owner 校验拒掉，等于置顶既扣费失败也不生效。
+    if (action === 'top_task') {
+      const { taskId, days } = body
+      const me = await requireUser(uid)
+      const d = Number(days)
+      if (![1, 3, 7].includes(d)) return json({ error: '置顶天数只能是 1 / 3 / 7' }, 400)
+      if (!taskId) return json({ error: '缺少任务 id' }, 400)
+
+      const cRes = await pg('GET', 'platform_config?select=top_price_d1,top_price_d3,top_price_d7&id=eq.1')
+      const cfg = cRes.data?.[0]
+      const price = Number(cfg?.[`top_price_d${d}`] ?? 0)
+      if (!price) return json({ error: '置顶价格未配置' }, 400)
+
+      const tRes = await pg('GET', `tasks?select=id,poster_id,title&id=eq.${enc(taskId)}`)
+      const task = tRes.data?.[0]
+      if (!task) return json({ error: '任务不存在' }, 404)
+      if (task.poster_id !== uid) return json({ error: '只能置顶自己发布的任务' }, 403)
+
+      const bal = Number(me.balance)
+      if (bal < price) return json({ error: `积分不足：需 ${price} 积分，当前 ${bal} 积分` }, 400)
+
+      const newBal = bal - price
+      const until = new Date(Date.now() + d * 86400000).toISOString()
+      const u1 = await pg('PATCH', `profiles?id=eq.${enc(uid)}`, { balance: newBal })
+      if (!u1.ok) return json({ error: '扣费失败' }, 500)
+      await pg('PATCH', `tasks?id=eq.${enc(taskId)}`, { top_until: until })
+      await pg('POST', 'txns', {
+        user_id: uid, type: 'pay', amount: -price, balance_after: newBal, remark: `付费置顶 ${d} 天`
+      })
+      await logActivity('user', uid, me.nickname || '', 'top_task', 'task', taskId, `置顶 ${d} 天，扣 ${price} 积分`)
+      return json({ ok: true, balance: newBal, top_until: until, price })
     }
 
     // ── 通用 insert（白名单表 + owner 校验）──

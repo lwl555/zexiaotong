@@ -67,6 +67,7 @@ const Config        = safeLazy(() => import('./pages/admin/Config'))
 const System        = safeLazy(() => import('./pages/admin/System'))
 const FeatureChats  = safeLazy(() => import('./pages/admin/FeatureChats'))
 const Logs          = safeLazy(() => import('./pages/admin/Logs'))
+const Reports       = safeLazy(() => import('./pages/admin/Reports'))
 
 // 路由切换时的加载占位：骨架屏（首帧立即出现页面结构，不再是孤立转圈）
 // 见 src/components/RouteSkeleton.tsx —— 重页面首屏 5–8 秒也不会「看起来像白屏」
@@ -184,6 +185,7 @@ export default function App() {
             <Route path="config" element={<Config />} />
             <Route path="feature-chats" element={<FeatureChats />} />
             <Route path="logs" element={<Logs />} />
+            <Route path="reports" element={<Reports />} />
             <Route path="system" element={<System />} />
           </Route>
 

@@ -2,7 +2,8 @@ import { create } from 'zustand'
 import type {
   Profile, Role, Task, Goods, Post, Message, WalletTxn, Withdrawal, RechargeOrder,
   Arbitration, Notification, Category, Banner, PlatformConfig,
-  TaskStatus, GoodsStatus, PostStatus, School, Bulletin, ActivityLog, CheckIn
+  TaskStatus, GoodsStatus, PostStatus, School, Bulletin, ActivityLog, CheckIn,
+  Report, ReportStatus, ReportTarget
 } from '../lib/types'
 import * as db from '../lib/db'
 import { notifyNative } from '../lib/nativeNotify'
@@ -55,6 +56,7 @@ interface State {
   txns: WalletTxn[]
   withdrawals: Withdrawal[]
   arbitrations: Arbitration[]
+  reports: Report[]
   notifications: Notification[]
   categories: Category[]
   banners: Banner[]
@@ -87,6 +89,17 @@ interface State {
   reviewReject: (taskId: string) => Promise<void>
   applyArbitration: (taskId: string, reason: string) => Promise<void>
   adminDecide: (arbId: string, winner: 'plaintiff' | 'defendant' | 'split', result: string) => Promise<void>
+
+  // 举报（reports 表）：用户提交；管理端读取与处理
+  report: (input: {
+    targetType: ReportTarget
+    targetId: string
+    targetTitle?: string
+    reason: string
+    detail?: string
+  }) => Promise<void>
+  fetchReports: () => Promise<void>
+  handleReport: (id: string, status: ReportStatus) => Promise<void>
 
   // 钱包（充值走「下单 → 收银台支付 → 入账」三步，订单 id 即幂等键）
   createRechargeOrder: (amountYuan: number) => Promise<RechargeOrder>
@@ -160,6 +173,7 @@ export const useStore = create<State>((set, get) => ({
   txns: [],
   withdrawals: [],
   arbitrations: [],
+  reports: [],
   notifications: [],
   categories: [],
   banners: [],
@@ -373,8 +387,10 @@ export const useStore = create<State>((set, get) => ({
       task_title: task.title,
       plaintiff_id: me.id,
       plaintiff_name: me.nickname,
-      defendant_id: task.accepted_id ?? undefined,
-      defendant_name: task.accepted_name ?? undefined,
+      // defendant_name / defendant_id 在库中为 NOT NULL：任务若尚未有人接单，
+      // 原写法 `?? undefined` 会让整条 insert 报 23502 直接失败。这里给显式兜底。
+      defendant_id: task.accepted_id ?? me.id,
+      defendant_name: task.accepted_name ?? '（尚未有人接单）',
       reason
     })
     await db.updateTask(taskId, { status: 'arbitration' })
@@ -389,6 +405,35 @@ export const useStore = create<State>((set, get) => ({
     await db.updateArbitration(arbId, { status: 'closed', winner, result })
     const arbitrations = await db.fetchArbitrations(get().me!.id, 'all')
     set({ arbitrations })
+  },
+
+  // ─── 举报 ───
+  report: async ({ targetType, targetId, targetTitle, reason, detail }) => {
+    const me = get().me
+    if (!me) throw new Error('请先登录后再举报')
+    await db.createReport({
+      target_type: targetType,
+      target_id: targetId,
+      target_title: targetTitle,
+      reason,
+      detail,
+      reporter_id: me.id,
+      reporter_name: me.nickname,
+    })
+  },
+
+  fetchReports: async () => {
+    const me = get().me
+    if (!me) return
+    const reports = await db.fetchReports(me.id)
+    set({ reports })
+  },
+
+  handleReport: async (id, status) => {
+    const me = get().me
+    if (!me) return
+    await db.handleReport(id, status, me.id)
+    set((s) => ({ reports: s.reports.map((r) => (r.id === id ? { ...r, status } : r)) }))
   },
 
   // ─── 钱包 ───
@@ -591,24 +636,21 @@ export const useStore = create<State>((set, get) => ({
     set({ posts })
   },
 
+  // 付费置顶：改走服务端专用动作 top_task。
+  // 原实现用 updateTask + addTxn：① addTxn 漏传 uid 会被 owner 校验拒掉；② 前端无法改
+  // profiles.balance（该列不在更新白名单），等于只改了本地余额、库里没扣钱。
+  // 现在扣费 / 写流水 / 改置顶时间由后端一次性完成，前端只负责刷新。
   topTask: async (id, days) => {
-    const me = get().me!
-    const config = get().config
-    if (!config) return { ok: false, msg: '配置未加载' }
-    const price = config.top_price['d' + days as 'd1' | 'd3' | 'd7']
-    if (me.balance < price) return { ok: false, msg: `积分不足，需 ${price} 积分` }
-    const until = new Date(Date.now() + days * 86400000).toISOString()
-    await db.updateTask(id, { top_until: until })
-    await db.addTxn({
-      user_id: me.id,
-      type: 'pay',
-      amount: -price,
-      balance_after: me.balance - price,
-      remark: `付费置顶 ${days} 天`
-    })
-    const [tasks, txns] = await Promise.all([db.fetchTasks(), db.fetchTxns(me.id)])
-    set(s => ({ tasks, txns, me: { ...me, balance: me.balance - price } }))
-    return { ok: true, msg: `已置顶 ${days} 天，扣费 ${price} 积分` }
+    const me = get().me
+    if (!me) return { ok: false, msg: '请先登录' }
+    try {
+      const r = await db.topTask(id, days as 1 | 3 | 7)
+      const [tasks, txns] = await Promise.all([db.fetchTasks(), db.fetchTxns(me.id)])
+      set({ tasks, txns, me: { ...me, balance: r.balance } })
+      return { ok: true, msg: `已置顶 ${days} 天，扣费 ${r.price} 积分` }
+    } catch (e: any) {
+      return { ok: false, msg: e?.message || '置顶失败' }
+    }
   },
 
   approveWithdrawal: async (id) => {

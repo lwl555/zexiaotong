@@ -5,6 +5,7 @@ import { useStore } from '../../store/store'
 import { useMe } from '../../store/useMe'
 import { useIsMobile } from '../../lib/useIsMobile'
 import { fetchComments, createComment } from '../../lib/db'
+import ReportSheet from '../../components/ReportSheet'
 import type { Comment } from '../../lib/types'
 import {
   PageHeader,
@@ -37,6 +38,7 @@ export default function PostDetail() {
   const [comment, setComment] = useState('')
   const [comments, setComments] = useState<Comment[]>([])
   const [loading, setLoading] = useState(true)
+  const [showReport, setShowReport] = useState(false)
 
   // 拉取真实评论
   useEffect(() => {
@@ -123,10 +125,19 @@ export default function PostDetail() {
         <button onClick={() => collectPost(post.id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT, fontSize: 14, fontWeight: 600, color: post.collected ? ACCENT : MUTED, padding: 0 }}>
           <Star size={18} /> {post.collects}
         </button>
-        <button onClick={() => nav('/')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT, fontSize: 14, fontWeight: 600, color: MUTED, marginLeft: 'auto', padding: 0 }}>
+        <button onClick={() => { if (!me?.id) { nav('/login'); return } setShowReport(true) }} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT, fontSize: 14, fontWeight: 600, color: MUTED, marginLeft: 'auto', padding: 0 }}>
           <Flag size={16} /> 举报
         </button>
       </div>
+
+      {/* 举报弹层：真实写入 reports 表，管理员后台可处理 */}
+      <ReportSheet
+        open={showReport}
+        onClose={() => setShowReport(false)}
+        targetType="post"
+        targetId={post.id}
+        targetTitle={post.title}
+      />
 
       <SectionLabel index="02" label="评论" />
 

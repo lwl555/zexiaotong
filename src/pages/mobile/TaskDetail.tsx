@@ -3,6 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Pin, Clock, MessageSquare, Flag, Share2, ChevronRight, CheckCircle2, Scale } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { useMe } from '../../store/useMe'
+import { sharePage } from '../../lib/share'
+import { toast } from '../../lib/toast'
+import ReportSheet from '../../components/ReportSheet'
 import {
   PageHeader,
   HardCard,
@@ -36,6 +39,7 @@ export default function TaskDetail() {
   const applyArbitration = useStore(s => s.applyArbitration)
   const [showDeliver, setShowDeliver] = useState(false)
   const [deliverText, setDeliverText] = useState('')
+  const [showReport, setShowReport] = useState(false)
 
   if (!task) return <div style={{ padding: '40px 2px', textAlign: 'center', color: MUTED, fontFamily: FONT }}>任务不存在</div>
 
@@ -140,10 +144,32 @@ export default function TaskDetail() {
         <button onClick={() => nav('/messages?peer=' + task.accepted_id)} style={{ ...btnGhost({ padding: '8px 12px', fontSize: 13 }), display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
           <MessageSquare size={18} /> <span style={{ fontFamily: FONT }}>联系接单者</span>
         </button>
-        <button onClick={() => nav('/')} style={{ ...btnGhost({ padding: '8px 12px', fontSize: 13 }), display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+        <button
+          onClick={async () => {
+            const r = await sharePage({ title: task.title, text: `「${task.title}」${task.amount} 积分 · 择校通悬赏任务` })
+            if (r === 'copied') toast('链接已复制，快去分享给同学吧')
+            else if (r === 'failed') toast('分享失败，请手动复制浏览器地址')
+          }}
+          style={{ ...btnGhost({ padding: '8px 12px', fontSize: 13 }), display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}
+        >
           <Share2 size={18} /> <span style={{ fontFamily: FONT }}>分享</span>
         </button>
+        <button
+          onClick={() => { if (!me?.id) { nav('/login'); return } setShowReport(true) }}
+          style={{ ...btnGhost({ padding: '8px 12px', fontSize: 13 }), display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}
+        >
+          <Flag size={18} /> <span style={{ fontFamily: FONT }}>举报</span>
+        </button>
       </div>
+
+      {/* 举报弹层：真实写入 reports 表 */}
+      <ReportSheet
+        open={showReport}
+        onClose={() => setShowReport(false)}
+        targetType="task"
+        targetId={task.id}
+        targetTitle={task.title}
+      />
 
       {showDeliver && (
         <div onClick={() => setShowDeliver(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(17,17,17,0.4)', zIndex: 40, display: 'flex', alignItems: 'flex-end' }}>
