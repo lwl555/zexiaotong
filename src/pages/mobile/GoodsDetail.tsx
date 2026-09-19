@@ -5,6 +5,7 @@ import { useStore } from '../../store/store'
 import { useMe } from '../../store/useMe'
 import { sharePage } from '../../lib/share'
 import { toast } from '../../lib/toast'
+import { img } from '../../lib/img'
 import ReportSheet from '../../components/ReportSheet'
 import {
   SectionLabel,
@@ -60,7 +61,7 @@ export default function GoodsDetail() {
       {/* 主图 + 缩略点 */}
       <div style={{ position: 'relative' }}>
         <img
-          src={good.images[imgIdx] || ''}
+          src={good.images[imgIdx] || img('暂无商品图片', 400, 260)}
           alt=""
           style={{ width: '100%', height: 260, objectFit: 'cover', border: `1px solid #e8e8e8`, borderRadius: 2, background: '#efefef', display: 'block' }}
         />
