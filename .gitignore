@@ -37,3 +37,6 @@ vite.config.ts.timestamp-*.mjs
 .tmp*.sql
 .top-*.sql
 .cleanup.sql
+
+# 本地 anon key（公开 key，但仍不入库，避免误当凭证用）
+.anon
