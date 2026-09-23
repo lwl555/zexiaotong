@@ -63,6 +63,7 @@ const GoodsAudit    = safeLazy(() => import('./pages/admin/GoodsAudit'))
 const PostAudit     = safeLazy(() => import('./pages/admin/PostAudit'))
 const Arbitration   = safeLazy(() => import('./pages/admin/Arbitration'))
 const Withdraw      = safeLazy(() => import('./pages/admin/Withdraw'))
+const RechargeReview = safeLazy(() => import('./pages/admin/RechargeReview'))
 const Config        = safeLazy(() => import('./pages/admin/Config'))
 const System        = safeLazy(() => import('./pages/admin/System'))
 const FeatureChats  = safeLazy(() => import('./pages/admin/FeatureChats'))
@@ -182,6 +183,7 @@ export default function App() {
             <Route path="posts" element={<PostAudit />} />
             <Route path="arbitration" element={<Arbitration />} />
             <Route path="withdraw" element={<Withdraw />} />
+            <Route path="recharge" element={<RechargeReview />} />
             <Route path="config" element={<Config />} />
             <Route path="feature-chats" element={<FeatureChats />} />
             <Route path="logs" element={<Logs />} />
@@ -210,8 +212,8 @@ export default function App() {
             <Route path="my-tasks" element={<MyTasks />} />
             <Route path="ai-history" element={<AIHistory />} />
             <Route path="wallet" element={<Wallet />} />
-            {/* 收银台：充值必须经此确认支付才入账（订单号即幂等键） */}
-            <Route path="pay/:orderId" element={<Pay />} />
+            {/* 充值收银台：扫码转账 → 上传截图 + 金额 + 支付宝姓名 → 提交后台审核（无需预创建订单） */}
+            <Route path="pay" element={<Pay />} />
             <Route path="mine" element={<Mine />} />
             <Route path="settings" element={<Settings />} />
             <Route path="discover" element={<Discover />} />

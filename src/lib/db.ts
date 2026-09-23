@@ -10,7 +10,7 @@ import { supabase } from './supabase'
 import { sha256Hex } from './hash'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
-  Profile, Task, Goods, Post, Comment, Message, WalletTxn, Withdrawal, RechargeOrder,
+  Profile, Task, Goods, Post, Comment, Message, WalletTxn, Withdrawal, RechargeOrder, RechargeOrderStatus,
   Arbitration, Notification, Category, Banner, PlatformConfig, Role,
   TaskStatus, GoodsStatus, PostStatus, School, Bulletin, ActivityLog, CheckIn,
   Report, ReportTarget, ReportStatus
@@ -493,13 +493,13 @@ export async function handleReport(id: string, status: ReportStatus, adminId: st
 // ─── 平台配置 ───────────────────────────────────────────────────
 
 export async function fetchPlatformConfig(): Promise<PlatformConfig> {
-  const DEFAULT_CFG: PlatformConfig = { commission_rate: 0.10, top_price: { d1: 2, d3: 5, d7: 10 }, announce: '' }
+  const DEFAULT_CFG: PlatformConfig = { commission_rate: 0.10, top_price: { d1: 2, d3: 5, d7: 10 }, announce: '', alipay_qr_url: '', alipay_account: '' }
   if (!supabase) return DEFAULT_CFG
   try {
     // 优化：显式列 + maybeSingle()。原 select('*') 在 RLS 列级限制下返回 406（控制台报错且取不到配置）。
     const { data, error } = await withTimeout(
       supabase!.from('platform_config')
-        .select('commission_rate, top_price_d1, top_price_d3, top_price_d7, announce')
+        .select('commission_rate, top_price_d1, top_price_d3, top_price_d7, announce, alipay_qr_url, alipay_account')
         .maybeSingle(),
       6000, 'fetchConfig'
     )
@@ -507,7 +507,9 @@ export async function fetchPlatformConfig(): Promise<PlatformConfig> {
     return {
       commission_rate: (data as any).commission_rate,
       top_price: { d1: (data as any).top_price_d1, d3: (data as any).top_price_d3, d7: (data as any).top_price_d7 },
-      announce: (data as any).announce
+      announce: (data as any).announce,
+      alipay_qr_url: (data as any).alipay_qr_url || '',
+      alipay_account: (data as any).alipay_account || ''
     } as PlatformConfig
   } catch {
     return DEFAULT_CFG
@@ -765,6 +767,120 @@ export async function fetchRechargeOrders(userId: string): Promise<RechargeOrder
     .limit(20)
   if (error) throw error
   return (data || []) as RechargeOrder[]
+}
+
+// ─── 充值（人工审核模式）：用户扫码转账 → 传截图 → 后台审核 → 通过才入账 ───
+
+/** 上传充值截图 / 收款码到 Storage（经 db-write 用 service_role 写，前端不直接碰 Storage）。
+ *  file: 浏览器 File；folder: 'recharge-proofs' | 'alipay-qr'（后端白名单校验）。 */
+export async function uploadRechargeFile(file: File, folder: 'recharge-proofs' | 'alipay-qr'): Promise<string> {
+  // 客户端压成 JPEG，控制体积（Edge 函数请求体别太大）
+  const compressed = await compressImage(file, 1280, 0.82)
+  const ext = 'jpg'
+  const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+  // 转 base64（去掉 data: 前缀）
+  const b64 = await fileToBase64(compressed.blob)
+  const d = await dbWrite('upload_file', { folder, fileName, contentType: compressed.contentType, data: b64, uid: currentUid() })
+  if (!d?.url) throw new Error('上传失败')
+  return d.url as string
+}
+
+/** 提交充值申请：金额（实际转账额）+ 支付宝姓名 + 截图 URL。落 pending，不入账。 */
+export async function submitRecharge(
+  uid: string,
+  amountYuan: number,
+  alipayName: string,
+  proofUrl: string
+): Promise<RechargeOrder> {
+  const d = await dbWrite('submit_recharge', { uid, amount: amountYuan, alipayName, proofUrl })
+  return {
+    id: d.orderId,
+    user_id: uid,
+    amount_yuan: d.amountYuan,
+    points: d.points,
+    status: (d.status || 'pending') as RechargeOrderStatus,
+    channel: 'alipay',
+    paid_at: null,
+    created_at: new Date().toISOString(),
+    alipay_name: alipayName,
+    proof_url: proofUrl,
+    reviewed_at: null,
+    reviewed_by: '',
+    reject_reason: ''
+  } as RechargeOrder
+}
+
+/** 我的充值申请列表（本人） */
+export async function fetchMyRechargeOrders(uid: string): Promise<RechargeOrder[]> {
+  const d = await dbWrite('list_recharge_orders', { uid, scope: 'mine' })
+  return (d.orders || []) as RechargeOrder[]
+}
+
+/** 充值审核列表（管理员全量，含申请人昵称 phone） */
+export async function fetchRechargeReviews(operatorId: string): Promise<any[]> {
+  const d = await dbWrite('list_recharge_orders', { uid: operatorId, scope: 'all' })
+  return (d.orders || []) as any[]
+}
+
+/** 管理员审核充值申请 */
+export async function reviewRecharge(operatorId: string, orderId: string, decision: 'approve' | 'reject', reason = ''): Promise<{ ok: boolean; decision: string; balance?: number; points?: number }> {
+  const d = await dbWrite('review_recharge', { uid: operatorId, orderId, decision, reason })
+  return { ok: !!d.ok, decision: d.decision, balance: d.balance, points: d.points }
+}
+
+/** 设置支付宝收款码 / 收款账号（管理员） */
+export async function setAlipayQr(operatorId: string, alipayQrUrl: string, alipayAccount: string) {
+  await dbWrite('set_alipay_qr', { uid: operatorId, alipay_qr_url: alipayQrUrl, alipay_account: alipayAccount })
+}
+
+// 图片压缩：画到 canvas，最长边不超过 maxDim，导出 JPEG
+function compressImage(file: File, maxDim: number, quality: number): Promise<{ blob: Blob; contentType: string }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('读取图片失败'))
+    reader.onload = () => {
+      const img = new Image()
+      img.onerror = () => reject(new Error('图片解析失败'))
+      img.onload = () => {
+        let { width, height } = img
+        if (width > maxDim || height > maxDim) {
+          const scale = Math.min(maxDim / width, maxDim / height)
+          width = Math.round(width * scale)
+          height = Math.round(height * scale)
+        }
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return reject(new Error('无法创建画布'))
+        ctx.drawImage(img, 0, 0, width, height)
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) return reject(new Error('压缩失败'))
+            resolve({ blob, contentType: 'image/jpeg' })
+          },
+          'image/jpeg',
+          quality
+        )
+      }
+      img.src = reader.result as string
+    }
+    reader.readAsDataURL(file)
+  })
+}
+
+// File → base64（去掉 data: 前缀，便于后端 atob）
+function fileToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('读取失败'))
+    reader.onload = () => {
+      const result = reader.result as string
+      const comma = result.indexOf(',')
+      resolve(comma >= 0 ? result.slice(comma + 1) : result)
+    }
+    reader.readAsDataURL(blob)
+  })
 }
 
 // 平台配置：仅管理员可改

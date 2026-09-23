@@ -52,6 +52,15 @@ const WD_STATUS: Record<string, { label: string; tone: 'line' | 'accent' | 'ink'
   rejected: { label: '已驳回', tone: 'ink' },
 }
 
+const RC_STATUS: Record<string, { label: string; tone: 'line' | 'accent' | 'ink' }> = {
+  pending: { label: '待审核', tone: 'line' },
+  approved: { label: '已到账', tone: 'accent' },
+  rejected: { label: '已驳回', tone: 'ink' },
+  paid: { label: '已支付', tone: 'accent' },
+  cancelled: { label: '已取消', tone: 'ink' },
+  expired: { label: '已过期', tone: 'ink' },
+}
+
 const TXN_LABEL: any = {
   recharge: '充值',
   income: '任务收入',
@@ -94,12 +103,13 @@ export default function Wallet() {
   const me = useMe()
   const allTxns = useStore(s => s.txns)
   const allWithdrawals = useStore(s => s.withdrawals)
-  const createRechargeOrder = useStore(s => s.createRechargeOrder)
+  const rechargeOrders = useStore(s => s.rechargeOrders)
+  const submitRecharge = useStore(s => s.submitRecharge)
+  const fetchMyRechargeOrders = useStore(s => s.fetchMyRechargeOrders)
   const withdraw = useStore(s => s.withdraw)
   const refreshWithdrawals = useStore(s => s.refreshWithdrawals)
   const config = useStore(s => s.config)
 
-  const [tier, setTier] = useState(DEFAULT_RULES.rechargeTiers[2])
   const [rules, setRules] = useState<WalletRules>(DEFAULT_RULES)
   const [wdAmt, setWdAmt] = useState('')
   const [channel, setChannel] = useState(CHANNELS[0].key)
@@ -108,16 +118,13 @@ export default function Wallet() {
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState<{ type: 'ok' | 'err'; msg: string } | null>(null)
 
-  // 规则以后端为准（档位 / 门槛 / 单笔与单日上限）
+  // 规则以后端为准（提现门槛 / 单笔与单日上限；充值走人工审核，不再下发档位）
   useEffect(() => {
     let alive = true
     fetchWalletRules()
-      .then(r => {
-        if (!alive) return
-        setRules(r)
-        setTier(prev => (r.rechargeTiers.includes(prev) ? prev : r.rechargeTiers[Math.min(2, r.rechargeTiers.length - 1)]))
-      })
+      .then(r => { if (alive) setRules(r) })
       .catch(() => {})
+    fetchMyRechargeOrders()
     return () => { alive = false }
   }, [])
 
@@ -136,20 +143,9 @@ export default function Wallet() {
     setTimeout(() => setToast(null), 3200)
   }
 
-  // 充值：先在下单接口拿到订单号，再跳到收银台页面确认支付。
-  // 未确认支付不会到账；同一订单重复支付也只会入账一次（后端幂等）。
-  const goPay = async () => {
-    if (busy) return
-    setBusy(true)
-    try {
-      const order = await createRechargeOrder(tier)
-      nav(`/pay/${order.id}`)
-    } catch (e: any) {
-      showToast('err', e?.message || '创建订单失败，请重试')
-    } finally {
-      setBusy(false)
-    }
-  }
+  // 充值：跳转收银台页面（扫码转账 → 上传截图 → 提交审核）。
+  // 未审核通过不会到账；审核由管理员在后台完成。
+  const goPay = () => { nav('/pay') }
 
   const submitWd = async () => {
     if (busy) return
@@ -230,43 +226,17 @@ export default function Wallet() {
         </div>
       </div>
 
-      {/* 01 充值：选档位 → 去收银台 */}
+      {/* 01 充值：跳转收银台（扫码转账 → 上传截图 → 后台审核） */}
       <SectionLabel index="01" label="充值积分" />
       <div style={{ ...hard(), background: '#ffffff', padding: 18, marginBottom: 24 }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          {rules.rechargeTiers.map(t => {
-            const on = t === tier
-            return (
-              <button
-                key={t}
-                onClick={() => setTier(t)}
-                style={{
-                  flex: '1 1 82px',
-                  minWidth: 82,
-                  padding: '11px 6px',
-                  border: `1px solid ${on ? ACCENT : LINE}`,
-                  background: on ? ACCENT : '#ffffff',
-                  color: on ? '#ffffff' : INK,
-                  borderRadius: 2,
-                  cursor: 'pointer',
-                  fontFamily: FONT,
-                  textAlign: 'center',
-                }}
-              >
-                <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: '-0.01em' }}>¥{t}</div>
-                <div style={{ fontFamily: MONO, fontSize: 10, marginTop: 3, color: on ? 'rgba(255,255,255,0.85)' : MUTED }}>
-                  {t * ppu} 积分
-                </div>
-              </button>
-            )
-          })}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16, flexWrap: 'wrap' }}>
-          <BtnPrimary onClick={goPay} disabled={busy}>
-            {busy ? '正在创建订单…' : `去支付 ¥${tier}`}
-          </BtnPrimary>
+        <p style={{ fontFamily: FONT, fontSize: 13, color: MUTED, margin: '0 0 14px', lineHeight: 1.7 }}>
+          充值仅支持<strong style={{ color: INK }}>支付宝</strong>：按页内收款码扫码转账 → 上传支付截图并填写金额、支付宝姓名 → 提交。
+          <strong style={{ color: INK }}>后台审核通过前积分不会到账</strong>，请耐心等待。
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <BtnPrimary onClick={goPay}>去充值</BtnPrimary>
           <span style={{ fontFamily: FONT, fontSize: 12, color: MUTED }}>
-            下一步进入收银台确认支付；未支付的订单不会到账，重复支付也只会到账一次。
+            兑换比例 {ppu} 积分 = 1 元（单笔上限 ¥{rules.rechargeMaxYuan}）
           </span>
         </div>
       </div>
@@ -387,6 +357,42 @@ export default function Wallet() {
               </div>
               <div style={{ fontFamily: MONO, fontSize: 10.5, color: MUTED, letterSpacing: 1, whiteSpace: 'nowrap' }}>
                 #{w.id.slice(0, 6)}
+              </div>
+            </ListRow>
+          )
+        })}
+      </div>
+
+      {/* 03b 我的充值申请 */}
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+        <SectionLabel index="03b" label="我的充值申请" />
+        <BtnGhost onClick={() => fetchMyRechargeOrders()} style={{ fontSize: 12, padding: '5px 10px' }}>刷新</BtnGhost>
+      </div>
+      <div style={{ marginBottom: 24 }}>
+        {rechargeOrders.length === 0 && (
+          <div style={{ color: MUTED, fontSize: 13, padding: '18px 2px' }}>还没有充值申请</div>
+        )}
+        {rechargeOrders.map(o => {
+          const st = RC_STATUS[o.status] || { label: o.status, tone: 'line' as const }
+          return (
+            <ListRow key={o.id}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontFamily: FONT, fontSize: 14, fontWeight: 700, color: INK }}>
+                    充值 ¥{Number(o.amount_yuan).toFixed(2)}
+                  </span>
+                  <Tag tone={st.tone}>{st.label}</Tag>
+                </div>
+                <div style={{ fontFamily: FONT, fontSize: 12, color: MUTED, marginTop: 3 }}>
+                  得 {o.points.toLocaleString()} 积分{o.alipay_name ? ` · 支付宝 ${o.alipay_name}` : ''}
+                  {' · '}{new Date(o.created_at).toLocaleString('zh-CN')}
+                </div>
+                {o.status === 'rejected' && o.reject_reason && (
+                  <div style={{ fontFamily: FONT, fontSize: 12, color: ACCENT, marginTop: 3 }}>驳回原因：{o.reject_reason}</div>
+                )}
+              </div>
+              <div style={{ fontFamily: MONO, fontSize: 10.5, color: MUTED, letterSpacing: 1, whiteSpace: 'nowrap' }}>
+                #{o.id.slice(0, 6)}
               </div>
             </ListRow>
           )

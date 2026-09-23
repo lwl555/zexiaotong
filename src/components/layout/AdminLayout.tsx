@@ -14,6 +14,7 @@ const menu = [
   { to: '/admin/posts', label: '帖子审核', icon: MessageSquare },
   { to: '/admin/arbitration', label: '订单与仲裁', icon: Gavel },
   { to: '/admin/withdraw', label: '提现审核', icon: Wallet },
+  { to: '/admin/recharge', label: '充值审核', icon: Wallet },
   { to: '/admin/reports', label: '举报处理', icon: Flag },
   { to: '/admin/feature-chats', label: '功能反馈', icon: Bell },
   { to: '/admin/config', label: '运营配置', icon: Settings2 },

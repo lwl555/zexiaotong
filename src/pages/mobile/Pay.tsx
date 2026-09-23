@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../store/store'
-import { useMe } from '../../store/useMe'
-import { fetchRechargeOrder } from '../../lib/db'
-import type { RechargeOrder } from '../../lib/types'
-import { CheckCircle, XCircle, ShieldCheck } from 'lucide-react'
+import { uploadRechargeFile } from '../../lib/db'
+import { CheckCircle, ShieldCheck, Upload } from 'lucide-react'
 import {
   PageHeader,
   BtnPrimary,
   BtnGhost,
   SectionLabel,
+  ListRow,
+  Tag,
   hard,
   INK,
   MUTED,
@@ -21,64 +21,80 @@ import {
   MONO,
 } from '../../components/Editorial'
 
-// 收银台渠道（当前为演示环境的模拟支付，不接真实扣款）
-const CHANNELS = [
-  { key: 'wechat', label: '微信支付' },
-  { key: 'alipay', label: '支付宝' },
-]
+const RC_STATUS: Record<string, { label: string; tone: 'line' | 'accent' | 'ink' }> = {
+  pending: { label: '待审核', tone: 'line' },
+  approved: { label: '已到账', tone: 'accent' },
+  rejected: { label: '已驳回', tone: 'ink' },
+  paid: { label: '已支付', tone: 'accent' },
+  cancelled: { label: '已取消', tone: 'ink' },
+  expired: { label: '已过期', tone: 'ink' },
+}
+
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  border: `1px solid ${LINE}`,
+  borderRadius: 2,
+  padding: '10px 12px',
+  fontFamily: FONT,
+  fontSize: 15,
+  outline: 'none',
+  background: '#ffffff',
+  color: INK,
+}
 
 export default function Pay() {
-  const { orderId = '' } = useParams()
   const nav = useNavigate()
-  const me = useMe()
-  const confirmRecharge = useStore(s => s.confirmRecharge)
+  const config = useStore(s => s.config)
+  const rechargeOrders = useStore(s => s.rechargeOrders)
+  const submitRecharge = useStore(s => s.submitRecharge)
+  const fetchMyRechargeOrders = useStore(s => s.fetchMyRechargeOrders)
 
-  const [order, setOrder] = useState<RechargeOrder | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [channel, setChannel] = useState(CHANNELS[0].key)
-  const [paying, setPaying] = useState(false)
-  const [done, setDone] = useState<{ points: number } | null>(null)
+  const [amount, setAmount] = useState('')
+  const [alipayName, setAlipayName] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [preview, setPreview] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState(false)
   const [err, setErr] = useState('')
 
-  // 刷新 / 直接打开链接时按 URL 里的订单号重新拉单（订单状态以服务端为准）
-  useEffect(() => {
-    let alive = true
-    setLoading(true)
-    ;(async () => {
-      try {
-        const o = await fetchRechargeOrder(orderId)
-        if (!alive) return
-        if (!o || o.user_id !== me.id) {
-          setErr('订单不存在，或不属于当前账号')
-          setOrder(null)
-          return
-        }
-        setOrder(o)
-        // 已经是已支付状态：直接进成功页（同一订单不会二次入账）
-        if (o.status === 'paid') setDone({ points: o.points })
-      } catch (e: any) {
-        if (alive) setErr(e?.message || '订单加载失败，请返回钱包重试')
-      } finally {
-        if (alive) setLoading(false)
-      }
-    })()
-    return () => {
-      alive = false
-    }
-  }, [orderId, me.id])
+  const ppu = config?.points_per_yuan || 100
+  const qrUrl = config?.alipay_qr_url || ''
 
-  const pay = async () => {
-    if (paying || !order) return
-    setPaying(true)
+  useEffect(() => {
+    fetchMyRechargeOrders()
+    return () => { if (preview) URL.revokeObjectURL(preview) }
+  }, [preview])
+
+  const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    if (!f) return
+    setFile(f)
+    setPreview(URL.createObjectURL(f))
+  }
+
+  const submit = async () => {
     setErr('')
+    const yuan = Number(amount)
+    if (!Number.isFinite(yuan) || yuan <= 0) { setErr('请输入充值金额（元）'); return }
+    if (!alipayName.trim()) { setErr('请填写支付宝姓名（便于核对）'); return }
+    if (!file) { setErr('请上传支付截图'); return }
+    setBusy(true)
     try {
-      const r = await confirmRecharge(order.id)
-      if (r.ok) setDone({ points: r.points })
-      else setErr(r.msg)
+      const url = await uploadRechargeFile(file, 'recharge-proofs')
+      const r = await submitRecharge({ amountYuan: yuan, alipayName: alipayName.trim(), proofUrl: url })
+      if (r.ok) {
+        setDone(true)
+        setAmount('')
+        setAlipayName('')
+        setFile(null)
+        setPreview('')
+      } else {
+        setErr(r.msg)
+      }
     } catch (e: any) {
-      setErr(e?.message || '支付失败，请重试')
+      setErr(e?.message || '提交失败，请重试')
     } finally {
-      setPaying(false)
+      setBusy(false)
     }
   }
 
@@ -86,128 +102,153 @@ export default function Pay() {
 
   return (
     <div style={{ padding: '8px 16px 48px', maxWidth: 640, margin: '0 auto', fontFamily: FONT }}>
-      <PageHeader eyebrow="Checkout" title="收银台" desc="确认支付后积分到账；同一订单重复提交只会入账一次。" />
+      <PageHeader eyebrow="Recharge" title="充值积分" desc="仅支持支付宝：扫码转账后上传截图，审核通过后积分到账。" />
 
-      {loading && (
-        <div style={{ ...hard(), background: '#ffffff', padding: 24, textAlign: 'center', color: MUTED, fontSize: 14 }}>
-          订单加载中…
-        </div>
-      )}
-
-      {!loading && err && !done && (
-        <div style={{ ...hard(), background: '#ffffff', padding: 18 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: INK, fontSize: 14, fontWeight: 600 }}>
-            <XCircle size={16} color={ACCENT} /> {err}
+      {!qrUrl && (
+        <div style={{ ...hard(), background: ACCENT_SOFT, border: `1px solid ${LINE}`, padding: 16, marginBottom: 18 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', color: INK, fontSize: 14, fontWeight: 600 }}>
+            <ShieldCheck size={16} color={ACCENT} /> 暂未开放充值
           </div>
-          <div style={{ marginTop: 14 }}>
-            <BtnGhost onClick={backToWallet}>返回钱包</BtnGhost>
-          </div>
-        </div>
-      )}
-
-      {!loading && done && (
-        <div style={{ ...hard(), background: '#ffffff', padding: 22 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: ACCENT }}>
-            <CheckCircle size={18} />
-            <span style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: 2 }}>PAYMENT CONFIRMED</span>
-          </div>
-          <div style={{ fontFamily: FONT, fontSize: 16, fontWeight: 700, color: INK, marginTop: 10 }}>
-            支付已完成
-          </div>
-          <div style={{ fontFamily: FONT, fontSize: 32, fontWeight: 800, color: INK, marginTop: 6, letterSpacing: '-0.02em' }}>
-            +{done.points.toLocaleString()} <span style={{ fontSize: 14, fontWeight: 600, color: MUTED }}>积分</span>
-          </div>
-          <p style={{ fontFamily: FONT, fontSize: 12, color: MUTED, marginTop: 10, marginBottom: 0, lineHeight: 1.7 }}>
-            积分已计入账户余额。若这是重复提交，系统只入账一次——这是设计如此，不是漏记。
+          <p style={{ fontFamily: FONT, fontSize: 13, color: MUTED, margin: '8px 0 0', lineHeight: 1.7 }}>
+            管理员尚未配置支付宝收款码，暂时无法充值。请稍后再来，或联系平台管理员。
           </p>
-          <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
-            <BtnPrimary onClick={backToWallet}>返回钱包</BtnPrimary>
-            <BtnGhost onClick={() => nav('/community')}>去社区逛逛</BtnGhost>
-          </div>
         </div>
       )}
 
-      {!loading && !done && order && (
+      {qrUrl && !done && (
         <>
-          <div style={{ ...hard(), background: '#ffffff', padding: 20, marginBottom: 18 }}>
-            <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: 2, color: MUTED }}>应付金额</div>
-            <div style={{ fontFamily: FONT, fontSize: 40, fontWeight: 800, color: INK, marginTop: 4, letterSpacing: '-0.03em', lineHeight: 1.05 }}>
-              ¥{Number(order.amount_yuan).toFixed(2)}
-            </div>
-            <div style={{ fontFamily: FONT, fontSize: 13, color: MUTED, marginTop: 8 }}>
-              到账 {order.points.toLocaleString()} 积分
-            </div>
-            <div style={{ display: 'flex', gap: 24, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${HAIR}` }}>
-              <div>
-                <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: 2, color: MUTED }}>订单号</div>
-                <div style={{ fontFamily: MONO, fontSize: 12, color: INK, marginTop: 3 }}>{order.id.slice(0, 8)}</div>
+          {/* 收款码 */}
+          <SectionLabel index="01" label="扫码转账" />
+          <div style={{ ...hard(), background: '#ffffff', padding: 18, marginBottom: 18, textAlign: 'center' }}>
+            <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: 2, color: MUTED, textAlign: 'left' }}>支付宝收款码</div>
+            <img
+              src={qrUrl}
+              alt="支付宝收款码"
+              style={{ width: 220, height: 220, objectFit: 'contain', margin: '12px auto', border: `1px solid ${HAIR}`, borderRadius: 2 }}
+            />
+            {config?.alipay_account && (
+              <div style={{ fontFamily: FONT, fontSize: 13, color: INK, marginTop: 4 }}>
+                收款账号：<strong>{config.alipay_account}</strong>
               </div>
-              <div>
-                <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: 2, color: MUTED }}>下单时间</div>
-                <div style={{ fontFamily: FONT, fontSize: 12, color: INK, marginTop: 3 }}>
-                  {new Date(order.created_at).toLocaleString('zh-CN')}
-                </div>
-              </div>
+            )}
+            <p style={{ fontFamily: FONT, fontSize: 12, color: MUTED, margin: '10px 0 0', lineHeight: 1.7, textAlign: 'left' }}>
+              请用支付宝<strong style={{ color: INK }}>扫描上方二维码</strong>，按你实际想充的金额转账；转账完成后<strong style={{ color: INK }}>截屏保存</strong>，在下方上传。
+            </p>
+          </div>
+
+          {/* 提交申请 */}
+          <SectionLabel index="02" label="提交充值申请" />
+          <div style={{ ...hard(), background: '#ffffff', padding: 18, marginBottom: 18 }}>
+            <label style={{ fontFamily: FONT, fontSize: 13, color: MUTED }}>充值金额（元）</label>
+            <input
+              value={amount}
+              onChange={e => setAmount(e.target.value.replace(/[^\d.]/g, ''))}
+              placeholder="实际转账金额，如 30 或 6.6"
+              inputMode="decimal"
+              style={{ ...inputStyle, marginTop: 8 }}
+            />
+            <div style={{ fontFamily: FONT, fontSize: 12, color: MUTED, marginTop: 6 }}>
+              预计到账 {amount ? Math.round(Number(amount) * ppu).toLocaleString() : 0} 积分（{ppu} 积分 = 1 元）
             </div>
-          </div>
 
-          <SectionLabel index="01" label="选择支付方式" />
-          <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-            {CHANNELS.map(c => {
-              const on = c.key === channel
-              return (
-                <button
-                  key={c.key}
-                  onClick={() => setChannel(c.key)}
-                  style={{
-                    flex: '1 1 0',
-                    padding: '12px 8px',
-                    border: `1px solid ${on ? ACCENT : LINE}`,
-                    background: on ? ACCENT : '#ffffff',
-                    color: on ? '#ffffff' : INK,
-                    borderRadius: 2,
-                    cursor: 'pointer',
-                    fontFamily: FONT,
-                    fontSize: 14,
-                    fontWeight: 700,
-                  }}
-                >
-                  {c.label}
-                </button>
-              )
-            })}
-          </div>
+            <label style={{ fontFamily: FONT, fontSize: 13, color: MUTED, marginTop: 14, display: 'block' }}>支付宝姓名</label>
+            <input
+              value={alipayName}
+              onChange={e => setAlipayName(e.target.value)}
+              placeholder="转账的支付宝实名（便于核对）"
+              style={{ ...inputStyle, marginTop: 8 }}
+            />
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <BtnPrimary onClick={pay} disabled={paying}>
-              {paying ? '支付处理中…' : `确认支付 ¥${Number(order.amount_yuan).toFixed(2)}`}
-            </BtnPrimary>
-            <BtnGhost onClick={backToWallet} disabled={paying}>取消</BtnGhost>
-          </div>
+            <label style={{ fontFamily: FONT, fontSize: 13, color: MUTED, marginTop: 14, display: 'block' }}>支付截图</label>
+            <div style={{ marginTop: 8 }}>
+              <label
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  border: `1px dashed ${file ? ACCENT : LINE}`, borderRadius: 2, padding: '14px',
+                  color: file ? ACCENT : MUTED, cursor: 'pointer', fontFamily: FONT, fontSize: 14, background: '#fff'
+                }}
+              >
+                <Upload size={16} /> {file ? '重新选择截图' : '点击上传支付截图'}
+                <input type="file" accept="image/*" capture="environment" onChange={onPick} style={{ display: 'none' }} />
+              </label>
+              {preview && (
+                <img src={preview} alt="支付截图预览" style={{ width: '100%', marginTop: 10, borderRadius: 2, border: `1px solid ${HAIR}` }} />
+              )}
+            </div>
 
-          {err && (
-            <div style={{ marginTop: 14, color: ACCENT, fontSize: 13, fontWeight: 600 }}>{err}</div>
-          )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16, flexWrap: 'wrap' }}>
+              <BtnPrimary onClick={submit} disabled={busy}>
+                {busy ? '提交中…' : '提交申请'}
+              </BtnPrimary>
+              <BtnGhost onClick={backToWallet} disabled={busy}>返回钱包</BtnGhost>
+            </div>
 
-          <div
-            style={{
-              display: 'flex',
-              gap: 10,
-              marginTop: 20,
-              padding: '12px 14px',
-              background: ACCENT_SOFT,
-              border: `1px solid ${LINE}`,
-              borderRadius: 2,
-            }}
-          >
-            <ShieldCheck size={16} color={ACCENT} style={{ flexShrink: 0, marginTop: 1 }} />
-            <span style={{ fontFamily: FONT, fontSize: 12, color: INK, lineHeight: 1.7 }}>
-              当前为<strong>模拟收银台</strong>（演示环境，未接入真实支付渠道，不会产生实际扣款）。
-              它的作用是让"充值"必须有一步明确的支付确认，订单号即入账凭据，重复提交不会重复到账。
-            </span>
+            {err && <div style={{ marginTop: 12, color: ACCENT, fontSize: 13, fontWeight: 600 }}>{err}</div>}
+
+            <div style={{ display: 'flex', gap: 10, marginTop: 16, padding: '12px 14px', background: ACCENT_SOFT, border: `1px solid ${LINE}`, borderRadius: 2 }}>
+              <ShieldCheck size={16} color={ACCENT} style={{ flexShrink: 0, marginTop: 1 }} />
+              <span style={{ fontFamily: FONT, fontSize: 12, color: INK, lineHeight: 1.7 }}>
+                提交后进入<strong>人工审核</strong>：管理员核对截图与金额无误才会把积分打入你的账户，审核通过前不会到账。
+              </span>
+            </div>
           </div>
         </>
       )}
+
+      {done && (
+        <div style={{ ...hard(), background: '#ffffff', padding: 22, marginBottom: 18 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: ACCENT }}>
+            <CheckCircle size={18} />
+            <span style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: 2 }}>SUBMITTED</span>
+          </div>
+          <div style={{ fontFamily: FONT, fontSize: 16, fontWeight: 700, color: INK, marginTop: 10 }}>
+            申请已提交，等待审核
+          </div>
+          <p style={{ fontFamily: FONT, fontSize: 12, color: MUTED, marginTop: 10, marginBottom: 0, lineHeight: 1.7 }}>
+            管理员审核通过后，积分会自动计入你的余额。你可以在「我的钱包 → 我的充值申请」中查看进度。
+          </p>
+          <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+            <BtnPrimary onClick={backToWallet}>返回钱包</BtnPrimary>
+            <BtnGhost onClick={() => { setDone(false); fetchMyRechargeOrders() }}>再充一笔</BtnGhost>
+          </div>
+        </div>
+      )}
+
+      {/* 我的充值记录 */}
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+        <SectionLabel index="03" label="我的充值记录" />
+        <BtnGhost onClick={() => fetchMyRechargeOrders()} style={{ fontSize: 12, padding: '5px 10px' }}>刷新</BtnGhost>
+      </div>
+      <div style={{ marginBottom: 12 }}>
+        {rechargeOrders.length === 0 && (
+          <div style={{ textAlign: 'center', color: MUTED, fontSize: 14, padding: '24px 0' }}>暂无充值记录</div>
+        )}
+        {rechargeOrders.map(o => {
+          const st = RC_STATUS[o.status] || { label: o.status, tone: 'line' as const }
+          return (
+            <ListRow key={o.id}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontFamily: FONT, fontSize: 14, fontWeight: 700, color: INK }}>
+                    充值 ¥{Number(o.amount_yuan).toFixed(2)}
+                  </span>
+                  <Tag tone={st.tone}>{st.label}</Tag>
+                </div>
+                <div style={{ fontFamily: FONT, fontSize: 12, color: MUTED, marginTop: 3 }}>
+                  得 {o.points.toLocaleString()} 积分{o.alipay_name ? ` · 支付宝 ${o.alipay_name}` : ''}
+                  {' · '}{new Date(o.created_at).toLocaleString('zh-CN')}
+                </div>
+                {o.status === 'rejected' && o.reject_reason && (
+                  <div style={{ fontFamily: FONT, fontSize: 12, color: ACCENT, marginTop: 3 }}>驳回原因：{o.reject_reason}</div>
+                )}
+              </div>
+              <div style={{ fontFamily: MONO, fontSize: 10.5, color: MUTED, letterSpacing: 1, whiteSpace: 'nowrap' }}>
+                #{o.id.slice(0, 6)}
+              </div>
+            </ListRow>
+          )
+        })}
+      </div>
     </div>
   )
 }

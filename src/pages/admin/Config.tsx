@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Save, Megaphone, Percent, Pin, CheckCircle, Loader2, Send } from 'lucide-react'
+import { Save, Megaphone, Percent, Pin, CheckCircle, Loader2, Send, Wallet, Upload } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { PageHeader } from './ui'
+import { uploadRechargeFile } from '../../lib/db'
 import type { PlatformConfig } from '../../lib/types'
 
 export default function Config() {
@@ -13,8 +14,12 @@ export default function Config() {
     commission_rate: 0.10,
     top_price: { d1: 2, d3: 5, d7: 10 },
     announce: '',
-    points_per_yuan: 100
+    points_per_yuan: 100,
+    alipay_qr_url: '',
+    alipay_account: ''
   })
+  const [qrBusy, setQrBusy] = useState(false)
+  const [qrErr, setQrErr] = useState('')
   const [saved, setSaved] = useState(false)
   const [pushTitle, setPushTitle] = useState('')
   const [pushContent, setPushContent] = useState('')
@@ -44,6 +49,19 @@ export default function Config() {
     setConfig({ ...draft, commission_rate: rate })
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
+  }
+
+  // 上传支付宝收款码到 uploads 桶（经 db-write 写入，返回公开 URL）
+  const onPickQr = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    if (!f) return
+    setQrErr(''); setQrBusy(true)
+    try {
+      const url = await uploadRechargeFile(f, 'alipay-qr')
+      setDraft(d => ({ ...d, alipay_qr_url: url }))
+    } catch (err: any) {
+      setQrErr(err?.message || '上传失败')
+    } finally { setQrBusy(false) }
   }
 
   return (
@@ -84,6 +102,37 @@ export default function Config() {
           <input type="number" min="1" className="input mt-2" value={draft.points_per_yuan}
             onChange={e => setDraft({ ...draft, points_per_yuan: Number(e.target.value) })} />
           <div className="text-xs text-gray-400 mt-1">当前：{draft.points_per_yuan} 积分 = 1 元</div>
+        </div>
+
+        <div className="card p-5 lg:col-span-2">
+          <div className="flex items-center gap-2 font-bold text-ink mb-4"><Wallet size={18} className="text-brand-600" /> 支付宝收款设置</div>
+          <p className="text-sm text-gray-500 mb-3">用户充值时展示此收款码与账号，扫码转账后上传截图，管理员审核通过后积分到账。</p>
+          <div className="flex items-start gap-4 flex-wrap">
+            <div>
+              <label className="text-sm text-gray-600">收款二维码</label>
+              <div className="mt-2 flex flex-col items-center" style={{ width: 180 }}>
+                {draft.alipay_qr_url ? (
+                  <img src={draft.alipay_qr_url} alt="收款码" className="w-[160px] h-[160px] object-contain border border-gray-200 rounded" />
+                ) : (
+                  <div className="w-[160px] h-[160px] flex items-center justify-center border border-dashed border-gray-300 rounded text-gray-300 text-xs text-center">未上传</div>
+                )}
+                <label className="btn-ghost mt-2 inline-flex items-center gap-1 cursor-pointer" style={{ fontSize: 13 }}>
+                  <Upload size={14} /> {qrBusy ? '上传中…' : '选择/更换二维码'}
+                  <input type="file" accept="image/*" onChange={onPickQr} disabled={qrBusy} style={{ display: 'none' }} />
+                </label>
+                {qrErr && <div className="text-xs text-red-500 mt-1">{qrErr}</div>}
+              </div>
+            </div>
+            <div className="flex-1 min-w-[200px]">
+              <label className="text-sm text-gray-600">支付宝收款账号 / 姓名（展示用，便于用户核对）</label>
+              <input className="input mt-2" value={draft.alipay_account}
+                onChange={e => setDraft({ ...draft, alipay_account: e.target.value })}
+                placeholder="如：138xxxx8888 或 张三" />
+              <div className="text-xs text-gray-400 mt-2">
+                修改后点击右上角「保存配置」才会生效（与抽佣、置顶价等一起保存）。
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="card p-5 lg:col-span-2">

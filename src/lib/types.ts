@@ -192,9 +192,10 @@ export interface Withdrawal {
   account_name?: string
 }
 
-// 充值订单：充值走「下单 →（模拟）支付 → 入账」三步，
-// 订单 id 即幂等键，同一订单只能入账一次（连点 / 重放不会重复加积分）。
-export type RechargeOrderStatus = 'pending' | 'paid' | 'cancelled' | 'expired'
+// 充值订单：充值走「用户提交申请（扫码转账截图）→ 管理员审核 → 审核通过才入账」人工审核模式。
+// 订单 id 即幂等键；status: pending=待审核、approved=审核通过已入账、rejected=已驳回。
+// paid/cancelled/expired 为历史兼容状态（旧「模拟收银台」流程）。
+export type RechargeOrderStatus = 'pending' | 'paid' | 'cancelled' | 'expired' | 'approved' | 'rejected'
 export interface RechargeOrder {
   id: string
   user_id: string
@@ -204,6 +205,12 @@ export interface RechargeOrder {
   channel: string
   paid_at: string | null
   created_at: string
+  // 人工审核模式新增字段
+  alipay_name: string
+  proof_url: string
+  reviewed_at: string | null
+  reviewed_by: string
+  reject_reason: string
 }
 
 export type ArbitrationStatus = 'open' | 'closed'
@@ -269,4 +276,6 @@ export interface PlatformConfig {
   top_price: { d1: number; d3: number; d7: number }  // 单位：积分
   announce: string
   points_per_yuan: number   // 积分换算比例（默认 100：100 积分 = 1 元）
+  alipay_qr_url: string     // 支付宝收款码（公开图，存 uploads 桶）
+  alipay_account: string    // 支付宝收款账号 / 姓名（展示用，便于用户核对）
 }

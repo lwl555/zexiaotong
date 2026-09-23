@@ -101,6 +101,36 @@ async function pg(method: string, path: string, body?: unknown) {
   return { ok: res.ok, status: res.status, data }
 }
 
+// 文件上传到 Storage 桶（用 service_role，绕过 RLS；写入只在后端发生，前端不直接碰 Storage）
+// 返回公开可读 URL。桶 uploads 已建（public=true），读策略由 SQL 显式放开。
+async function storageUpload(bucket: string, objectPath: string, contentType: string, data: Uint8Array): Promise<string> {
+  const url = `${SUPABASE_URL}/storage/v1/object/${bucket}/${objectPath}`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      apikey: SERVICE_ROLE,
+      Authorization: `Bearer ${SERVICE_ROLE}`,
+      'Content-Type': contentType,
+      'x-upsert': 'true'
+    },
+    body: data
+  })
+  const text = await res.text()
+  if (!res.ok) throw new HttpError('文件上传失败：' + (text || res.status), 500)
+  return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${objectPath}`
+}
+
+// base64 → 字节（前端传 base64，避免 multipart/form-data 在 Edge 里解析麻烦）
+function b64ToBytes(b64: string): Uint8Array {
+  const bin = atob(String(b64))
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return bytes
+}
+
+// 充值 / 收款码上传白名单（防任意目录写入）
+const UPLOAD_FOLDERS = ['recharge-proofs', 'alipay-qr']
+
 async function getProfile(uid: string): Promise<any | null> {
   if (!uid) return null
   const r = await pg('GET', `profiles?select=*&id=eq.${enc(uid)}`)
@@ -337,6 +367,133 @@ Deno.serve(async (req) => {
       return json({ ok: true, balance: newBal, points })
     }
 
+    // ── 充值：上传支付截图 / 收款码到 Storage（用户与管理员都用这个动作）──
+    // 前端把图片压成 JPEG 后转 base64 传过来，后端用 service_role 写入 uploads 桶。
+    if (action === 'upload_file') {
+      await requireUser(uid) // 管理员也是 profile，requireUser 同样通过
+      const { folder, fileName, contentType, data } = body
+      if (!UPLOAD_FOLDERS.includes(folder)) return json({ error: '不允许的存储目录' }, 400)
+      if (!fileName || !contentType || !data) return json({ error: '上传参数缺失' }, 400)
+      if (!/^image\//.test(String(contentType))) return json({ error: '仅支持图片文件' }, 400)
+      // 防路径穿越：文件名只允许 字母数字 . _ -
+      if (!/^[\w.\-]+$/.test(String(fileName))) return json({ error: '文件名非法' }, 400)
+      let bytes: Uint8Array
+      try { bytes = b64ToBytes(String(data)) } catch { return json({ error: '文件数据损坏' }, 400) }
+      if (bytes.length > 5 * 1024 * 1024) return json({ error: '文件过大（上限 5MB）' }, 400)
+      const objectPath = `${folder}/${fileName}`
+      try {
+        const url = await storageUpload('uploads', objectPath, String(contentType), bytes)
+        return json({ url })
+      } catch (e: any) {
+        return json({ error: e?.message || '文件上传失败' }, 500)
+      }
+    }
+
+    // ── 充值：用户提交申请（扫码转账后上传截图 + 金额 + 支付宝姓名）──
+    // 与旧「下单→支付→入账」不同：这里只落 pending 订单，**不入账**，必须管理员审核通过后才会加积分。
+    // 金额按用户实际转账填写（自由金额，不再限制档位），但仍被 RECHARGE_MAX_YUAN 兜底防超大值。
+    if (action === 'submit_recharge') {
+      const yuan = Number(body.amount)
+      const alipayName = String(body.alipayName || '').trim()
+      const proofUrl = String(body.proofUrl || '').trim()
+      if (!Number.isFinite(yuan)) return json({ error: '金额无效' }, 400)
+      if (yuan <= 0 || yuan > RECHARGE_MAX_YUAN) return json({ error: `金额需在 0~${RECHARGE_MAX_YUAN} 元之间` }, 400)
+      if (!alipayName) return json({ error: '请填写支付宝姓名' }, 400)
+      if (!proofUrl) return json({ error: '请上传支付截图' }, 400)
+      const me = await requireUser(uid)
+      if (me.status === 'banned') return json({ error: '账号已被冻结，暂不能充值' }, 403)
+      const cfgRes = await pg('GET', 'platform_config?select=points_per_yuan&limit=1')
+      const ppu = Array.isArray(cfgRes.data) && cfgRes.data[0]?.points_per_yuan ? Number(cfgRes.data[0].points_per_yuan) : 100
+      const points = Math.round(yuan * ppu)
+      if (!Number.isFinite(points) || points <= 0) return json({ error: '兑换比例异常，请联系管理员' }, 500)
+      const ins = await pg('POST', 'recharge_orders', {
+        user_id: uid,
+        amount_yuan: yuan,
+        points,
+        status: 'pending',
+        channel: 'alipay',
+        alipay_name: alipayName,
+        proof_url: proofUrl
+      })
+      if (!ins.ok || !Array.isArray(ins.data) || !ins.data.length) return json({ error: '提交失败' }, 500)
+      const order = ins.data[0]
+      await logActivity('user', uid, me.nickname || '', 'recharge_submit', 'wallet', String(order.id), `提交充值申请 ¥${yuan.toFixed(2)}（支付宝 ${alipayName}）`)
+      return json({ orderId: order.id, amountYuan: yuan, points, status: order.status })
+    }
+
+    // ── 充值：列表（mine=本人 / all=管理员全量，含申请人昵称）──
+    if (action === 'list_recharge_orders') {
+      const scope = body.scope === 'all' ? 'all' : 'mine'
+      if (!uid) return json({ error: '缺少 uid' }, 400)
+      if (scope === 'all') await requireAdmin(uid)
+      const path =
+        scope === 'all'
+          ? 'recharge_orders?select=*,profiles(nickname,phone)&order=created_at.desc&limit=500'
+          : `recharge_orders?select=*&user_id=eq.${enc(uid)}&order=created_at.desc&limit=50`
+      const r = await pg('GET', path)
+      if (!r.ok) return json({ error: '读取充值列表失败' }, 500)
+      return json({ orders: r.data || [] })
+    }
+
+    // ── 充值：管理员审核（通过才入账；驳回不入账）──
+    // 通过：条件更新 status: pending → approved 抢单（并发/双击只成功一次），再给用户加积分 + 写流水。
+    // 驳回：置 rejected + 驳回原因，不碰余额。
+    if (action === 'review_recharge') {
+      const { orderId, decision, reason } = body
+      await requireAdmin(uid)
+      if (!orderId) return json({ error: '缺少订单号' }, 400)
+      if (decision !== 'approve' && decision !== 'reject') return json({ error: '无效的审核动作' }, 400)
+      const q = await pg('GET', `recharge_orders?select=*&id=eq.${enc(orderId)}`)
+      const order = Array.isArray(q.data) ? q.data[0] : null
+      if (!order) return json({ error: '充值订单不存在' }, 404)
+      if (order.status !== 'pending') return json({ error: `该订单已处理（${order.status}）` }, 409)
+      const claim = await pg('PATCH', `recharge_orders?id=eq.${enc(orderId)}&status=eq.pending`, {
+        status: decision === 'approve' ? 'approved' : 'rejected',
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: uid,
+        reject_reason: decision === 'reject' ? String(reason || '') : order.reject_reason
+      })
+      if (!claim.ok) return json({ error: '更新失败' }, 500)
+      if (!Array.isArray(claim.data) || !claim.data.length) return json({ error: '该订单已被处理，请刷新后查看' }, 409)
+      if (decision === 'reject') {
+        await logActivity('admin', uid, '', 'reject_recharge', 'user', order.user_id, `驳回充值 ¥${Number(order.amount_yuan).toFixed(2)}：${String(reason || '')}`)
+        return json({ ok: true, decision: 'reject' })
+      }
+      // 通过：入账
+      const points = Number(order.points) || 0
+      if (points <= 0) return json({ error: '订单积分异常' }, 400)
+      const target = await getProfile(order.user_id)
+      if (!target) return json({ error: '申请用户不存在' }, 404)
+      const newBal = Number(target.balance) + points
+      const u = await pg('PATCH', `profiles?id=eq.${enc(order.user_id)}`, { balance: newBal })
+      if (!u.ok) {
+        // 入账失败：把订单退回 pending，避免「订单已审核但积分没到」的钱货两空
+        await pg('PATCH', `recharge_orders?id=eq.${enc(orderId)}`, { status: 'pending', reviewed_at: null, reviewed_by: '', reject_reason: '' })
+        return json({ error: '入账失败，请重试' }, 500)
+      }
+      await pg('POST', 'txns', {
+        user_id: order.user_id,
+        type: 'recharge',
+        amount: points,
+        balance_after: newBal,
+        remark: `充值 ¥${Number(order.amount_yuan).toFixed(2)}，得 ${points} 积分（审核通过，订单 ${String(orderId).slice(0, 8)}）`
+      })
+      await logActivity('admin', uid, '', 'approve_recharge', 'user', order.user_id, `通过充值 ¥${Number(order.amount_yuan).toFixed(2)}，得 ${points} 积分`)
+      return json({ ok: true, decision: 'approve', balance: newBal, points })
+    }
+
+    // ── 平台配置：支付宝收款码 / 收款账号（管理员）──
+    if (action === 'set_alipay_qr') {
+      await requireAdmin(uid)
+      const { alipay_qr_url, alipay_account } = body
+      const u = await pg('PATCH', 'platform_config?id=eq.1', {
+        alipay_qr_url: String(alipay_qr_url || ''),
+        alipay_account: String(alipay_account || '')
+      })
+      if (!u.ok) return json({ error: '更新失败' }, 500)
+      return json({ ok: true })
+    }
+
     // ── 发布任务（冻结余额 + 建任务 + 记流水）──
     if (action === 'publish_task') {
       const { task } = body
@@ -450,7 +607,9 @@ Deno.serve(async (req) => {
         top_price_d3: config.top_price.d3,
         top_price_d7: config.top_price.d7,
         announce: config.announce,
-        points_per_yuan: config.points_per_yuan
+        points_per_yuan: config.points_per_yuan,
+        alipay_qr_url: config.alipay_qr_url ?? '',
+        alipay_account: config.alipay_account ?? ''
       })
       if (!u.ok) return json({ error: '更新失败' }, 500)
       return json({ ok: true })

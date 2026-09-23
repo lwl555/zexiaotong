@@ -55,6 +55,7 @@ interface State {
   messages: Message[]
   txns: WalletTxn[]
   withdrawals: Withdrawal[]
+  rechargeOrders: RechargeOrder[]
   arbitrations: Arbitration[]
   reports: Report[]
   notifications: Notification[]
@@ -101,9 +102,9 @@ interface State {
   fetchReports: () => Promise<void>
   handleReport: (id: string, status: ReportStatus) => Promise<void>
 
-  // 钱包（充值走「下单 → 收银台支付 → 入账」三步，订单 id 即幂等键）
-  createRechargeOrder: (amountYuan: number) => Promise<RechargeOrder>
-  confirmRecharge: (orderId: string) => Promise<{ ok: boolean; msg: string; points: number; duplicate: boolean }>
+  // 钱包（充值走「用户提交申请 → 后台审核 → 通过才入账」人工审核模式）
+  submitRecharge: (input: { amountYuan: number; alipayName: string; proofUrl: string }) => Promise<{ ok: boolean; msg: string; order?: RechargeOrder }>
+  fetchMyRechargeOrders: () => Promise<void>
   withdraw: (input: {
     amount: number
     channel: string
@@ -172,6 +173,7 @@ export const useStore = create<State>((set, get) => ({
   messages: [],
   txns: [],
   withdrawals: [],
+  rechargeOrders: [],
   arbitrations: [],
   reports: [],
   notifications: [],
@@ -437,25 +439,25 @@ export const useStore = create<State>((set, get) => ({
   },
 
   // ─── 钱包 ───
-  createRechargeOrder: async (amountYuan) => {
-    const me = get().me!
-    return await db.createRechargeOrder(me.id, amountYuan)
-  },
-
-  confirmRecharge: async (orderId) => {
+  submitRecharge: async ({ amountYuan, alipayName, proofUrl }) => {
     const me = get().me!
     try {
-      const r = await db.confirmRecharge(me.id, orderId)
-      const txns = await db.fetchTxns(me.id)
-      set(s => ({ me: { ...(s.me as Profile), balance: r.balance }, txns }))
-      return {
-        ok: true,
-        msg: r.duplicate ? '该订单已支付过，积分不会重复到账' : `支付成功，到账 ${r.points} 积分`,
-        points: r.points,
-        duplicate: r.duplicate
-      }
+      const order = await db.submitRecharge(me.id, amountYuan, alipayName, proofUrl)
+      set(s => ({ rechargeOrders: [order, ...s.rechargeOrders] }))
+      return { ok: true, msg: '充值申请已提交，等待管理员审核，审核通过后积分才会到账', order }
     } catch (e: any) {
-      return { ok: false, msg: e?.message || '支付失败，请重试', points: 0, duplicate: false }
+      return { ok: false, msg: e?.message || '提交失败，请重试' }
+    }
+  },
+
+  fetchMyRechargeOrders: async () => {
+    const me = get().me
+    if (!me) return
+    try {
+      const orders = await db.fetchMyRechargeOrders(me.id)
+      set({ rechargeOrders: orders })
+    } catch {
+      // 读取失败不阻塞钱包页
     }
   },
 
