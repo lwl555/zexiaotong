@@ -103,6 +103,58 @@ function phaseOf(ms: number): string {
   return '生成较慢（外部推理模型，深度检索+思考需 30–40 秒，属正常现象），请稍候…'
 }
 
+// 从 AI 回复中拆分出「官网与地址」「继续追问」两个特殊板块，其余作为正文交给 renderReport。
+function splitSpecialSections(text: string): { main: string; official: string; followups: string } {
+  const lines = (text || '').split('\n')
+  const main: string[] = []
+  const official: string[] = []
+  const followups: string[] = []
+  let cur: 'main' | 'official' | 'followups' = 'main'
+  for (const raw of lines) {
+    const t = raw.trim()
+    const head = t.match(/^===?\s*(官网与地址|继续追问)(?:（[^）]*）)?\s*===?$/)
+    if (head) {
+      cur = head[1] === '官网与地址' ? 'official' : 'followups'
+      continue
+    }
+    // 命中其它 ===板块=== 时回到正文，确保只捕获本板块内容
+    if (/^===?\s*.+?\s*===?$/.test(t)) cur = 'main'
+    if (cur === 'main') main.push(raw)
+    else if (cur === 'official') official.push(raw)
+    else followups.push(raw)
+  }
+  return { main: main.join('\n'), official: official.join('\n'), followups: followups.join('\n') }
+}
+
+// 解析「官网与地址」板块：提取官网 URL 与真实详细地址。
+function parseOfficial(section: string): { url: string; address: string } {
+  const urlMatch = section.match(/https?:\/\/[^\s）)】]+/)
+  const url = urlMatch ? urlMatch[0] : ''
+  const lines = section.split('\n').map((l) => l.replace(/\r$/, '').trim())
+  let address = ''
+  let capturing = false
+  for (const l of lines) {
+    const am = l.match(/(?:详细地址|地址)[：:]\s*(.+)/)
+    if (am) { address = am[1].trim(); capturing = true; continue }
+    if (capturing) {
+      if (!l) break
+      if (/[：:]/.test(l) || /^\*\*/.test(l) || /^[（(]/.test(l)) break
+      address += (address ? ' ' : '') + l
+    }
+  }
+  return { url, address: address.trim() }
+}
+
+// 解析「继续追问」板块：每条一行（支持 - / 数字. / 【标签】前缀），返回可点击的问题列表。
+function parseFollowups(section: string): string[] {
+  return (section || '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((l) => l.replace(/^[-*]\s+/, '').replace(/^\d+[.、]\s*/, '').replace(/^[【\[][^】\]]*[】\]]\s*/, '').trim())
+    .filter(Boolean)
+}
+
 interface Props {
   title: string
   systemPrompt: string
@@ -450,7 +502,9 @@ export default function AIChat({
             </div>
           </div>
         )}
-        {messages.map((m, i) => (
+        {messages.map((m, i) => {
+          const parsed = m.role === 'ai' ? splitSpecialSections(m.content) : null
+          return (
           <div key={i} className={`msg ${m.role}${m.error ? ' msg-error' : ''}`}>
             <div className="bubble">
               <div className="role">{roleLabel(m.role)}</div>
@@ -532,12 +586,51 @@ export default function AIChat({
                       </button>
                     </div>
                   )}
-                  <div className="report">{renderReport(m.content, theme)}</div>
+                  <div className="report">{renderReport(parsed ? parsed.main : m.content, theme)}</div>
+                  {parsed && (() => {
+                    const off = parseOfficial(parsed.official)
+                    if (!off.url && !off.address) return null
+                    return (
+                      <div className="official-card">
+                        <div className="oc-title">📍 官网与地址（点击可打开 · 可复制）</div>
+                        {off.url && (
+                          <div className="oc-row">
+                            <span className="oc-label">官网</span>
+                            <a className="oc-url" href={off.url} target="_blank" rel="noopener noreferrer" title={off.url}>{off.url}</a>
+                            <button className="oc-copy" onClick={() => copyLink(off.url)}>复制</button>
+                          </div>
+                        )}
+                        {off.address && (
+                          <div className="oc-row">
+                            <span className="oc-label">地址</span>
+                            <span className="oc-addr">{off.address}</span>
+                            <button className="oc-copy" onClick={() => copyLink(off.address)}>复制</button>
+                            <a className="oc-map" href={`https://uri.amap.com/search?keyword=${encodeURIComponent(off.address)}`} target="_blank" rel="noopener noreferrer">地图</a>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
+                  {parsed && (() => {
+                    const fups = parseFollowups(parsed.followups)
+                    if (!fups.length) return null
+                    return (
+                      <div className="reply-followups">
+                        <div className="chips-label">继续追问：</div>
+                        <div className="chips">
+                          {fups.map((f, idx) => (
+                            <button key={idx} className="chip" onClick={() => send(f)}>{f}</button>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })()}
                 </>
               )}
             </div>
           </div>
-        ))}
+          )
+        })}
         {loading && (
           <div className="msg ai">
             <div className="bubble">

@@ -779,6 +779,32 @@ textarea { resize: vertical; min-height: 88px; }
 /* 重要信息：加粗 + 标红（模型用 **...** 标记，前端解析） */
 .hot { color: #e11d48; font-weight: 700; }
 
+/* 报告内文裸链接：可点开新标签 + 可复制 */
+.rep-link-wrap { display: inline-flex; align-items: center; gap: 3px; vertical-align: baseline; max-width: 100%; }
+.rep-link { color: var(--theme, #1d4ed8); text-decoration: underline; text-underline-offset: 2px; word-break: break-all; }
+.rep-link:hover { opacity: 0.82; }
+.rep-link-copy { flex: none; border: none; background: transparent; color: var(--faint); cursor: pointer; font-size: 11px; padding: 0 2px; line-height: 1; font-family: inherit; }
+.rep-link-copy:hover { color: var(--theme, #1d4ed8); }
+
+/* 官网与地址醒目卡片（可点开 + 可复制 + 地图） */
+.official-card {
+  margin: 6px 0 16px;
+  border: 1px solid color-mix(in srgb, var(--theme, #1d4ed8) 35%, var(--border));
+  border-left: 4px solid var(--theme, #1d4ed8);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--theme, #1d4ed8) 5%, #fff);
+  padding: 12px 14px;
+}
+.official-card .oc-title { font-size: 13.5px; font-weight: 700; color: var(--theme, #1d4ed8); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+.oc-row { display: flex; align-items: flex-start; gap: 8px; padding: 7px 0; border-top: 1px dashed color-mix(in srgb, var(--theme, #1d4ed8) 18%, transparent); }
+.oc-row:first-of-type { border-top: none; padding-top: 0; }
+.oc-label { flex: none; font-size: 12px; font-weight: 700; color: var(--faint); width: 32px; padding-top: 2px; }
+.oc-url { flex: 1; min-width: 0; color: var(--theme, #1d4ed8); text-decoration: underline; text-underline-offset: 2px; word-break: break-all; }
+.oc-addr { flex: 1; min-width: 0; color: var(--fg, #1c1814); line-height: 1.6; }
+.oc-copy, .oc-map { flex: none; font-family: inherit; font-size: 12px; cursor: pointer; padding: 3px 10px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--theme, #1d4ed8) 32%, transparent); background: #fff; color: var(--theme, #1d4ed8); transition: background 0.15s ease; text-decoration: none; white-space: nowrap; }
+.oc-copy:hover, .oc-map:hover { background: color-mix(in srgb, var(--theme, #1d4ed8) 12%, #fff); }
+.reply-followups { margin-top: 14px; }
+
 /* 快捷问题 / 追问 chips（暖编辑风：陶土主题色胶囊，复用 --theme） */
 .chips-wrap { margin-top: 14px; }
 .chips-label { font-size: 12px; color: var(--faint); margin: 2px 0 8px; }

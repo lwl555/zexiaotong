@@ -34,15 +34,47 @@ function stripTag(line: string): string {
   return line.replace(/^(【)?(优点|优势|长处|利好|加分|值得|缺点|劣势|不足|坑|雷|避雷|亮点|好点|推荐|重点|关键|提醒|注意|警告|务必)(】)?[：:]\s*/, '')
 }
 
+// 匹配裸 URL（含常见尾随标点排除），用于在正文中自动转为可点开链接
+const URL_RE = /(https?:\/\/[^\s）)】】\s]+)/g
+const isHttp = (s: string) => /^https?:\/\//.test(s)
+
 function renderInline(text: string): ReactNode[] {
   if (!text) return []
-  // 解析 **关键短语** → 红色加粗（重要信息自动标红）。其余按原样渲染。
+  // 先按 **关键短语** 切分；星号片段标红，其余片段里再识别裸 URL 做成可点链接。
   const parts = text.split(/(\*\*[^*]+\*\*)/g)
   const out: ReactNode[] = []
-  parts.forEach((p, i) => {
+  let k = 0
+  parts.forEach((p) => {
     const m = p.match(/^\*\*([^*]+)\*\*$/)
-    if (m) out.push(<strong key={i} className="hot">{m[1]}</strong>)
-    else if (p) out.push(<span key={i}>{p}</span>)
+    if (m) {
+      out.push(<strong key={k++} className="hot">{m[1]}</strong>)
+      return
+    }
+    if (!p) return
+    // 把非加粗片段按 URL 再切，URL 渲染成「可点开 + 可复制」的链接
+    const segs = p.split(URL_RE)
+    segs.forEach((seg) => {
+      if (!seg) return
+      if (isHttp(seg)) {
+        const url = seg
+        out.push(
+          <span key={k++} className="rep-link-wrap">
+            <a className="rep-link" href={url} target="_blank" rel="noopener noreferrer" title={url}>{url}</a>
+            <button
+              className="rep-link-copy"
+              title="复制链接"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                try { navigator.clipboard?.writeText(url) } catch {}
+              }}
+            >复制</button>
+          </span>
+        )
+      } else {
+        out.push(<span key={k++}>{seg}</span>)
+      }
+    })
   })
   return out
 }
