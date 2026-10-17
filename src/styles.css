@@ -552,7 +552,14 @@ textarea { resize: vertical; min-height: 88px; }
 .panel-head .meta.warn { color: #b45309; background: #fffbeb; border-color: #fde68a; font-weight: 600; }
 .panel-body { padding: 20px; }
 
-.chat-input { display: flex; gap: 10px; padding: 14px; border-top: 1px solid var(--border); background: var(--bg); }
+.chat-input {
+  display: flex; gap: 10px; padding: 14px; border-top: 1px solid var(--border); background: var(--bg);
+  /* 输入框永远粘在视口底部：对话再多也不会把输入框顶出屏幕，
+     用户不必滚过全部历史消息才能打下一句（修复「对话把输入框拉得很长、不收纳」） */
+  position: sticky; bottom: 0; z-index: 5;
+}
+/* 手机端底部有 48px 的固定 TabBar，输入框抬高避开，否则会被遮住 */
+.wx .chat-input { bottom: 48px; }
 .chat-input input { flex: 1; }
 
 .msg { margin-bottom: 18px; }

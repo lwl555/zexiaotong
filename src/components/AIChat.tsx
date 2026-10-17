@@ -411,6 +411,10 @@ export default function AIChat({
     const next = [...messages, { role: 'user' as const, content: text }]
     setMessages(next)
     setInput('')
+    // 发送是明确意图：sticky 输入框让用户在页面任意位置都能打字，
+    // 但新消息追加在文档流末尾——必须强制滚过去，否则用户看到的画面纹丝不动。
+    // （useEffect 里的自动滚动带 nearBottom 判断，用户在顶部时不会触发，这里补上）
+    setTimeout(() => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), 60)
     await run(next)
   }
 
