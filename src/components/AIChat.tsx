@@ -257,10 +257,28 @@ export default function AIChat({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [convId])
 
+  // 面板高度自适应：面板顶对齐当前位置，底部留余量（手机 TabBar 48+8 / PC 24），
+  // 让 .panel 正好填满视口剩余空间 ⇒ 消息在 panel-body 内部滚动、输入框永远钉在面板底部可见。
+  // （此前消息撑开整页，一轮长回答就把输入框顶出视口，手机上要滚 1000px+ 才能再打字）
+  const panelRef = useRef<HTMLDivElement | null>(null)
+  const bodyRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const el = panelRef.current
+    if (!el) return
+    const fit = () => {
+      const top = el.getBoundingClientRect().top
+      const pad = isMobile ? 56 : 24
+      el.style.height = Math.max(420, window.innerHeight - top - pad) + 'px'
+    }
+    fit()
+    window.addEventListener('resize', fit)
+    return () => window.removeEventListener('resize', fit)
+  }, [isMobile])
+
   // 新内容出现时自动滚到底部（仅当用户本就在底部附近，避免打断回看历史）
   useEffect(() => {
-    const nearBottom =
-      window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 160
+    const b = bodyRef.current
+    const nearBottom = !b || b.scrollTop + b.clientHeight >= b.scrollHeight - 160
     if (nearBottom) endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [messages, loading])
 
@@ -463,7 +481,7 @@ export default function AIChat({
   const roleLabel = (r: 'user' | 'ai') => (r === 'user' ? '你' : 'AI')
 
   return (
-    <div className={`panel theme-${theme}${isMobile ? ' wx' : ''}`}>
+    <div ref={panelRef} className={`panel theme-${theme}${isMobile ? ' wx' : ''}`}>
       {/* 移动端微信风聊天顶栏由外层 MobileLayout 统一提供（保证在最顶部） */}
       <div className="panel-head">
         <span className="who">{title}</span>
@@ -486,7 +504,7 @@ export default function AIChat({
         )}
       </div>
 
-      <div className="panel-body">
+      <div ref={bodyRef} className="panel-body">
         {messages.length === 0 && !loading && (
           <div className="note">
             在下方输入，AI 会<b>先联网检索真实资料</b>，再结合多维度分析给出带颜色标记的结论（优点 / 缺点 / 亮点 / 重点 一目了然），关键事实会标注来源，<b>重要信息自动加粗标红</b>。
