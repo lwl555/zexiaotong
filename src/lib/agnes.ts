@@ -161,6 +161,8 @@ export interface SearchMeta {
   image?: { url: string; title: string } | null
   /** 针对查询实体的真实场景图（维基百科校园/场景图，最多 4 张），用于报告内展示；可能为空 */
   images?: { url: string; title: string }[]
+  /** 检索时间戳（YYYY-MM-DD），由后端在检索发生时写入；前端据此展示「检索于 X」以透明化数据时效 */
+  retrievedAt?: string
 }
 
 /** chat 返回：正文 + 可选的检索元数据 + 可选的纯检索结果（search_only 模式）+ 可选的思考过程 */

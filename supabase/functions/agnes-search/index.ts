@@ -137,6 +137,16 @@ function extractEntityQuery(text: string): string {
   return m ? m[0] : text.trim()
 }
 
+// 时效性增强（任务 #366）：用户常问「四川大学录取分数线」「成都互联网公司」这类不带年份的查询，
+// 若不注入当前年份，检索源（尤其新闻/通用网页）易返回陈年结果，导致回答时效性差。
+// 做法：query 不含 4 位年份（19xx/20xx）时，自动追加当前年份，让检索偏向最新资料；
+// 已带年份（如「2026年分数线」）则原样返回，避免「2025 2026」双年份污染。
+// 维基为百科类，年份无关紧要且后缀年份偶会拉偏词条，故 searchMulti 内部对维基保持干净 query（见下）。
+function injectYear(query: string): string {
+  if (!query || /(?:19|20)\d{2}/.test(query)) return query
+  return `${query} ${new Date().getFullYear()}`
+}
+
 // —— 检索片段相关性过滤 ——
 // 目的：剔除与问题主体无关的噪声片段（如某次出现的「廪学」乱入），避免污染生成模型。
 // 思路：抽取 query 的「去重汉字集合 + 年份 + 关键领域词」，保留的片段需满足其一：
@@ -908,7 +918,10 @@ const SOCIAL_DOMAINS = ['xiaohongshu.com', 'douyin.com', 'bilibili.com', 'zhihu.
 const SOCIAL_SITE_SCOPE = '(site:xiaohongshu.com OR site:douyin.com OR site:bilibili.com OR site:zhihu.com OR site:weibo.com OR site:tieba.baidu.com)'
 
 // 多源并发检索，收集任意成功源的结果
-async function searchMulti(query: string): Promise<SearchResult> {
+// yearQuery：由调用方传入「已注入当前年份」的版本（见 injectYear），用于新闻/通用网页源，提升时效性；
+// 维基为百科类，年份无关且后缀年份偶会拉偏词条，故维基始终用干净 query（下面单独传 query）。
+async function searchMulti(query: string, yearQuery?: string): Promise<SearchResult> {
+  const q = yearQuery && yearQuery !== query ? yearQuery : query
   const tasks: Promise<{ items: string[]; ok: boolean; src: string }>[] = []
 
   // 有密钥则优先用可靠商业源（Tavily 覆盖实时检索；中文经模型整理输出，规避上游偶发乱码）
@@ -918,25 +931,25 @@ async function searchMulti(query: string): Promise<SearchResult> {
   if (SEARCH_KEY) {
     keySrc = SEARCH_PROVIDER === 'brave' ? 'brave' : SEARCH_PROVIDER === 'serper' ? 'serper' : 'tavily'
     const p = keySrc === 'brave' ? searchBrave : keySrc === 'serper' ? searchSerper : searchTavily
-    tasks.push(withTimeout(s2(p(query), keySrc, true), 3500))
+    tasks.push(withTimeout(s2(p(q), keySrc, true), 3500))
   }
 
   // 免密钥通用网页源（常驻兜底，不依赖任何 API key）：Bing 从悉尼出口实测可达、中文干净、~240ms。
   // 即便配了付费 key，Bing 也并行提供第二路通用网页结果，提升「县城/小生意/长尾实体」类查询的覆盖率。
-  tasks.push(withTimeout(s2(searchBing(query), 'bing', true), 3500))
+  tasks.push(withTimeout(s2(searchBing(q), 'bing', true), 3500))
 
   // 中文覆盖面最广的通用源（百度）：中文实体/长尾查询覆盖率高于 Bing，悉尼出口可达。
-  tasks.push(withTimeout(s2(searchBaidu(query), 'baidu', true), 3500))
+  tasks.push(withTimeout(s2(searchBaidu(q), 'baidu', true), 3500))
 
   // DuckDuckGo HTML 版：免 key 通用网页源，反爬宽松，实测悉尼可达
-  tasks.push(withTimeout(s2(searchDuckDuckGo(query), 'ddg', true), 3500))
+  tasks.push(withTimeout(s2(searchDuckDuckGo(q), 'ddg', true), 3500))
 
   // 动态 / 新闻源（最新信息，优先注入模型上下文）。同样 relaxed：新闻/HN 已是 query 定向，
   // 区域相关新闻（如查某县高校命中该县新闻）对回答有价值，不必逐字命中实体名。
-  tasks.push(withTimeout(s2(searchGoogleNews(query), 'gnews', true), 1800))
-  tasks.push(withTimeout(s2(searchHackerNews(query), 'hn', true), 1800))
+  tasks.push(withTimeout(s2(searchGoogleNews(q), 'gnews', true), 1800))
+  tasks.push(withTimeout(s2(searchHackerNews(q), 'hn', true), 1800))
   // 百科兜底源：维基（中/英）。维基片段偶发严重跑题（如查「内江医科学校」返回「中国高校合并」通页），
-  // 故**保留**严格 token 相关性过滤，避免把无关词条污染生成模型。
+  // 故**保留**严格 token 相关性过滤，避免把无关词条污染生成模型。**维基用干净 query（不带年份后缀）**。
   tasks.push(withTimeout(s2(searchWikipedia(query, 'zh'), 'wiki-zh'), 1800))
   tasks.push(withTimeout(s2(searchWikipedia(query, 'en'), 'wiki-en'), 1800))
 
@@ -949,7 +962,7 @@ async function searchMulti(query: string): Promise<SearchResult> {
   const wiki: string[] = []
   const social: string[] = [] // 社媒/UGC 专项池：保证抖音/小红书等内容有独立配额，不被通用结果淹没
   const seen = new Set<string>()
-  const rt = relevanceInfo(query)
+  const rt = relevanceInfo(q)
   // 收集可点击参考链接（去重 + 过滤搜索引擎自身包装/跳转噪音 + 通用源关联性门控），供前端「相关链接」卡片使用
   // 通用搜索引擎（Tavily/Brave/Serper/Bing/DDG）若整源 items 全被相关性过滤（典型：Tavily 共享 key 出乱数据返回 Unicode 字符表这种内容），
   // 其 links 全部丢弃——否则「内江医科学校」会混进 Unicode 表/肺癌论文这种不沾边的卡片噪声；
@@ -1022,6 +1035,7 @@ const linksFinal = sortLinks(links.filter((lk) => isLinkRelevant(lk, rt))).slice
     links: linksFinal,
     ok: strictOk,
     diag: {
+      queryEff: q,
       settled: settled.map((s: any) => ({ src: s.src, ok: !!s.ok, n: (s.items || []).length, timeout: !!s._timeout, relaxed: !!s.relaxed })),
       useful: usefulResults.length,
       raw: merged.length
@@ -1411,6 +1425,9 @@ Deno.serve(async (req: Request) => {
   type ImgSet = { lead: { url: string; title: string } | null; scenes: { url: string; title: string }[] }
   const EMPTY_IMG: ImgSet = { lead: null, scenes: [] }
 
+  // 检索时间戳：回答「数据是否最新」透明度的关键字段。前端据此展示「检索于 YYYY-MM-DD」，
+  // 让用户一眼知道这份资料是哪天的；也作为生成模型校准时效的锚点（见下方 prompt 注入「今天」）。
+  const retrievedAt = new Date().toISOString().slice(0, 10)
   let searchMeta: {
     ok: boolean
     count: number
@@ -1420,29 +1437,33 @@ Deno.serve(async (req: Request) => {
     images: { url: string; title: string }[]
     query?: string
     needSearch?: boolean
+    retrievedAt?: string
     diag?: any
   } = { ok: false, count: 0, sources: [], links: [], image: null, images: [] }
   // 透出诊断：无论是否真正发起检索，都把 query / needSearch 带回，便于排查「检索被跳过」类问题
   searchMeta.query = query
   searchMeta.needSearch = needSearch
+  searchMeta.retrievedAt = retrievedAt
   let rawResults: string[] = []
 
   if (needSearch && query) {
-    let ctx = await searchMulti(query)
+    let ctx = await searchMulti(query, injectYear(query))
     // 第一次检索资料不足时，用完整实体名再查一次（避免"内江医科学校"被拆成"内江医科"导致跑偏）
     if (!ctx.ok) {
       const entityQuery = extractEntityQuery(rawUser)
-      if (entityQuery !== query) ctx = await searchMulti(entityQuery)
+      if (entityQuery !== query) ctx = await searchMulti(entityQuery, injectYear(entityQuery))
     }
-    searchMeta = { ok: ctx.ok, count: ctx.results.length, sources: ctx.sources, links: ctx.links, image: null, images: [], query, needSearch, diag: ctx.diag }
+    searchMeta = { ok: ctx.ok, count: ctx.results.length, sources: ctx.sources, links: ctx.links, image: null, images: [], query, needSearch, retrievedAt, diag: ctx.diag }
     // 清洗无效 Unicode（lone surrogates 等）：TextEncoder round-trip 模拟 UTF-8 传输，
     // 让无法编码的字符现形为 U+FFFD 再删除——否则 Deno 编码响应体时它们会变成 U+FFFD 乱码方块到达客户端
     rawResults = ctx.results.map(r => { try { return new TextDecoder().decode(new TextEncoder().encode(r)).replace(/\uFFFD/g, '') } catch { return r } }).filter(r => r.trim().length > 10)
     // 浏览器级全文抓取：对排名靠前的参考链接打开页面抓全文，像浏览器一样拿到详细正文。
-    // 检索成功且有链接时触发，与图片抓取并行、硬截止 6s，不拖慢主路径。
+    // 检索成功且有链接时触发，与图片抓取并行、硬截止 7s，不拖慢主路径。
+    // 任务 #371：单链接 3→5、上限 3500→4000ms、总截止 6000→7000ms，抓取更多页面正文，
+    // 让分数线/政策/薪资等易截断的具体数据在 <search> 里更完整，回答更详实。
     let deepPromise: Promise<string[]> = Promise.resolve([])
     if (ctx.ok && ctx.links.length > 0 && !searchOnly) {
-      deepPromise = deepFetchLinks(ctx.links, 3, 3500, 6000)
+      deepPromise = deepFetchLinks(ctx.links, 5, 4000, 7000)
     }
     // 资料不足分支：检索跑过但没拿到有效资料（连 2 条 ≥50 字的实质片段都凑不齐）。
     // 原代码不分这种情况，都走"资料齐全"分支并允许 AI 用知识补 → 大量幻觉（用户截图：
@@ -1481,8 +1502,9 @@ Deno.serve(async (req: Request) => {
         role: 'system',
         content:
           '你具备查阅最新公开资料的能力。\n' +
+          `（注：今天是 ${retrievedAt}。回答涉及最新动态、分数线、招生政策、录取、薪资、排名等易变信息时，必须明确标注资料对应的时间口径，切勿含糊说"近年来"。）\n` +
           `【用户原话】${rawUser}\n` +
-          '以下是针对用户原话检索到的资料（来自网络，可能不保证 100% 最新，请批判性采用，优先采信可交叉验证的事实）：\n' +
+          `以下是针对用户原话检索到的资料（来自网络公开检索，检索于 ${retrievedAt}；资料片段自带抓取日期，请批判性采用，优先采信可交叉验证且标注了时间的事实；对无明确时间的信息，提醒用户以官方最新公布为准）：\n` +
           '（注：前缀「网页全文」的片段是打开对应网页抓取的完整正文，内容远比普通检索摘要详细，请优先基于它们作答。）\n' +
           '<search>\n' +
           mergedForSearch.join('\n') +
@@ -1496,9 +1518,9 @@ Deno.serve(async (req: Request) => {
           '③ **仅当 <search> 里确有可用资料时**才允许"综合作答"：基于上方 <search> 资料与你自身的知识一起作答；资料齐全处直接给结论与数据，资料偏旧处用知识补充并标注「（以下为 AI 基于公开知识补充，非本次检索原文）」；' +
           '若 <search> 几乎为空 / 片段极短 / 全部不沾边（本情况会单独推一条「资料不足」指令，不再走本条），**严禁**用自身知识编造具体事实（学校类型、办学层次、专业设置、分数线、就业率、内部数据 等），那些不在检索资料里、用户查不到、编出来就是幻觉——这是上一版模型集中翻车的根因；' +
           '只有连你也无法确认的具体数字 / 内部信息才单独标注「暂无法确认」，且要小范围、克制；' +
-          '④ 涉及排名/分数/政策等易变数据，提醒用户以官方最新公布为准；' +
+          '④ 涉及排名/分数/政策/录取/薪资等易变数据，必须标注其时间口径（如「2025 年」「2024-2025 学年」；若资料未注明年份则写「具体年份以官方最新公布为准」），并提醒用户以官方最新公布为准，切勿含糊说"近年来/目前"；' +
           '⑤ 引用用户原话时务必使用上面【用户原话】字段里的完整字句，不要把检索片段里的 query 拼接词当成用户原话；' +
-          '⑥ 回答末尾必须包含「相关链接与地点」板块，列出上述参考链接中的官网/百科/新闻/社媒主页，并补充该实体的具体地址、交通、地图可定位信息（查不到写「暂无法确认具体地址」）。' +
+          '⑥ 回答末尾必须包含「相关链接与地点」板块：逐条列出上述参考链接，每条标注来源类型（官网/百科/新闻/社媒）与链接标题中可见的发布时间或年份（如「新闻·2026-06-12」「维基百科」），并补充该实体的具体地址、交通、地图可定位信息（查不到写「暂无法确认具体地址」）；严禁编造未列出的链接。' +
           '⑦ 你**不需要、也不允许**调用任何搜索或函数工具（如 web_search）；资料已附在 <search> 中，请直接基于它们作答，严禁输出 <tool_call>、<function> 等内部协议标签。\n' +
           '⑧ **你必须深度思考，给出自己的分析和判断，而非单纯复述检索资料**：\n' +
           '  a) 回答前先梳理检索资料的关键信息，辨别哪些是最相关、最可靠的；\n' +

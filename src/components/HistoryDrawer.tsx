@@ -138,7 +138,7 @@ export default function HistoryDrawer({ open, onClose }: Props) {
             </div>
             <div className="qd-meta">
               {detail.pageLabel} · {fmt(detail.createdAt)}
-              {detail.search?.ok ? ` · 已联网检索 ${detail.search.count} 条（${detail.search.sources.join(' · ')}）` : ' · 模型知识作答'}
+              {detail.search?.ok ? ` · 检索于 ${detail.search.retrievedAt || '未知日期'} · 已联网检索 ${detail.search.count} 条（${detail.search.sources.join(' · ')}）` : ' · 模型知识作答'}
             </div>
             <div className="qd-block">
               <div className="qd-label">问</div>

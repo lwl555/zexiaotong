@@ -415,7 +415,7 @@ export default function AIChat({
           新建对话
         </button>
         {(webSearch || autoSearch) && searchMeta?.ok && (
-          <span className="meta ok">已参考 {searchMeta.count} 条公开资料（{searchMeta.sources.map(srcLabel).join(' · ')}）</span>
+          <span className="meta ok">{searchMeta.retrievedAt ? `检索于 ${searchMeta.retrievedAt} · ` : ''}已参考 {searchMeta.count} 条公开资料（{searchMeta.sources.map(srcLabel).join(' · ')}）</span>
         )}
         {(webSearch || autoSearch) && searchMeta && !searchMeta.ok && (
           <span className="meta warn">公开资料暂时无法获取，已按已有知识作答</span>
