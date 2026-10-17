@@ -519,6 +519,13 @@ export default function AITangdou() {
 
     const controller = new AbortController()
     abortRef.current = controller
+    // 兜底硬超时：后端流式已有 95s 预算，这里再留 15s 余量（110s）。
+    // 极端情况（网络断流 / 后端被网关强杀且未关流）下，前端不再永远转圈。
+    let timedOut = false
+    const hardTimeout = setTimeout(() => {
+      timedOut = true
+      try { controller.abort() } catch {}
+    }, 110000)
 
     try {
       // 模式系统提示增量：选中模式后持续注入，让整段对话都带模式行为
@@ -579,7 +586,15 @@ export default function AITangdou() {
       })
       if (!settled) throw new Error('未收到完成信号')
     } catch (e: any) {
-      if (e?.name !== 'AbortError') {
+      if (timedOut) {
+        // 兜底超时：明确告诉用户，别让转圈无声停止、用户完全不知道发生了什么
+        const aiMsg: Msg = {
+          role: 'ai',
+          content: `⏱️ 这次查询超过 110 秒仍未完成，已自动停止。\n\n💡 可以尝试：\n- 点击下方「重新生成」按钮\n- 换个更具体的问法（如「深圳大学 食堂 宿舍 师资 地址」）\n- 把联网切到「手动」强制先检索再回答`,
+          error: true
+        }
+        setMessages(prev => [...prev, aiMsg])
+      } else if (e?.name !== 'AbortError') {
         // 错误信息以 AI 气泡样式显示在聊天框中，与正常 AI 回复风格一致
         const aiMsg: Msg = {
           role: 'ai',
@@ -589,6 +604,7 @@ export default function AITangdou() {
         setMessages(prev => [...prev, aiMsg])
       }
     } finally {
+      clearTimeout(hardTimeout)
       if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
       setLoading(false)
       setLiveReasoning('')

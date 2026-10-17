@@ -1562,6 +1562,18 @@ Deno.serve(async (req: Request) => {
         const send = (obj: any) => {
           try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`)) } catch {}
         }
+        // —— 流式超时保护：修复「查询永远转圈」的主因 ——
+        // 原先这里是裸 fetch（无 signal）+ 裸 reader.read()（无超时）：上游 Agnes 一旦不返回、
+        // 或流中途卡住，本函数永不结束 → 前端 loading 永远不落地，用户看到的就是「查询功能不行」。
+        // 补两层闸：① 首字节硬超时 45s（上游必须开始吐数据）② 整段流总预算 95s + 单次 read 最多等 12s。
+        // 95s 在 Edge Function 免费档墙钟（约 150s）内留足余量给检索与配图。
+        let fullReasoning = ''
+        let fullContent = ''
+        const STREAM_FIRST_BYTE_MS = 45000
+        const STREAM_BUDGET_MS = 95000
+        const streamCtrl = new AbortController()
+        let firstByteTimer: any = setTimeout(() => { try { streamCtrl.abort() } catch {} }, STREAM_FIRST_BYTE_MS)
+        const streamDeadline = Date.now() + STREAM_BUDGET_MS
         try {
           const r = await fetch(`${V9_BASE}/v1/chat/completions`, {
             method: 'POST',
@@ -1572,16 +1584,23 @@ Deno.serve(async (req: Request) => {
               max_tokens: maxTokens,
               stream: true,
               temperature: body.temperature ?? 0.7
-            })
+            }),
+            signal: streamCtrl.signal
           })
+          clearTimeout(firstByteTimer)
           if (!r.ok || !r.body) throw new Error('v9 stream ' + r.status)
           const reader = r.body.getReader()
           const decoder = new TextDecoder()
           let buf = ''
-          let fullReasoning = ''
-          let fullContent = ''
           while (true) {
-            const { done, value } = await reader.read()
+            // 预算耗尽 → 抛错进降级分支（把已生成内容交付，绝不干挂）
+            const remain = streamDeadline - Date.now()
+            if (remain <= 0) throw new Error('stream budget exceeded')
+            const rd: any = await Promise.race([
+              reader.read(),
+              new Promise((_, rej) => setTimeout(() => rej(new Error('stream read timeout')), Math.min(remain, 12000)))
+            ])
+            const { done, value } = rd
             if (done) break
             buf += decoder.decode(value, { stream: true })
             let idx: number
@@ -1621,13 +1640,20 @@ Deno.serve(async (req: Request) => {
             degraded: false
           })
         } catch (e) {
+          // 超时/中断：把已流出的部分内容照样交付（标记 degraded）。
+          // 用户等了几十秒，至少拿到半截答案，好过一句「请重新生成」全白等。
+          const partial = (fullContent || '').trim()
           send({
             type: 'done',
-            content: '⏱️ 生成中断，请点「重新生成」再试一次。',
-            reasoning: '',
+            content: partial
+              ? partial + '\n\n（本次生成超时中断，内容可能不完整，可点「重新生成」补全）'
+              : '⏱️ 生成超时，请点「重新生成」再试一次。',
+            reasoning: fullReasoning || '',
             search: { ...searchMeta },
             degraded: true
           })
+        } finally {
+          clearTimeout(firstByteTimer)
         }
         try { controller.close() } catch {}
       }
