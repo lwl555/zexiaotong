@@ -1,7 +1,7 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, ListChecks, ShoppingBag, MessageSquare, Gavel,
-  Wallet, Settings2, Shield, ArrowLeft, Lock, Bell, ScrollText, Flag
+  Wallet, Settings2, Shield, ArrowLeft, Lock, Bell, ScrollText, Flag, Megaphone
 } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { useMe } from '../../store/useMe'
@@ -19,6 +19,7 @@ const menu = [
   { to: '/admin/feature-chats', label: '功能反馈', icon: Bell },
   { to: '/admin/config', label: '运营配置', icon: Settings2 },
   { to: '/admin/logs', label: '运行日志', icon: ScrollText },
+  { to: '/admin/announcements', label: '公告管理', icon: Megaphone },
   { to: '/admin/system', label: '系统安全', icon: Shield }
 ]
 

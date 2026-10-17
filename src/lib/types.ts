@@ -131,6 +131,19 @@ export interface Bulletin {
   created_at: string
 }
 
+// 全站横幅公告（后台 manage_announcement 管理，前台只读 active 行）
+export interface Announcement {
+  id: string
+  title: string
+  content: string
+  active: boolean
+  once_only: boolean // true：用户关闭后不再弹出（后台「每次不提醒」开关）
+  priority: number // 越大越靠前
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type ActorType = 'user' | 'admin' | 'bot' | 'system'
 export interface ActivityLog {
   id: string

@@ -591,6 +591,25 @@ export async function adminSendAnnounce(title: string, content: string, operator
   await dbWrite('send_announce', { title, content, uid: operatorId })
 }
 
+// ─── 全站横幅公告 ───
+// 前台匿名读取 active 公告（受 RLS 约束，仅能看到已上线的）
+export async function fetchAnnouncements(): Promise<Announcement[]> {
+  if (!supabase) return []
+  const { data, error } = await supabase
+    .from('announcements')
+    .select('*')
+    .eq('active', true)
+    .order('priority', { ascending: false })
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return (data || []) as Announcement[]
+}
+
+// 后台公告管理：list / create / update / delete（后端校验管理员）
+export async function manageAnnouncement(op: 'list' | 'create' | 'update' | 'delete', payload: Record<string, any> = {}): Promise<any> {
+  return dbWrite('manage_announcement', { op, ...payload })
+}
+
 // 后台运行日志（需管理员身份，后端校验）
 export async function fetchActivityLogs(opts?: { actor_type?: string; action?: string; limit?: number; operatorId?: string }): Promise<ActivityLog[]> {
   const data = await dbWrite('admin_logs', {

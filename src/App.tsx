@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import Layout from './components/Layout'
 import MobileLayout from './components/layout/MobileLayout'
 import AdminLayout from './components/layout/AdminLayout'
+import AnnouncementBanner from './components/AnnouncementBanner'
 import { useIsMobile } from './lib/useIsMobile'
 import { ROUTE_TITLES } from './lib/nav'
 import { safeLazy, reloadForNewVersion } from './lib/safeLazy'
@@ -69,6 +70,7 @@ const System        = safeLazy(() => import('./pages/admin/System'))
 const FeatureChats  = safeLazy(() => import('./pages/admin/FeatureChats'))
 const Logs          = safeLazy(() => import('./pages/admin/Logs'))
 const Reports       = safeLazy(() => import('./pages/admin/Reports'))
+const Announcements  = safeLazy(() => import('./pages/admin/Announcements'))
 
 // 路由切换时的加载占位：骨架屏（首帧立即出现页面结构，不再是孤立转圈）
 // 见 src/components/RouteSkeleton.tsx —— 重页面首屏 5–8 秒也不会「看起来像白屏」
@@ -121,7 +123,12 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { err: any }> {
 // 同一套 URL、同一套功能，只是外壳不同——这就是「一个平台」。
 function ResponsiveShell() {
   const isMobile = useIsMobile()
-  return isMobile ? <MobileLayout /> : <Layout />
+  return (
+    <>
+      <AnnouncementBanner />
+      {isMobile ? <MobileLayout /> : <Layout />}
+    </>
+  )
 }
 
 // 手机端首页用微信聊天列表界面，PC 端首页保持原样
@@ -189,6 +196,7 @@ export default function App() {
             <Route path="logs" element={<Logs />} />
             <Route path="reports" element={<Reports />} />
             <Route path="system" element={<System />} />
+            <Route path="announcements" element={<Announcements />} />
           </Route>
 
           {/* 统一前台：同一套 URL，设备自适应切换手机壳 / 桌面壳 */}

@@ -1084,6 +1084,63 @@ Deno.serve(async (req) => {
       return json({ ok: true, sent })
     }
 
+    // ── 全站横幅公告管理（后台）：list / create / update / delete，需管理员 ──
+    if (action === 'manage_announcement') {
+      const { op } = body
+      await requireAdmin(uid)
+      if (!op) return json({ error: '缺少操作类型' }, 400)
+
+      if (op === 'list') {
+        const r = await pg('GET', 'announcements?select=*&order=priority.desc,created_at.desc')
+        if (!r.ok) return json({ error: '读取公告失败' }, 500)
+        return json({ announcements: r.data || [] })
+      }
+
+      if (op === 'create') {
+        const { title, content, active, once_only, priority } = body
+        if ((title == null || String(title).trim() === '') && (content == null || String(content).trim() === '')) {
+          return json({ error: '标题与内容不能同时为空' }, 400)
+        }
+        const ins = await pg('POST', 'announcements', {
+          title: String(title || ''),
+          content: String(content || ''),
+          active: active === undefined ? true : !!active,
+          once_only: !!once_only,
+          priority: Number.isFinite(Number(priority)) ? Number(priority) : 0,
+          created_by: uid
+        })
+        if (!ins.ok || !Array.isArray(ins.data) || !ins.data.length) return json({ error: '创建失败：' + JSON.stringify(ins.data) }, 500)
+        await logActivity('admin', uid, '', 'manage_announcement', 'announcement', ins.data[0].id, `创建公告：${title}`)
+        return json({ announcement: ins.data[0] })
+      }
+
+      if (op === 'update') {
+        const { id, title, content, active, once_only, priority } = body
+        if (!id) return json({ error: '缺少公告 id' }, 400)
+        const patch: Record<string, any> = { updated_at: new Date().toISOString() }
+        if (title !== undefined) patch.title = String(title)
+        if (content !== undefined) patch.content = String(content)
+        if (active !== undefined) patch.active = !!active
+        if (once_only !== undefined) patch.once_only = !!once_only
+        if (priority !== undefined) patch.priority = Number.isFinite(Number(priority)) ? Number(priority) : 0
+        const u = await pg('PATCH', `announcements?id=eq.${enc(id)}`, patch)
+        if (!u.ok) return json({ error: '更新失败：' + JSON.stringify(u.data) }, 500)
+        await logActivity('admin', uid, '', 'manage_announcement', 'announcement', id, `更新公告`)
+        return json({ announcement: u.data?.[0] })
+      }
+
+      if (op === 'delete') {
+        const { id } = body
+        if (!id) return json({ error: '缺少公告 id' }, 400)
+        const d = await pg('DELETE', `announcements?id=eq.${enc(id)}`)
+        if (!d.ok) return json({ error: '删除失败：' + JSON.stringify(d.data) }, 500)
+        await logActivity('admin', uid, '', 'manage_announcement', 'announcement', id, `删除公告`)
+        return json({ ok: true })
+      }
+
+      return json({ error: '未知操作：' + op }, 400)
+    }
+
     // ── 后台查看运行日志 ──
     if (action === 'admin_logs') {
       await requireAdmin(uid)
