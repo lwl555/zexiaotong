@@ -607,6 +607,13 @@ function AIChatView({ chat, nav, me }: { chat: ChatDef; nav: ReturnType<typeof u
     abortRef.current?.abort()
     const ac = new AbortController()
     abortRef.current = ac
+    // 兜底硬超时：后端流式已有 95s 预算，这里再留 15s 余量（110s）。
+    // 极端情况（网络断流 / 后端被网关强杀且未关流）下，前端不再永远转圈。
+    let timedOut = false
+    const hardTimeout = setTimeout(() => {
+      timedOut = true
+      try { ac.abort() } catch {}
+    }, 110000)
 
     // 拼系统提示词(基础 + 模式 + 联网指令)
     const sysParts: string[] = []
@@ -651,20 +658,35 @@ function AIChatView({ chat, nav, me }: { chat: ChatDef; nav: ReturnType<typeof u
       })
       // 流未触发 onDone(早期失败): 仍正常结束 loading
       setLoading(prev => { if (prev) stopTimer(); return false })
+      clearTimeout(hardTimeout)
     } catch (e: any) {
       if (e?.name === 'AbortError') {
-        setMessages(prev => {
-          const copy = [...prev]
-          const last = copy[copy.length - 1]
-          if (last && last.side === 'them' && !last.text) {
-            copy.pop()
-          }
-          return copy
-        })
+        clearTimeout(hardTimeout)
+        if (timedOut) {
+          // 兜底超时：明确提示，别让转圈无声停止、用户完全不知道发生了什么
+          setMessages(prev => {
+            const copy = [...prev]
+            const last = copy[copy.length - 1]
+            if (last && last.side === 'them') {
+              copy[copy.length - 1] = { side: 'them', text: '⏱️ 这次查询超过 110 秒还没完成，已自动停止。\n可以点「重新生成」，或换个更具体的问法试试 🙏', error: true }
+            }
+            return copy
+          })
+        } else {
+          setMessages(prev => {
+            const copy = [...prev]
+            const last = copy[copy.length - 1]
+            if (last && last.side === 'them' && !last.text) {
+              copy.pop()
+            }
+            return copy
+          })
+        }
         setLoading(false)
         stopTimer()
         return
       }
+      clearTimeout(hardTimeout)
       const msg = String(e?.message || e)
       setError(msg)
       setMessages(prev => {
