@@ -224,35 +224,16 @@ export interface VideoPollResult {
   error?: string
 }
 
-// ===== 备用 AI 通道（Agnes 限流时自动兜底）=====
-// 背景：Agnes 免费档速率配额极小（实测 30s 窗口仅放 1~2 次生成），主通道撞限流时用户只能干等或看降级提示。
-// 备用通道 = 任意 OpenAI 兼容平台（推荐免费额度宽松的国产模型，如智谱 GLM-4-Flash，注册免费、不绑卡）。
-// 配置来源（二选一；两者都未配置时整条备用链完全跳过，行为与之前完全一致）：
-//   ① 运行时（免重新部署）：localStorage['zex:ai_backup'] = {"base":"https://open.bigmodel.cn/api/paas/v4","key":"xxx","model":"glm-4-flash"}
-//   ② 构建注入：VITE_AI_BACKUP_BASE / VITE_AI_BACKUP_KEY / VITE_AI_BACKUP_MODEL
+// ===== 备用 AI 通道（已按用户要求禁用）=====
+// 用户明确要求：Agnes 为唯一生成模型，禁用一切备用模型（智谱 GLM 等）。
+// 因此 resolveBackup 恒返回 null、hasBackupChannel 恒返回 false，前端不再尝试任何第三方模型兜底。
+// 主通道（Agnes via agnes-search）失败时，由各调用处自己的降级逻辑（展示已检索资料 + 重新生成）接住，
+// 不再用备用模型代为作答，避免答案风格/来源不一致与不可控幻觉。
 interface BackupCfg { base: string; key: string; model: string }
 function resolveBackup(): BackupCfg | null {
-  const norm = (b: string) => b.trim().replace(/\/+$/, '')
-  try {
-    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('zex:ai_backup') : null
-    if (raw) {
-      const o = JSON.parse(raw)
-      if (o?.base && o?.key) {
-        return { base: norm(String(o.base)), key: String(o.key), model: String(o.model || 'glm-4-flash') }
-      }
-    }
-  } catch {}
-  const env = (import.meta as any).env || {}
-  if (env.VITE_AI_BACKUP_BASE && env.VITE_AI_BACKUP_KEY) {
-    return {
-      base: norm(String(env.VITE_AI_BACKUP_BASE)),
-      key: String(env.VITE_AI_BACKUP_KEY),
-      model: String(env.VITE_AI_BACKUP_MODEL || 'glm-4-flash')
-    }
-  }
   return null
 }
-export function hasBackupChannel(): boolean { return !!resolveBackup() }
+export function hasBackupChannel(): boolean { return false }
 
 /** 备用通道纯生成（OpenAI 兼容，非流式） */
 async function backupChat(messages: ChatMsg[], maxTokens: number): Promise<string> {

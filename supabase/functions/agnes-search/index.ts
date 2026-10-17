@@ -1208,33 +1208,10 @@ async function callV9(payload: any, timeoutMs = 30000): Promise<{ data: any; sta
   }
 }
 
-// —— 备用生成模型：智谱 GLM-4-Flash（免费、稳定，实测 3–19s 出答案）——
-// 背景：agnes-2.0-flash 是推理模型，免费档冷启动偶发 60s+ 卡死，导致「检索到了资料却给不出回答」
-// （前端表现为「AI 生成超时」）。智谱 GLM 走 open.bigmodel.cn，稳定且快，作为主生成模型最可靠。
-// 密钥复用已有的 BACKUP_KEY / IMAGE_API_KEY（智谱平台，文本与图像通用同一 key）。
-const ZHIPU_KEY = Deno.env.get('BACKUP_KEY') || Deno.env.get('IMAGE_API_KEY') || ''
-const ZHIPU_BASE = (Deno.env.get('ZHIPU_BASE') || 'https://open.bigmodel.cn/api/paas/v4').replace(/\/+$/, '')
-const ZHIPU_MODEL = Deno.env.get('ZHIPU_MODEL') || 'glm-4-flash'
-
-async function callZhipu(payload: any, timeoutMs = 45000): Promise<{ data: any; status: number }> {
-  if (!ZHIPU_KEY) return { data: {}, status: 0 }
-  const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs)
-  try {
-    const r = await fetch(`${ZHIPU_BASE}/chat/completions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ZHIPU_KEY}` },
-      body: JSON.stringify(payload),
-      signal: ctrl.signal
-    })
-    const data = await r.json().catch(() => ({}))
-    return { data, status: r.status }
-  } catch {
-    return { data: {}, status: 0 }
-  } finally {
-    clearTimeout(timer)
-  }
-}
+// —— 生成模型：仅 Agnes（agnes-3.0-flash），不配置任何备用模型 ——
+// 用户明确要求：Agnes 为主模型，禁用备用模型（智谱 GLM 等）。因此本函数只走 Agnes 单通道，
+// 不再有「回落智谱」分支。若 Agnes 因网络/限流失败，直接走下方降级分支（返回已检索资料 + 重新生成提示），
+// 不再用第三方模型代为作答，避免答案风格/来源不一致与不可控的幻觉。
 
 // —— 检索决策器：让模型判断「这个问题是否需要检索最新公开资料才能准确回答」——
 // 纯历史 / 概念 / 常识 / 数学 / 创作 / 闲聊类无需检索；涉及具体院校 / 公司 / 城市当前信息、
@@ -1657,8 +1634,8 @@ Deno.serve(async (req: Request) => {
   // 40s 是经验值：暖路径实测 1–12s（curl 杭电 19.78s 拿到 1183 token），冷启动 25–35s 也覆盖；
   // 比之前 30s 更宽容，彻底避开偶发 30-40s 卡死的冷启动——本轮用户截图"杭州电子科技大学超时"根因就是阈值太紧。
   let v9Resp: { data: any; status: number } | null = null
-  // 生成主链路：优先用 Agnes（agnes-3.0-flash 免费轻量版），经 agnes-proxy 转发到此上游。
-  // 仅当 Agnes 限流/不可用时，才回落智谱 GLM-4-Flash（免费档额度宽松，作兜底，保证答案一定能出）。
+  // 生成主链路：唯一模型 Agnes（agnes-3.0-flash），经 agnes-proxy 转发到此上游。
+  // 按用户要求禁用一切备用模型（智谱 GLM 等），失败一律走下方降级分支，绝不改用第三方模型作答。
   const genDeadline = Date.now() + 40000
   for (let i = 0; i < 3 && !v9Resp && Date.now() < genDeadline; i++) {
     try {
@@ -1683,28 +1660,7 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  // —— 智谱 GLM-4-Flash 兜底（保留）：Agnes 限流/不可用时接住，避免用户干等或只看到降级资料 ——
-  if (!v9Resp && ZHIPU_KEY) {
-    try {
-      const zr = await callZhipu(
-        {
-          model: ZHIPU_MODEL,
-          messages: [...sysMessages, ...otherMessages],
-          max_tokens: 4096,
-          stream: false,
-          temperature: body.temperature ?? 0.7
-        },
-        45000
-      )
-      if (zr.status === 200 && (zr.data?.choices?.[0]?.message?.content || '').trim()) {
-        v9Resp = { data: zr.data, status: 200 }
-      }
-    } catch {
-      /* GLM 也失败则进入降级分支 */
-    }
-  }
-
-  // 降级：v9 两次都超时/失败（偶发冷启动卡死）。返回 200 + degraded 标记 + 已检索资料摘要，
+  // 降级：Agnes 在 genDeadline 内始终未返回（偶发网络/冷启动超时或限流）。返回 200 + degraded 标记 + 已检索资料摘要，
   // 避免用户干等 60s+ 后只看到空白答案。前端会提示「生成超时，已为你整理资料 + 重新生成」按钮。
   if (!v9Resp) {
     const q = (rawUser || '').slice(0, 100) // 用原始用户问题，不被 extractQuery 截断
