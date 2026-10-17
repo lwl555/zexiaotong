@@ -11,7 +11,7 @@
 //   SERPER_API_KEY              可选，配置了就用 Serper 做真·搜索；没配则 DuckDuckGo HTML 兜底
 //   ARK_API_KEY / ARK_IMAGE_MODEL  可选（推荐），火山方舟图片生成 key + 接入点 ID（ep-xxxx）
 //   ARK_IMAGE_BASE              可选，默认 https://ark.cn-beijing.volces.com/api/v3
-//   BACKUP_KEY / BACKUP_BASE / BACKUP_MODEL  可选，文本主上游失败时的备用模型（默认智谱 glm-4-flash）
+//   备注：文本生成仅用 Agnes 上游，不配置任何备用模型（按用户要求禁用智谱等兜底）。
 //
 // 前端调用：
 //   POST {VITE_AGNES_BASE}/v1/chat/completions   → 文本/流式对话
@@ -23,17 +23,6 @@
 const UPSTREAM_BASE = Deno.env.get('UPSTREAM_BASE') || 'https://api.agnes-ai.cn/v1'
 const UPSTREAM_KEY = Deno.env.get('AGNES_KEY') || Deno.env.get('AGNES_API_KEY') || ''
 const SERPER_KEY = Deno.env.get('SERPER_API_KEY') || ''
-
-// ─── 备用上游（主上游 Agnes 限流/故障时自动接管）───
-// 默认智谱 GLM-4-Flash：免费额度宽松、OpenAI 兼容、CORS 友好。
-// key 只存服务端 secret（BACKUP_KEY），前端永不接触。
-// 配置（Supabase 后台 Functions → agnes-proxy → Secrets）：
-//   BACKUP_KEY    必填，备用平台 API key（配置后才启用备用逻辑；未配置则整条备用链跳过）
-//   BACKUP_BASE   可选，默认 https://open.bigmodel.cn/api/paas/v4
-//   BACKUP_MODEL  可选，默认 glm-4-flash
-const BACKUP_BASE = (Deno.env.get('BACKUP_BASE') || 'https://open.bigmodel.cn/api/paas/v4').replace(/\/+$/, '')
-const BACKUP_KEY = Deno.env.get('BACKUP_KEY') || ''
-const BACKUP_MODEL = Deno.env.get('BACKUP_MODEL') || 'glm-4-flash'
 
 // ─── 图片生成上游：火山方舟（豆包 Seedream）───
 // 用户自带方舟账号，按张计费（约 0.22 元/张），质量明显优于免费档。
@@ -277,10 +266,12 @@ Deno.serve(async (req: Request) => {
   const chatMessages = [...sysMessages, ...otherMessages]
 
   let upstream: Response
-  // 主上游超时 8s：**必须足够短**。下游 agnes-search 的整条生成预算只有 40s
-  // （检索约 8s 后剩 ~32s），预算要同时容纳「等主上游 + 备用生成含 20+ 条检索资料的长 prompt」。
-  // 实测 15s 会挤压备用生成 → 频繁 degraded（只有资料没答案）。压到 8s 后备用有 ~24s 完成生成。
-  // 代价：Agnes 偶发 >8s 的慢响应会切到备用模型（答案依然完整，仅模型不同）。
+  // 主上游（Agnes）超时 50s：已禁用备用模型，唯一目标是「让慢但有效的 Agnes 响应能跑完」。
+  // 关键：本函数收到的文本生成请求是 **非流式**（stream:false），Agnes 免费档生成 8000 token
+  // 的完整响应需 25~50s；非流式下 fetch 要等服务器**完整生成后**才回首字节，故此处超时
+  // 必须 ≥ 完整生成耗时，否则会过早掐掉正常慢响应 → 504 → 下游被迫降级。
+  // 真实上限由下游 agnes-search 的 45s 总预算兜底（callV9 超时 = min(40s, 剩余预算)），本值只是
+  // 不让 proxy 在「Agnes 正常慢」时被误杀；50s 略大于 45s 预算，留出边界余量，且远低于 Edge 网关硬限。
   try {
     upstream = await fetchWithTimeout(
       `${UPSTREAM_BASE}/chat/completions`,
@@ -294,7 +285,7 @@ Deno.serve(async (req: Request) => {
           stream: useStream
         })
       },
-      8000
+      50000
     )
   } catch {
     upstream = new Response('{"error":"upstream timeout"}', {
@@ -303,50 +294,10 @@ Deno.serve(async (req: Request) => {
     })
   }
 
-  // ─── 备用上游自动接管 ───
-  // 主上游（Agnes 免费档）速率配额极小，实测 30s 窗口仅放 1~2 次，对外表现为 429。
-  // 命中限流/5xx 时自动切到备用上游（默认智谱 GLM-4-Flash，免费额度宽松）。
-  // 关键：备用 key 只存服务端 secret（Deno.env BACKUP_KEY），前端永不接触、不暴露。
-  if (!upstream.ok && BACKUP_KEY && (upstream.status === 429 || upstream.status >= 500)) {
-    const failStatus = upstream.status
-    const failText = await upstream.text().catch(() => '')
-    const restoreFail = () =>
-      new Response(failText || '{"error":"upstream failed"}', {
-        status: failStatus,
-        headers: { 'Content-Type': 'application/json' }
-      })
-    try {
-      // 备用上游的 prompt 精简：agnes-search 注入的检索资料可长达 1.5 万字符（20~30 条），
-      // 免费模型处理长 prompt 明显更慢，会把下游 agnes-search 的生成预算耗尽 → 用户只能看到降级资料。
-      // 这里把注入的 <search> system 段截断，换取更快的备用生成（预算内完成率显著提升）。
-      const backupMessages = chatMessages.map((m: any) => {
-        if (m?.role === 'system' && typeof m.content === 'string' && m.content.includes('<search>')) {
-          const c = m.content
-          return {
-            ...m,
-            content: c.length > 9000 ? c.slice(0, 9000) + '\n（资料过长已截断，请基于以上内容作答）' : c
-          }
-        }
-        return m
-      })
-      const backupRes = await fetch(`${BACKUP_BASE}/chat/completions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${BACKUP_KEY}` },
-        body: JSON.stringify({
-          model: BACKUP_MODEL,
-          messages: backupMessages,
-          max_tokens: Math.min(maxTokens, 3000),
-          stream: useStream,
-          temperature: body.temperature ?? 0.7
-        })
-      })
-      // 备用返回 OpenAI 兼容结构（含流式 SSE），与主上游同形，下游 agnes-search / 前端无需改动
-      upstream = backupRes.ok ? backupRes : restoreFail()
-    } catch {
-      // 备用也失败 → 还原主上游的失败响应（下游仍能读到原始错误信息）
-      upstream = restoreFail()
-    }
-  }
+  // ─── 唯一上游：Agnes（agnes-3.0-flash）───
+  // 按用户要求禁用一切备用模型（智谱 GLM 等）。主上游 Agnes 失败（429/5xx/超时）时不再切第三方，
+  // 直接把失败状态透传给下游 agnes-search，由其降级分支返回「已检索资料 + 重新生成」提示，
+  // 保证答案始终只来自 Agnes，避免第三方模型风格/来源不一致与不可控幻觉。
 
   // 流式：直接把上游 SSE 透传给调用方（agnes-search 再转发给前端），实现「思考过程实时流出」
   if (useStream) {

@@ -1470,7 +1470,21 @@ Deno.serve(async (req: Request) => {
       // 浏览器级全文抓取：await 已并行启动的 deepPromise，合并到 <search> 中。
       // 全文片段带「网页全文」前缀，与检索摘要区分，让模型优先引用全文内容。
       const deepResults = await deepPromise
-      const mergedForSearch = deepResults.length ? [...ctx.results, ...deepResults] : ctx.results
+      let mergedForSearch = deepResults.length ? [...ctx.results, ...deepResults] : ctx.results
+      // 防超长上下文拖垮 Agnes 免费档生成（拖到 20s 内算不完 → 误判超时）。总量超 18k 字时，
+      // 优先保留「网页全文」(deepResults，信息密度最高)，再依次补靠前的检索摘要，截断尾部低价值片段。
+      const SEARCH_BUDGET = 18000
+      if (mergedForSearch.join('\n').length > SEARCH_BUDGET) {
+        const capped: string[] = []
+        let budget = SEARCH_BUDGET
+        for (const d of deepResults) {
+          if (d.length <= budget) { capped.push(d); budget -= d.length } else break
+        }
+        for (const s of ctx.results) {
+          if (s.length <= budget) { capped.push(s); budget -= s.length } else break
+        }
+        mergedForSearch = capped
+      }
       const linkBlock = ctx.links.length
         ? '\n【检索到的参考链接（请在回答末尾「相关链接与地点」板块中如实引用，标注来源；不要编造未列出的链接）：】\n' +
           ctx.links.slice(0, 14).map((l, i) => `${i + 1}. （${l.source}）${l.title} ${l.url}`).join('\n') + '\n'
@@ -1629,14 +1643,14 @@ Deno.serve(async (req: Request) => {
     })
   }
 
-  // v9 调用统一走 callV9：单次 40s 超时 + 失败（含超时）自动重试一次，共 ~80s，
-  // 远在 Edge Function 网关预算（免费档约 50s）兜底里靠 Supabase 客户端层面 retry；两次都失败 → 降级而非干挂。
-  // 40s 是经验值：暖路径实测 1–12s（curl 杭电 19.78s 拿到 1183 token），冷启动 25–35s 也覆盖；
-  // 比之前 30s 更宽容，彻底避开偶发 30-40s 卡死的冷启动——本轮用户截图"杭州电子科技大学超时"根因就是阈值太紧。
+  // v9 调用统一走 callV9：单次超时由 agnes-proxy 上游（20s）决定，失败（含超时）自动重试，
+  // 在下方 genDeadline（45s）内尽量多试；两次都失败 → 降级而非干挂。45s 在 Edge Function 网关免费档
+  // 预算（约 50s）内留有余量。禁用备用模型后，唯一目标就是让「慢但有效」的 Agnes 响应跑完，避免误超时。
+  // 实测暖路径 1–12s、偶发冷响应 10–18s，20s 上游超时 + 45s 总预算足以覆盖绝大多数情况。
   let v9Resp: { data: any; status: number } | null = null
   // 生成主链路：唯一模型 Agnes（agnes-3.0-flash），经 agnes-proxy 转发到此上游。
   // 按用户要求禁用一切备用模型（智谱 GLM 等），失败一律走下方降级分支，绝不改用第三方模型作答。
-  const genDeadline = Date.now() + 40000
+  const genDeadline = Date.now() + 45000
   for (let i = 0; i < 3 && !v9Resp && Date.now() < genDeadline; i++) {
     try {
       const r = await callV9(
