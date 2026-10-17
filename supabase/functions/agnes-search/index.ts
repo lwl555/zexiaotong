@@ -1669,14 +1669,14 @@ Deno.serve(async (req: Request) => {
     })
   }
 
-  // v9 调用统一走 callV9：单次超时由 agnes-proxy 上游（20s）决定，失败（含超时）自动重试，
-  // 在下方 genDeadline（45s）内尽量多试；两次都失败 → 降级而非干挂。45s 在 Edge Function 网关免费档
-  // 预算（约 50s）内留有余量。禁用备用模型后，唯一目标就是让「慢但有效」的 Agnes 响应跑完，避免误超时。
-  // 实测暖路径 1–12s、偶发冷响应 10–18s，20s 上游超时 + 45s 总预算足以覆盖绝大多数情况。
+  // v9 调用统一走 callV9，失败（含超时）自动重试，在 genDeadline 内尽量多试；耗尽 → 降级而非干挂。
+  // 预算从 45s 提到 100s（2026-10-18）：Agnes 生成时长波动大（实测同一问题 24s ~ 60s+，带大段
+  // 检索资料时更慢），45s 覆盖不住慢尾部，用户频繁看到「生成超时」降级。Edge 免费档墙钟实测 ~150s
+  // （community-bots 两阶段并发即按此设计），检索 ~5s + 生成 100s + 收尾 ~3s ≈ 110s < 150s，安全。
   let v9Resp: { data: any; status: number } | null = null
   // 生成主链路：唯一模型 Agnes（agnes-3.0-flash），经 agnes-proxy 转发到此上游。
   // 按用户要求禁用一切备用模型（智谱 GLM 等），失败一律走下方降级分支，绝不改用第三方模型作答。
-  const genDeadline = Date.now() + 45000
+  const genDeadline = Date.now() + 100000
   for (let i = 0; i < 3 && !v9Resp && Date.now() < genDeadline; i++) {
     try {
       const r = await callV9(
@@ -1687,7 +1687,7 @@ Deno.serve(async (req: Request) => {
           stream: false,
           temperature: body.temperature ?? 0.7
         },
-        Math.max(8000, Math.min(40000, genDeadline - Date.now()))
+        Math.max(8000, Math.min(90000, genDeadline - Date.now()))
       )
       if (r.status === 429 || r.status >= 500) {
         await new Promise((res) => setTimeout(res, 3000))

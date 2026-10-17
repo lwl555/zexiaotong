@@ -140,6 +140,8 @@ export interface ChatOptions {
   searchOnly?: boolean
   /** 外部中断信号（如用户点击「停止生成」） */
   signal?: AbortSignal
+  /** 单次请求总超时（毫秒）。默认放宽到 150s：后端生成预算 100s + 检索 ~5s，前端必须等得起后端跑完，否则前端先掐反而报错 */
+  timeoutMs?: number
 }
 
 /** 一条可点击的参考链接（后端检索时抓取的真实 URL） */
@@ -328,7 +330,8 @@ export async function agnesChat(
         auto_search: opts.autoSearch ?? false,
         search_only: opts.searchOnly ?? false
       },
-      signal: opts.signal
+      signal: opts.signal,
+      timeoutMs: opts.timeoutMs ?? 150_000
     })
   } catch (e: any) {
     const payload = e?.payload
