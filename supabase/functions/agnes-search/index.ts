@@ -1,6 +1,6 @@
 ﻿// agnes-search — Supabase Edge Function (Deno)
 // 「搜索增强层」：服务端联网检索真实资料，再把「检索结果 + 用户问题」转发给
-// 现有的 v9 agnes-proxy（Agnes 平台，agnes-2.0-flash，已验证可用）生成回答。
+// 现有的 v9 agnes-proxy（Agnes 平台，agnes-3.0-flash 免费轻量版，已验证可用）生成回答。
 //
 // 设计要点：
 //  - 不改动现在能跑的 v9 / Agnes 配置，只是套一层搜索。
@@ -25,7 +25,7 @@ const V9_BASE =
 const V9_ANON =
   Deno.env.get('V9_ANON') ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndjbnNzeWlxaXR1Z3FmbWNiZGhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0MDEyNzUsImV4cCI6MjA5ODk3NzI3NX0.9EfbEr7BQhZtbOwHJ3IrkOy16kcaxlmzuJuV0A2Z8Eg'
-const V9_MODEL = 'agnes-2.0-flash'
+const V9_MODEL = 'agnes-3.0-flash'
 
 // 平台身份指令：在转发 v9 时强制注入到 system 最前，盖掉模型自带的「Agnes / Sapiens AI」
 // 等固有身份，确保所有路径下用户都只看到「择校通助手」，不泄露底层模型/供应商。
@@ -1635,30 +1635,8 @@ Deno.serve(async (req: Request) => {
   // 40s 是经验值：暖路径实测 1–12s（curl 杭电 19.78s 拿到 1183 token），冷启动 25–35s 也覆盖；
   // 比之前 30s 更宽容，彻底避开偶发 30-40s 卡死的冷启动——本轮用户截图"杭州电子科技大学超时"根因就是阈值太紧。
   let v9Resp: { data: any; status: number } | null = null
-  // 生成主链路：优先用智谱 GLM-4-Flash（免费、稳定、实测 3–19s 出答案），
-  // 彻底绕开 agnes-2.0-flash 推理模型免费档偶发的 60s+ 冷启动卡死（旧链路「检索到了资料却给不出回答」的根因）。
-  // 仅当 GLM 不可用/失败时，才回落 Agnes（保留原 40s 预算 + 重试，作为最后兜底）。
-  if (ZHIPU_KEY) {
-    try {
-      const zr = await callZhipu(
-        {
-          model: ZHIPU_MODEL,
-          messages: [...sysMessages, ...otherMessages],
-          max_tokens: 4096,
-          stream: false,
-          temperature: body.temperature ?? 0.7
-        },
-        45000
-      )
-      if (zr.status === 200 && (zr.data?.choices?.[0]?.message?.content || '').trim()) {
-        v9Resp = { data: zr.data, status: 200 }
-      }
-    } catch {
-      /* GLM 失败则继续走 Agnes 兜底 */
-    }
-  }
-
-  // —— Agnes 兜底（保留原逻辑）：40s 预算 + 重试，覆盖 GLM 也偶发不可用的情况 ——
+  // 生成主链路：优先用 Agnes（agnes-3.0-flash 免费轻量版），经 agnes-proxy 转发到此上游。
+  // 仅当 Agnes 限流/不可用时，才回落智谱 GLM-4-Flash（免费档额度宽松，作兜底，保证答案一定能出）。
   const genDeadline = Date.now() + 40000
   for (let i = 0; i < 3 && !v9Resp && Date.now() < genDeadline; i++) {
     try {
@@ -1680,6 +1658,27 @@ Deno.serve(async (req: Request) => {
     } catch {
       // 重试前短暂等待，给 agnes-proxy 冷实例一点启动时间
       await new Promise((r) => setTimeout(r, 800))
+    }
+  }
+
+  // —— 智谱 GLM-4-Flash 兜底（保留）：Agnes 限流/不可用时接住，避免用户干等或只看到降级资料 ——
+  if (!v9Resp && ZHIPU_KEY) {
+    try {
+      const zr = await callZhipu(
+        {
+          model: ZHIPU_MODEL,
+          messages: [...sysMessages, ...otherMessages],
+          max_tokens: 4096,
+          stream: false,
+          temperature: body.temperature ?? 0.7
+        },
+        45000
+      )
+      if (zr.status === 200 && (zr.data?.choices?.[0]?.message?.content || '').trim()) {
+        v9Resp = { data: zr.data, status: 200 }
+      }
+    } catch {
+      /* GLM 也失败则进入降级分支 */
     }
   }
 
