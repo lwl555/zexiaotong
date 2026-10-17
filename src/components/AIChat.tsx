@@ -272,7 +272,11 @@ export default function AIChat({
     }
     fit()
     window.addEventListener('resize', fit)
-    return () => window.removeEventListener('resize', fit)
+    // 顶部内容（页头/引导区）异步渲染完成后 panel 的 top 会变：body 尺寸一变就重算，
+    // 避免首次挂载量到偏小的 top 导致面板偏高、输入框底边溢出视口（PC 实测差 41px）
+    const ro = new ResizeObserver(fit)
+    ro.observe(document.body)
+    return () => { window.removeEventListener('resize', fit); ro.disconnect() }
   }, [isMobile])
 
   // 新内容出现时自动滚到底部（仅当用户本就在底部附近，避免打断回看历史）
