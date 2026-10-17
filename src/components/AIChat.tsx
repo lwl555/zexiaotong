@@ -272,11 +272,13 @@ export default function AIChat({
     }
     fit()
     window.addEventListener('resize', fit)
-    // 顶部内容（页头/引导区）异步渲染完成后 panel 的 top 会变：body 尺寸一变就重算，
-    // 避免首次挂载量到偏小的 top 导致面板偏高、输入框底边溢出视口（PC 实测差 41px）
+    // 顶部内容（页头/tabs/公告条等）在 mount 后仍可能异步撑高、把 panel 往下推：
+    // 外层布局高度是锁死的（body 恒 900px），观察 body 不会触发 —— 必须观察父元素，
+    // 父元素高度一变就重算；再叠 3 次延时重算兜底，覆盖"父高度不变但 top 变化"的极端时序
     const ro = new ResizeObserver(fit)
-    ro.observe(document.body)
-    return () => { window.removeEventListener('resize', fit); ro.disconnect() }
+    if (el.parentElement) ro.observe(el.parentElement)
+    const kickers = [1200, 2600, 5000].map((d) => setTimeout(fit, d))
+    return () => { window.removeEventListener('resize', fit); ro.disconnect(); kickers.forEach(clearTimeout) }
   }, [isMobile])
 
   // 新内容出现时自动滚到底部（仅当用户本就在底部附近，避免打断回看历史）
